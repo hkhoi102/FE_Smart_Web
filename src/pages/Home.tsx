@@ -1,100 +1,145 @@
 import { Link } from 'react-router-dom'
+import { CategoryCard, ProductCard, SectionHeader, PromoCard, TestimonialCard } from '@/components'
+import bannerImg from '@/images/Bannar_Big-removebg-preview.png'
+import freshFruit from '@/images/fresh_fruit.png'
+import freshVegetables from '@/images/fresh_vegetables.png'
+import meatFish from '@/images/meat_fish.jpg'
+import snacksImg from '@/images/snacks.png'
+import beveragesImg from '@/images/beverages.png'
+import beautyHealthImg from '@/images/Beauty_Health.png'
+import breadBakeryImg from '@/images/Bread_Bakery.png'
+import bakingNeedsImg from '@/images/Baking_Needs.png'
+import cookingImg from '@/images/cooking.png'
+import diabeticFoodImg from '@/images/Diabetic_Food.png'
+import dishDetergentsImg from '@/images/Dish_Detergents.png'
+import oilImg from '@/images/oil.png'
+
+const categories = [
+  { name: 'Fresh Fruit', imageUrl: freshFruit },
+  { name: 'Fresh Vegetables', imageUrl: freshVegetables },
+  { name: 'Meat & Fish', imageUrl: meatFish },
+  { name: 'Snacks', imageUrl: snacksImg },
+  { name: 'Beverages', imageUrl: beveragesImg },
+  { name: 'Beauty & Health', imageUrl: beautyHealthImg },
+  { name: 'Bread & Bakery', imageUrl: breadBakeryImg },
+  { name: 'Baking Needs', imageUrl: bakingNeedsImg },
+  { name: 'Cooking', imageUrl: cookingImg },
+  { name: 'Diabetic Food', imageUrl: diabeticFoodImg },
+  { name: 'Dish Detergents', imageUrl: dishDetergentsImg },
+  { name: 'Oil', imageUrl: oilImg },
+]
+
+const products = [
+  { name: 'Green Apple', imageUrl: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?q=80&w=800&auto=format&fit=crop', price: 12, originalPrice: 24 },
+  { name: 'Spinach Leaves', imageUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?q=80&w=800&auto=format&fit=crop', price: 8.5 },
+  { name: 'Fresh Lettuce', imageUrl: 'https://images.unsplash.com/photo-1615486363623-ccfed2a58c17?q=80&w=800&auto=format&fit=crop', price: 6.25 },
+  { name: 'Eggplant', imageUrl: 'https://images.unsplash.com/photo-1607301405390-0a1264fad5a7?q=80&w=800&auto=format&fit=crop', price: 7.1, originalPrice: 9.0 },
+  { name: 'Tomatoes', imageUrl: 'https://images.unsplash.com/photo-1546470427-ea3b3f2a5a0c?q=80&w=800&auto=format&fit=crop', price: 5.7 },
+  { name: 'Cucumber', imageUrl: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?q=80&w=800&auto=format&fit=crop', price: 4.15 },
+  { name: 'Bell Pepper', imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=800&auto=format&fit=crop', price: 3.85 },
+  { name: 'Peach', imageUrl: 'https://images.unsplash.com/photo-1626808642875-0aa545482dfb?q=80&w=800&auto=format&fit=crop', price: 10.2 },
+  { name: 'Orange', imageUrl: 'https://images.unsplash.com/photo-1508747703725-719777637510?q=80&w=800&auto=format&fit=crop', price: 6.9 },
+  { name: 'Grapes', imageUrl: 'https://images.unsplash.com/photo-1576402187878-974f58d4dc67?q=80&w=800&auto=format&fit=crop', price: 9.4 },
+]
 
 const Home = () => {
-  const features = [
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-      title: 'Fast Performance',
-      description: 'Lightning-fast loading times and smooth interactions for the best user experience.'
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-        </svg>
-      ),
-      title: 'Secure & Reliable',
-      description: 'Built with security best practices to keep your data safe and protected.'
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-        </svg>
-      ),
-      title: 'User Friendly',
-      description: 'Intuitive design that makes navigation and interaction effortless for users.'
-    }
-  ]
-
   return (
     <div className="space-y-16">
-      {/* Hero Section */}
-      <section className="text-center py-20">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            Welcome to{' '}
-            <span className="text-primary-600">Smart Web</span>
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            A modern, responsive web application built with React, TypeScript, Vite, and Tailwind CSS. 
-            Experience the future of web development.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/about" className="btn-primary">
-              Learn More
-            </Link>
-            <Link to="/contact" className="btn-secondary">
-              Get Started
-            </Link>
+      {/* Hero */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 bg-[rgb(37,99,235)] text-white rounded-2xl overflow-hidden relative">
+          {/* Right-side banner image */}
+          <img src={bannerImg} alt="Fresh & Healthy" className="hidden md:block absolute inset-y-0 right-0 h-full w-1/2 object-cover" />
+          <div className="relative p-10 md:p-12 max-w-xl">
+            <p className="uppercase tracking-wide text-green-100 text-sm mb-2">Fresh & Healthy</p>
+            <h1 className="text-3xl md:text-5xl font-bold leading-tight">Organic Food</h1>
+            <p className="mt-4 text-green-100 max-w-md">Save more with 50% off this weekend. Get groceries delivered in as little as 2 hours.</p>
+            <Link to="/contact" className="inline-block mt-6 bg-white text-[rgb(37,99,235)] font-semibold px-5 py-2 rounded-lg hover:bg-gray-100">Shop now</Link>
+          </div>
+        </div>
+
+        <div className="grid gap-6">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
+            <h3 className="font-semibold text-gray-900">Special Products</h3>
+            <p className="text-sm text-gray-600">Deal of the Month</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
+            <h3 className="font-semibold text-gray-900">Summer Sale</h3>
+            <p className="text-sm text-gray-600">Up to 75% OFF</p>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section>
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Why Choose Smart Web?
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Our platform combines cutting-edge technology with user-centric design to deliver exceptional experiences.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8">
-          {features.map((feature, index) => (
-            <div key={index} className="card text-center group hover:shadow-lg transition-shadow duration-300">
-              <div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-primary-200 transition-colors duration-200">
-                {feature.icon}
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                {feature.title}
-              </h3>
-              <p className="text-gray-600">
-                {feature.description}
-              </p>
+      {/* Service features */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[{title:'Free Shipping',subtitle:'Free shipping on all your order',icon:(<svg className="w-7 h-7 text-primary-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 7h11v8H3zM14 9h4l3 3v3h-7V9zM5 21a2 2 0 100-4 2 2 0 000 4zm11 0a2 2 0 100-4 2 2 0 000 4z" /></svg>)},{title:'Customer Support 24/7',subtitle:'Instant access to Support',icon:(<svg className="w-7 h-7 text-primary-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M18 13v5a2 2 0 01-2 2h-3l-3 3v-3H8a2 2 0 01-2-2v-5" /><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M18 13a6 6 0 10-12 0" /></svg>)},{title:'100% Secure Payment',subtitle:'We ensure your money is save',icon:(<svg className="w-7 h-7 text-primary-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M2 7h20v6H2zM6 17h6" /><circle cx="18" cy="17" r="2" strokeWidth="2" /><circle cx="8" cy="17" r="2" strokeWidth="2" /></svg>)},{title:'Money-Back Guarantee',subtitle:'30 Days Money-Back Guarantee',icon:(<svg className="w-7 h-7 text-primary-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 1l3 5 6 .9-4.5 4.1 1.1 6-5.6-3-5.6 3 1.1-6L3 6.9 9 6z" /></svg>)}].map((item) => (
+          <div key={item.title} className="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-3">
+            <div className="shrink-0">{item.icon}</div>
+            <div>
+              <p className="text-gray-900 font-semibold text-sm">{item.title}</p>
+              <p className="text-xs text-gray-500">{item.subtitle}</p>
             </div>
+          </div>
+        ))}
+      </section>
+
+      {/* Popular Categories */}
+      <section>
+        <SectionHeader title="Popular Categories" action={<Link to="#" className="text-primary-600 flex items-center gap-1">View All <span>→</span></Link>} />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {categories.map((c) => (
+            <CategoryCard key={c.name} name={c.name} imageUrl={c.imageUrl} />
           ))}
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="text-center py-16 bg-gradient-to-r from-primary-600 to-primary-700 rounded-2xl text-white">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl font-bold mb-4">
-            Ready to Get Started?
-          </h2>
-          <p className="text-lg mb-8 opacity-90">
-            Join thousands of users who have already transformed their web experience with Smart Web.
-          </p>
-          <Link to="/contact" className="btn bg-white text-primary-600 hover:bg-gray-100">
-            Contact Us Today
-          </Link>
+      {/* Popular Products */}
+      <section>
+        <SectionHeader title="Popular Products" action={<Link to="#" className="text-primary-600">View all →</Link>} />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
+          {products.slice(0,10).map((p) => (
+            <ProductCard key={p.name} name={p.name} imageUrl={p.imageUrl} price={p.price} originalPrice={p.originalPrice} />
+          ))}
+        </div>
+      </section>
+
+      {/* Promo Banners */}
+      <section>
+        <div className="grid md:grid-cols-3 gap-6">
+          <PromoCard label="Best Deals" title="Sale of the Month" subline="" bgClassName="bg-blue-600" />
+          <PromoCard label="85% Fat Free" title="Low-Fat Meat" subline="Started at $79.99" bgClassName="bg-black" />
+          <PromoCard label="Summer Sale" title="100% Fresh Fruit" subline="Up to" badgeText="64% OFF" bgClassName="bg-yellow-400" />
+        </div>
+      </section>
+
+      {/* Banner */}
+      <section>
+        <div className="rounded-2xl bg-gray-900 text-white p-10 flex items-center justify-between">
+          <div>
+            <h3 className="text-2xl md:text-3xl font-bold">Organic Sale 37% OFF</h3>
+            <p className="text-gray-300 mt-2">Free shipping on your first order. No minimum.</p>
+          </div>
+          <Link to="#" className="bg-white text-gray-900 font-semibold px-5 py-2 rounded-lg hover:bg-gray-100">Shop now</Link>
+        </div>
+      </section>
+
+      {/* Featured Products */}
+      <section>
+        <SectionHeader title="Featured Products" action={<Link to="#" className="text-primary-600">View all →</Link>} />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+          {products.slice(0,5).map((p) => (
+            <ProductCard key={`featured-${p.name}`} name={p.name} imageUrl={p.imageUrl} price={p.price} originalPrice={p.originalPrice} />
+          ))}
+        </div>
+      </section>
+
+      {/* Client Testimonials */}
+      <section>
+        <SectionHeader title="Client Testimonials" action={<div className="flex items-center gap-3"><button aria-label="Previous" className="w-9 h-9 rounded-full bg-white border border-gray-300 grid place-items-center hover:bg-gray-50"><svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg></button><button aria-label="Next" className="w-9 h-9 rounded-full bg-green-600 text-white grid place-items-center hover:bg-green-700"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg></button></div>} />
+        <div className="grid md:grid-cols-3 gap-6">
+          <TestimonialCard quote="Pellentesque eu nibh eget mauris congue mattis mattis nec tellus. Phasellus imperdiet elit eu magna dictum, bibendum cursus velit sodales. Donec sed neque eget" name="Robert Fox" />
+          <TestimonialCard quote="Pellentesque eu nibh eget mauris congue mattis mattis nec tellus. Phasellus imperdiet elit eu magna dictum, bibendum cursus velit sodales. Donec sed neque eget" name="Dianne Russell" />
+          <TestimonialCard quote="Pellentesque eu nibh eget mauris congue mattis mattis nec tellus. Phasellus imperdiet elit eu magna dictum, bibendum cursus velit sodales. Donec sed neque eget" name="Eleanor Pena" />
         </div>
       </section>
     </div>
