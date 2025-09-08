@@ -1,159 +1,130 @@
 const About = () => {
-  const teamMembers = [
-    {
-      name: 'John Doe',
-      role: 'Frontend Developer',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-      description: 'Expert in React, TypeScript, and modern web technologies.'
-    },
-    {
-      name: 'Jane Smith',
-      role: 'UI/UX Designer',
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-      description: 'Passionate about creating beautiful and intuitive user experiences.'
-    },
-    {
-      name: 'Mike Johnson',
-      role: 'Backend Developer',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-      description: 'Specialized in scalable backend solutions and API development.'
-    }
+  const team = [
+    { name: 'Jenny Wilson', role: 'CEO & Founder' },
+    { name: 'Jane Cooper', role: 'Worker' },
+    { name: 'Cody Fisher', role: 'Security Guard' },
+    { name: 'Robert Fox', role: 'Senior Farmer Manager' }
   ]
 
-  const technologies = [
-    { name: 'React', icon: '⚛️', description: 'Modern UI library for building interactive user interfaces' },
-    { name: 'TypeScript', icon: '📘', description: 'Typed superset of JavaScript for better development experience' },
-    { name: 'Vite', icon: '⚡', description: 'Next-generation frontend tooling for fast development' },
-    { name: 'Tailwind CSS', icon: '🎨', description: 'Utility-first CSS framework for rapid UI development' }
+  const features = [
+    { title: '100% Organic food', desc: '100% healthy & fresh food' },
+    { title: 'Great Support 24/7', desc: 'Best support & contact' },
+    { title: 'Customer Feedback', desc: 'Our happy customer' },
+    { title: '100% Secure Payment', desc: 'We ensure your money' },
+    { title: 'Free Shipping', desc: 'Free shipping with discount' },
+    { title: '100% Organic Food', desc: '100% healthy & fresh food' }
   ]
 
   return (
-    <div className="space-y-16">
-      {/* Hero Section */}
-      <section className="text-center py-16">
-        <h1 className="text-4xl font-bold text-gray-900 mb-6">
-          About Smart Web
-        </h1>
-        <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-          We are passionate about creating modern, efficient, and user-friendly web applications 
-          that leverage the latest technologies and best practices in web development.
-        </p>
-      </section>
-
-      {/* Mission Section */}
-      <section className="card">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-6">
-            Our Mission
-          </h2>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            To empower developers and businesses with cutting-edge web solutions that combine 
-            performance, security, and exceptional user experience. We believe in the power of 
-            modern web technologies to create applications that make a difference.
-          </p>
+    <div className="space-y-20">
+      {/* Section 1: Text left, image right */}
+      <section className="grid md:grid-cols-2 gap-10 items-center">
+        <div className="space-y-5">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900">100% Trusted Organic Food Store</h2>
+          <p className="text-gray-600">Morbí porttitor ligula in nunc varius sagittis. Phasellus ut diam dui, laoreet ut tempor ac, cursus vitae eros. Cras quis ultricies elit. Praesent a lacus eu massa volutpat ornare. Vivamus ornare commodo ante, et commodo felis congue vitae.</p>
+        </div>
+        <div className="rounded-2xl overflow-hidden bg-gray-100 h-80">
+          {/* Replace with your image */}
+          <div className="w-full h-full grid place-items-center text-gray-400">Ảnh giới thiệu</div>
         </div>
       </section>
 
-      {/* Technologies Section */}
-      <section>
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Technologies We Use
-          </h2>
-          <p className="text-lg text-gray-600">
-            Built with the most modern and reliable technologies available
-          </p>
+      {/* Section 2: Image left, features right */}
+      <section className="grid md:grid-cols-2 gap-10 items-center">
+        <div className="rounded-2xl overflow-hidden bg-gray-100 h-80">
+          <div className="w-full h-full grid place-items-center text-gray-400">Ảnh nông trại</div>
         </div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {technologies.map((tech, index) => (
-            <div key={index} className="card text-center group hover:shadow-lg transition-shadow duration-300">
-              <div className="text-4xl mb-4">{tech.icon}</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                {tech.name}
-              </h3>
-              <p className="text-gray-600 text-sm">
-                {tech.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Team Section */}
-      <section>
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Meet Our Team
-          </h2>
-          <p className="text-lg text-gray-600">
-            Dedicated professionals committed to delivering excellence
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8">
-          {teamMembers.map((member, index) => (
-            <div key={index} className="card text-center group hover:shadow-lg transition-shadow duration-300">
-              <div className="w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden">
-                <img 
-                  src={member.avatar} 
-                  alt={member.name}
-                  className="w-full h-full object-cover"
-                />
+        <div>
+          <h3 className="text-3xl font-bold text-gray-900 mb-4">100% Trusted Organic Food Store</h3>
+          <p className="text-gray-600 mb-6">Pellentesque a ante vulputate leo porttitor luctus nec laoreet arcu. Nulla et rhoncus neque. Duis non erat sem. Aenean nec nisl consequat tortor tincidunt feugiat.</p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {features.map((f) => (
+              <div key={f.title} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200">
+                <span className="w-8 h-8 rounded-full bg-green-100 text-green-600 grid place-items-center">✓</span>
+                <div>
+                  <p className="font-semibold text-gray-900 text-sm">{f.title}</p>
+                  <p className="text-xs text-gray-600">{f.desc}</p>
+                </div>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                {member.name}
-              </h3>
-              <p className="text-primary-600 font-medium mb-3">
-                {member.role}
-              </p>
-              <p className="text-gray-600 text-sm">
-                {member.description}
-              </p>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Section 3: Delivery CTA */}
+      <section className="grid md:grid-cols-2 gap-10 items-center">
+        <div className="space-y-4">
+          <h3 className="text-3xl font-bold text-gray-900">We Delivered, You Enjoy Your Order.</h3>
+          <p className="text-gray-600">Ut suscipit eget mi vel posuere pellentesque nunc, ultrices consectetur velit quam. Mauris sollicitudin dignissim diam, et dictum lacus elementum.</p>
+          <ul className="space-y-2 text-gray-700">
+            <li className="flex items-center gap-2"><span className="text-green-600">•</span> Siêu thị miễn phí vận chuyển</li>
+            <li className="flex items-center gap-2"><span className="text-green-600">•</span> Giao hàng nhanh chóng, muộn nhất trong ngày</li>
+            <li className="flex items-center gap-2"><span className="text-green-600">•</span> Miễn cước ít nhất trong tuần đầu</li>
+          </ul>
+          <button className="inline-flex items-center gap-2 bg-green-600 text-white rounded-full px-5 py-2 font-semibold">Mua ngay <span>→</span></button>
+        </div>
+        <div className="rounded-2xl overflow-hidden bg-gray-100 h-80">
+          <div className="w-full h-full grid place-items-center text-gray-400">Ảnh giao hàng</div>
+        </div>
+      </section>
+
+      {/* Our Awesome Team */}
+      <section>
+        <div className="text-center mb-10">
+          <h3 className="text-3xl font-bold text-gray-900">Our Awesome Team</h3>
+          <p className="text-gray-600">Pellentesque a ante vulputate leo porttitor luctus sed eget arcu.</p>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {team.map((m) => (
+            <div key={m.name} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="h-40 bg-gray-100 grid place-items-center text-gray-400">Ảnh thành viên</div>
+              <div className="p-4">
+                <p className="font-semibold text-gray-900">{m.name}</p>
+                <p className="text-xs text-gray-500">{m.role}</p>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Values Section */}
-      <section className="card">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Our Values
-          </h2>
+      {/* Testimonials */}
+      <section className="space-y-6">
+        <h3 className="text-2xl font-bold text-gray-900">Cảm nhận của khách hàng</h3>
+        <div className="grid md:grid-cols-3 gap-6">
+          {[1,2,3].map((i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-xl p-6">
+              <p className="text-gray-600 mb-4">“Pellentesque eu nibh eget mauris congue mattis mattis nec tellus. Phasellus imperdiet elit eu magna dictum.”</p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gray-200" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Khách hàng {i}</p>
+                  <p className="text-xs text-gray-500">Customer</p>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-        
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Quality</h3>
-            <p className="text-gray-600">We never compromise on quality in our deliverables</p>
-          </div>
-          
-          <div className="text-center">
-            <div className="w-16 h-16 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Innovation</h3>
-            <p className="text-gray-600">Always exploring new technologies and approaches</p>
-          </div>
-          
-          <div className="text-center">
-            <div className="w-16 h-16 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Collaboration</h3>
-            <p className="text-gray-600">Working together to achieve exceptional results</p>
-          </div>
+      </section>
+
+      {/* Brands strip */}
+      <section className="py-10 border rounded-xl bg-white">
+        <div className="flex flex-wrap items-center justify-center gap-10 text-gray-400">
+          {['steps','mango','food','book-off','g series'].map((b) => (
+            <div key={b} className="h-8 w-24 bg-gray-100 rounded grid place-items-center text-xs uppercase">{b}</div>
+          ))}
         </div>
+      </section>
+
+      {/* Subscribe band */}
+      <section className="rounded-2xl bg-gray-100 p-6 md:p-8 flex flex-col md:flex-row items-center gap-4">
+        <div className="flex-1">
+          <p className="font-semibold text-gray-900">Subscribe our Newsletter</p>
+          <p className="text-sm text-gray-600">Nhận tin khuyến mãi mới nhất mỗi tuần.</p>
+        </div>
+        <form className="flex w-full md:w-auto items-center gap-3">
+          <input className="h-10 rounded-full border border-gray-300 px-4 text-sm w-full md:w-80" placeholder="Your email address" />
+          <button className="h-10 px-5 rounded-full bg-green-600 text-white text-sm font-semibold hover:bg-green-700">Subscribe</button>
+        </form>
       </section>
     </div>
   )
