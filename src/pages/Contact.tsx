@@ -71,31 +71,31 @@ const Contact = () => {
       {/* Hero Section */}
       <section className="text-center py-16">
         <h1 className="text-4xl font-bold text-gray-900 mb-6">
-          Get in Touch
+          Liên hệ với chúng tôi
         </h1>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-          Have a question or want to work together? We'd love to hear from you. 
-          Send us a message and we'll respond as soon as possible.
+          Bạn có câu hỏi hay muốn hợp tác? Hãy để lại lời nhắn, chúng tôi sẽ phản hồi sớm nhất có thể.
         </p>
       </section>
 
       <div className="grid lg:grid-cols-2 gap-16">
-        {/* Contact Form */}
+        {/* Contact Form */
+        }
         <section>
           <div className="card">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Send us a Message
+              Gửi tin nhắn cho chúng tôi
             </h2>
 
             {submitStatus === 'success' && (
               <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-green-800">Thank you! Your message has been sent successfully.</p>
+                <p className="text-green-800">Cảm ơn bạn! Tin nhắn của bạn đã được gửi thành công.</p>
               </div>
             )}
 
             {submitStatus === 'error' && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-800">Something went wrong. Please try again.</p>
+                <p className="text-red-800">Có lỗi xảy ra. Vui lòng thử lại.</p>
               </div>
             )}
 
@@ -103,7 +103,7 @@ const Contact = () => {
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                    Name *
+                    Họ và tên *
                   </label>
                   <input
                     type="text"
@@ -113,7 +113,7 @@ const Contact = () => {
                     onChange={handleInputChange}
                     required
                     className="input"
-                    placeholder="Your name"
+                    placeholder="Nhập họ và tên"
                   />
                 </div>
                 <div>
@@ -128,14 +128,14 @@ const Contact = () => {
                     onChange={handleInputChange}
                     required
                     className="input"
-                    placeholder="your.email@example.com"
+                    placeholder="tenban@example.com"
                   />
                 </div>
               </div>
 
               <div>
                 <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
-                  Subject *
+                  Chủ đề *
                 </label>
                 <input
                   type="text"
@@ -145,13 +145,13 @@ const Contact = () => {
                   onChange={handleInputChange}
                   required
                   className="input"
-                  placeholder="What's this about?"
+                  placeholder="Nội dung chính của yêu cầu"
                 />
               </div>
 
               <div>
                 <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-                  Message *
+                  Tin nhắn *
                 </label>
                 <textarea
                   id="message"
@@ -161,7 +161,7 @@ const Contact = () => {
                   required
                   rows={6}
                   className="input resize-none"
-                  placeholder="Tell us more about your inquiry..."
+                  placeholder="Mô tả chi tiết yêu cầu của bạn..."
                 />
               </div>
 
@@ -170,7 +170,7 @@ const Contact = () => {
                 disabled={isSubmitting}
                 className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Sending...' : 'Send Message'}
+                {isSubmitting ? 'Đang gửi...' : 'Gửi tin nhắn'}
               </button>
             </form>
           </div>
@@ -181,11 +181,10 @@ const Contact = () => {
           <div className="space-y-8">
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Contact Information
+                Thông tin liên hệ
               </h2>
               <p className="text-gray-600 mb-8">
-                Feel free to reach out to us through any of these channels. 
-                We're here to help and answer any questions you might have.
+                Bạn có thể liên hệ với chúng tôi qua các kênh dưới đây. Chúng tôi luôn sẵn sàng hỗ trợ.
               </p>
             </div>
 
@@ -210,20 +209,20 @@ const Contact = () => {
             {/* Business Hours */}
             <div className="card">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Business Hours
+                Giờ làm việc
               </h3>
               <div className="space-y-2 text-gray-600">
                 <div className="flex justify-between">
-                  <span>Monday - Friday:</span>
-                  <span>9:00 AM - 6:00 PM</span>
+                  <span>Thứ 2 - Thứ 6:</span>
+                  <span>9:00 - 18:00</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Saturday:</span>
-                  <span>10:00 AM - 4:00 PM</span>
+                  <span>Thứ 7:</span>
+                  <span>10:00 - 16:00</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Sunday:</span>
-                  <span>Closed</span>
+                  <span>Chủ nhật:</span>
+                  <span>Nghỉ</span>
                 </div>
               </div>
             </div>
@@ -234,17 +233,16 @@ const Contact = () => {
       {/* Map Section */}
       <section className="card">
         <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-          Find Us
+          Địa chỉ của chúng tôi
         </h2>
-        <div className="bg-gray-200 h-64 rounded-lg flex items-center justify-center">
-          <div className="text-center text-gray-500">
-            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <p>Interactive Map Coming Soon</p>
-            <p className="text-sm">123 Web Street, Tech City, TC 12345</p>
-          </div>
+        <div className="rounded-lg overflow-hidden">
+          <iframe
+            title="Google Map"
+            src="https://www.google.com/maps?q=10.776889,106.700806&z=14&output=embed"
+            className="w-full h-96 border-0"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
         </div>
       </section>
     </div>
