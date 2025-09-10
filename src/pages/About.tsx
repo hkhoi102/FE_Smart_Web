@@ -1,4 +1,4 @@
-const About = () => {
+function About() {
   const team = [
     { name: 'Jenny Wilson', role: 'CEO & Founder' },
     { name: 'Jane Cooper', role: 'Worker' },
@@ -106,26 +106,7 @@ const About = () => {
         </div>
       </section>
 
-      {/* Brands strip */}
-      <section className="py-10 border rounded-xl bg-white">
-        <div className="flex flex-wrap items-center justify-center gap-10 text-gray-400">
-          {['steps','mango','food','book-off','g series'].map((b) => (
-            <div key={b} className="h-8 w-24 bg-gray-100 rounded grid place-items-center text-xs uppercase">{b}</div>
-          ))}
-        </div>
-      </section>
 
-      {/* Subscribe band */}
-      <section className="rounded-2xl bg-gray-100 p-6 md:p-8 flex flex-col md:flex-row items-center gap-4">
-        <div className="flex-1">
-          <p className="font-semibold text-gray-900">Subscribe our Newsletter</p>
-          <p className="text-sm text-gray-600">Nhận tin khuyến mãi mới nhất mỗi tuần.</p>
-        </div>
-        <form className="flex w-full md:w-auto items-center gap-3">
-          <input className="h-10 rounded-full border border-gray-300 px-4 text-sm w-full md:w-80" placeholder="Your email address" />
-          <button className="h-10 px-5 rounded-full bg-green-600 text-white text-sm font-semibold hover:bg-green-700">Subscribe</button>
-        </form>
-      </section>
     </div>
   )
 }

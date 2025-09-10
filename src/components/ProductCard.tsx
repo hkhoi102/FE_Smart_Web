@@ -5,7 +5,6 @@ interface ProductCardProps extends HTMLAttributes<HTMLDivElement> {
   name: string
   price: number
   originalPrice?: number
-  rating?: number
 }
 
 const ProductCard = ({
@@ -13,7 +12,6 @@ const ProductCard = ({
   name,
   price,
   originalPrice,
-  rating = 4.5,
   className = '',
   ...props
 }: ProductCardProps) => {
@@ -26,10 +24,6 @@ const ProductCard = ({
       </div>
 
       <div className="p-4 space-y-2">
-        <div className="flex items-center text-amber-500 text-sm" aria-label="rating">
-          <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.122-6.545L.488 6.91l6.561-.954L10 0l2.951 5.956 6.561.954-4.756 4.635 1.122 6.545z"/></svg>
-          <span className="ml-1 text-gray-600">{rating.toFixed(1)}</span>
-        </div>
 
         <h3 className="text-gray-900 font-medium line-clamp-2 min-h-[2.5rem]">{name}</h3>
 

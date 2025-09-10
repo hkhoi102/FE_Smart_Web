@@ -44,7 +44,7 @@ const Contact = () => {
         </svg>
       ),
       title: 'Address',
-      content: '123 Web Street, Tech City, TC 12345'
+      content: 'Nguyễn Văn Bảo/12 Đ. Hạnh Thông, Phường, Gò Vấp, Hồ Chí Minh 700000, Vietnam'
     },
     {
       icon: (
@@ -53,7 +53,7 @@ const Contact = () => {
         </svg>
       ),
       title: 'Email',
-      content: 'info@smartweb.com'
+      content: 'dhcn@iuh.edu.vn'
     },
     {
       icon: (
@@ -62,7 +62,7 @@ const Contact = () => {
         </svg>
       ),
       title: 'Phone',
-      content: '+1 (555) 123-4567'
+      content: '028 38940 390'
     }
   ]
 
@@ -238,7 +238,7 @@ const Contact = () => {
         <div className="rounded-lg overflow-hidden">
           <iframe
             title="Google Map"
-            src="https://www.google.com/maps?q=10.776889,106.700806&z=14&output=embed"
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3918.231234567890!2d106.6842705!3d10.8221642!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3174deb3ef536f31%3A0x8b7bb8b7c956157b!2sIndustrial%20University%20of%20Ho%20Chi%20Minh%20City!5e0!3m2!1sen!2s!4v1234567890123!5m2!1sen!2s"
             className="w-full h-96 border-0"
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"

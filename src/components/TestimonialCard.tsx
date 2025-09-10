@@ -5,11 +5,9 @@ interface TestimonialCardProps extends HTMLAttributes<HTMLDivElement> {
   name: string
   role?: string
   avatarUrl?: string
-  rating?: number
 }
 
-const TestimonialCard = ({ quote, name, role = 'Customer', avatarUrl, rating = 5, className = '', ...props }: TestimonialCardProps) => {
-  const stars = Array.from({ length: 5 })
+const TestimonialCard = ({ quote, name, role = 'Customer', avatarUrl, className = '', ...props }: TestimonialCardProps) => {
   return (
     <div className={`bg-white border border-gray-200 rounded-xl p-6 md:p-7 ${className}`} {...props}>
       <div className="text-green-500 mb-4">
@@ -28,11 +26,6 @@ const TestimonialCard = ({ quote, name, role = 'Customer', avatarUrl, rating = 5
             <p className="text-gray-900 font-medium text-sm">{name}</p>
             <p className="text-xs text-gray-500">{role}</p>
           </div>
-        </div>
-        <div className="flex items-center">
-          {stars.map((_, i) => (
-            <svg key={i} className={`w-4 h-4 ${i < rating ? 'text-amber-400' : 'text-gray-300'}`} viewBox="0 0 20 20" fill="currentColor"><path d="M10 15l-5.878 3.09 1.122-6.545L.488 6.91l6.561-.954L10 0l2.951 5.956 6.561.954-4.756 4.635 1.122 6.545z"/></svg>
-          ))}
         </div>
       </div>
     </div>

@@ -77,9 +77,8 @@ const Layout = ({ children }: LayoutProps) => {
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                 <span className="text-sm">Wishlist</span>
               </Link>
-              <Link to="/cart" className="relative text-gray-700 hover:text-primary-600">
+              <Link to="/cart" className="text-gray-700 hover:text-primary-600">
                 <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l3-8H6.4M7 13L5.4 5M7 13l-2 9m12-9l2 9M9 22a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z"/></svg>
-                <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs rounded-full w-5 h-5 grid place-items-center">2</span>
               </Link>
             </div>
           </div>
@@ -124,70 +123,36 @@ const Layout = ({ children }: LayoutProps) => {
         {children}
       </main>
 
-      {/* Newsletter */}
-      <section className="bg-white border-t border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Subscribe our Newsletter</h3>
-            <p className="text-sm text-gray-600">Get updates about our latest shop and special offers.</p>
-          </div>
-          <form className="w-full md:w-auto flex gap-2">
-            <Input placeholder="Your email address" className="w-full md:w-80" type="email" />
-            <button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">Subscribe</button>
-          </form>
-        </div>
-      </section>
 
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <Link to="/" className="text-2xl font-bold text-white">Ecobazar</Link>
-            <p className="mt-4 text-sm">Fresh, healthy groceries delivered to your door. Quality you can trust.</p>
-            <div className="mt-4 space-y-1 text-sm">
-              <p>Call: +84 123 456 789</p>
-              <p>Email: support@ecobazar.com</p>
-              <p>Address: 123 Green Street, HCM</p>
+            <Link to="/" className="text-xl font-bold text-white">Ecobazar</Link>
+            <p className="mt-2 text-sm text-gray-400">Fresh, healthy groceries delivered to your door.</p>
+          </div>
+
+          <div>
+            <h4 className="text-white font-semibold mb-3 text-sm">Quick Links</h4>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <Link to="/about" className="hover:text-white">About</Link>
+              <Link to="/contact" className="hover:text-white">Contact</Link>
+              <Link to="#" className="hover:text-white">Orders</Link>
+              <Link to="#" className="hover:text-white">Help</Link>
             </div>
           </div>
 
           <div>
-            <h4 className="text-white font-semibold mb-4">My Account</h4>
-            <ul className="space-y-2 text-sm">
-              <li><Link to="#" className="hover:text-white">Orders</Link></li>
-              <li><Link to="#" className="hover:text-white">Wishlist</Link></li>
-              <li><Link to="#" className="hover:text-white">Account Details</Link></li>
-              <li><Link to="#" className="hover:text-white">Track Order</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-white font-semibold mb-4">Help</h4>
-            <ul className="space-y-2 text-sm">
-              <li><Link to="#" className="hover:text-white">About</Link></li>
-              <li><Link to="#" className="hover:text-white">Contact</Link></li>
-              <li><Link to="#" className="hover:text-white">Shipping</Link></li>
-              <li><Link to="#" className="hover:text-white">Refunds</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-white font-semibold mb-4">Categories</h4>
-            <ul className="space-y-2 text-sm">
-              <li><Link to="#" className="hover:text-white">Fruits & Vegetables</Link></li>
-              <li><Link to="#" className="hover:text-white">Meat & Fish</Link></li>
-              <li><Link to="#" className="hover:text-white">Beverages</Link></li>
-              <li><Link to="#" className="hover:text-white">Snacks</Link></li>
-            </ul>
+            <h4 className="text-white font-semibold mb-3 text-sm">Contact Info</h4>
+            <div className="space-y-1 text-sm text-gray-400">
+              <p>+84 123 456 789</p>
+              <p>support@ecobazar.com</p>
+            </div>
           </div>
         </div>
         <div className="border-t border-gray-800">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-sm flex flex-col md:flex-row items-center justify-between gap-2">
-            <p className="text-gray-400">© 2024 Ecobazar. All rights reserved.</p>
-            <div className="flex items-center gap-4 text-gray-400">
-              <span>Privacy Policy</span>
-              <span>Terms of Use</span>
-            </div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-sm text-center text-gray-400">
+            <p>© 2024 Ecobazar. All rights reserved.</p>
           </div>
         </div>
       </footer>
