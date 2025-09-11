@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { CategoryCard, ProductCard, SectionHeader, PromoCard, TestimonialCard, NewsletterModal } from '@/components'
+import { CategoryCard, ProductCard, SectionHeader, PromoCard, TestimonialCard } from '@/components'
 import bannerImg from '@/images/Bannar_Big-removebg-preview.png'
 import freshFruit from '@/images/fresh_fruit.png'
 import freshVegetables from '@/images/fresh_vegetables.png'
@@ -45,7 +45,6 @@ const products = [
 const Home = () => {
   return (
     <div className="space-y-16">
-      <NewsletterModal imageUrl={bannerImg} />
       {/* Hero */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 bg-green-600 text-white rounded-2xl overflow-hidden relative">
