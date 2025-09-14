@@ -1,0 +1,617 @@
+import { useAuth } from '@/contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { ProductService } from '@/services/productService'
+import { Product, ProductCategory } from '@/types/product'
+import { Pagination, ProductTable, ProductForm, Modal, UnitManagement, ManagementDropdown, PriceManagement, AccountManagement, InventoryManagement, WarehouseTab, PromotionManagement, OrderManagement } from '@/components'
+
+const Admin = () => {
+  const { user, logout, isAuthenticated } = useAuth()
+  const navigate = useNavigate()
+  
+  // State for products
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<ProductCategory[]>([])
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    total_pages: 1,
+    total_items: 0,
+    items_per_page: 10
+  })
+  const [loading, setLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<number | undefined>()
+  const [currentTab, setCurrentTab] = useState<'overview' | 'products' | 'units' | 'prices' | 'inventory' | 'warehouses' | 'accounts' | 'promotions' | 'orders'>('overview')
+  
+  // Modal states
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Stats for overview
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    activeProducts: 0,
+    totalCategories: 0,
+    totalRevenue: 0
+  })
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login')
+    }
+  }, [isAuthenticated, navigate])
+
+  // Load initial data
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadProducts()
+      loadCategories()
+    }
+  }, [isAuthenticated])
+
+  // Calculate stats when categories and products change
+  useEffect(() => {
+    if (categories.length > 0) {
+      calculateStats()
+    }
+  }, [categories, products])
+
+  // Load products when page or filters change
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadProducts()
+    }
+  }, [pagination.current_page, searchTerm, selectedCategory])
+
+  const loadProducts = async () => {
+    setLoading(true)
+    try {
+      const response = await ProductService.getProducts(
+        pagination.current_page,
+        pagination.items_per_page,
+        searchTerm || undefined,
+        selectedCategory
+      )
+      setProducts(response.products)
+      setPagination(response.pagination)
+    } catch (error) {
+      console.error('Error loading products:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadCategories = async () => {
+    try {
+      const cats = await ProductService.getCategories()
+      setCategories(cats)
+    } catch (error) {
+      console.error('Error loading categories:', error)
+    }
+  }
+
+  const calculateStats = async () => {
+    try {
+      // Get all products for stats calculation
+      const allProductsResponse = await ProductService.getProducts(1, 1000) // Get all products
+      const allProducts = allProductsResponse.products
+      
+      const totalProducts = allProducts.length
+      const activeProducts = allProducts.filter(p => p.active === 1).length
+      const totalCategories = categories.length
+      
+      // Calculate total revenue (sum of all default prices)
+      const totalRevenue = allProducts.reduce((sum, product) => {
+        const defaultPrice = product.prices.find(p => p.is_default)
+        return sum + (defaultPrice?.price || 0)
+      }, 0)
+      
+      setStats({
+        totalProducts,
+        activeProducts,
+        totalCategories,
+        totalRevenue
+      })
+    } catch (error) {
+      console.error('Error calculating stats:', error)
+    }
+  }
+
+  const handlePageChange = (page: number) => {
+    setPagination(prev => ({ ...prev, current_page: page }))
+  }
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value)
+    setPagination(prev => ({ ...prev, current_page: 1 }))
+  }
+
+  const handleCategoryFilter = (categoryId: number | undefined) => {
+    setSelectedCategory(categoryId)
+    setPagination(prev => ({ ...prev, current_page: 1 }))
+  }
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product)
+    setIsModalOpen(true)
+  }
+
+  const handleAddProduct = () => {
+    setEditingProduct(null)
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setEditingProduct(null)
+  }
+
+  const handleSubmitProduct = async (productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
+    setIsSubmitting(true)
+    try {
+      if (editingProduct) {
+        // Update existing product
+        await ProductService.updateProduct(editingProduct.id, productData)
+      } else {
+        // Create new product
+        await ProductService.createProduct(productData)
+      }
+      
+      // Reload products
+      await loadProducts()
+      handleCloseModal()
+    } catch (error) {
+      console.error('Error saving product:', error)
+      alert('Có lỗi xảy ra khi lưu sản phẩm')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteProduct = async (id: number) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa sản phẩm này?')) {
+      try {
+        await ProductService.deleteProduct(id)
+        loadProducts()
+      } catch (error) {
+        console.error('Error deleting product:', error)
+      }
+    }
+  }
+
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Trang quản trị</h1>
+              <p className="text-gray-600">Chào mừng, {user?.username}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+            >
+              Đăng xuất
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          {/* Tabs */}
+          <div className="border-b border-gray-200 mb-6">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setCurrentTab('overview')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  currentTab === 'overview'
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Tổng quan
+              </button>
+              <ManagementDropdown
+                currentTab={currentTab}
+                onTabChange={setCurrentTab}
+              />
+              <button
+                onClick={() => setCurrentTab('warehouses')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  currentTab === 'warehouses'
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Kho
+              </button>
+              <button
+                onClick={() => setCurrentTab('accounts')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  currentTab === 'accounts'
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Tài khoản
+              </button>
+              <button
+                onClick={() => setCurrentTab('promotions')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  currentTab === 'promotions'
+                    ? 'border-purple-500 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Khuyến mãi
+              </button>
+              <button
+                onClick={() => setCurrentTab('orders')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  currentTab === 'orders'
+                    ? 'border-orange-500 text-orange-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Đơn hàng
+              </button>
+            </nav>
+          </div>
+
+          {currentTab === 'overview' && (
+            <>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Tổng sản phẩm</dt>
+                      <dd className="text-lg font-medium text-gray-900">{stats.totalProducts}</dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Sản phẩm hoạt động</dt>
+                      <dd className="text-lg font-medium text-gray-900">{stats.activeProducts}</dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Danh mục</dt>
+                      <dd className="text-lg font-medium text-gray-900">{stats.totalCategories}</dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Tổng giá trị</dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {new Intl.NumberFormat('vi-VN', {
+                          style: 'currency',
+                          currency: 'VND'
+                        }).format(stats.totalRevenue)}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-white shadow rounded-lg mb-8">
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Thao tác nhanh</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button 
+                  onClick={handleAddProduct}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                >
+                  Thêm sản phẩm mới
+                </button>
+                <button 
+                  onClick={() => setCurrentTab('products')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                >
+                  Quản lý sản phẩm
+                </button>
+                <button 
+                  onClick={() => {
+                    calculateStats()
+                    alert('Dữ liệu đã được làm mới!')
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                >
+                  Làm mới dữ liệu
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Products */}
+          <div className="bg-white shadow rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Sản phẩm gần đây</h3>
+                <button 
+                  onClick={() => setCurrentTab('products')}
+                  className="text-green-600 hover:text-green-800 text-sm font-medium"
+                >
+                  Xem tất cả →
+                </button>
+              </div>
+              <div className="overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Mã SP
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tên sản phẩm
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Danh mục
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Giá
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ngày tạo
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {products.slice(0, 5).map((product) => (
+                      <tr key={product.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          #{product.id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-8 w-8">
+                              {product.image_url ? (
+                                <img
+                                  className="h-8 w-8 rounded object-cover"
+                                  src={product.image_url}
+                                  alt={product.name}
+                                />
+                              ) : (
+                                <div className="h-8 w-8 rounded bg-gray-200 flex items-center justify-center">
+                                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="ml-3">
+                              <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {categories.find(cat => cat.id === product.category_id)?.name || `ID: ${product.category_id}`}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Intl.NumberFormat('vi-VN', {
+                            style: 'currency',
+                            currency: 'VND'
+                          }).format(product.prices.find(p => p.is_default)?.price || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(product.created_at).toLocaleDateString('vi-VN')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+            </>
+          )}
+
+          {currentTab === 'products' && (
+            <div className="space-y-6">
+              {/* Search and Filters */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tìm kiếm sản phẩm
+                    </label>
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      placeholder="Nhập tên sản phẩm..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Danh mục
+                    </label>
+                    <select
+                      value={selectedCategory || ''}
+                      onChange={(e) => handleCategoryFilter(e.target.value ? Number(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    >
+                      <option value="">Tất cả danh mục</option>
+                      {categories.map(category => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <button
+                      onClick={() => {
+                        setSearchTerm('')
+                        setSelectedCategory(undefined)
+                        setPagination(prev => ({ ...prev, current_page: 1 }))
+                      }}
+                      className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium"
+                    >
+                      Xóa bộ lọc
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Products Table */}
+              <div className="bg-white shadow rounded-lg">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Danh sách sản phẩm ({pagination.total_items})
+                    </h3>
+                    <button 
+                      onClick={handleAddProduct}
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                    >
+                      Thêm sản phẩm mới
+                    </button>
+                  </div>
+                </div>
+                
+                {loading ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                  </div>
+                ) : (
+                  <>
+                    <ProductTable
+                      products={products}
+                      categories={categories}
+                      onEdit={handleEditProduct}
+                      onDelete={handleDeleteProduct}
+                    />
+                    <Pagination
+                      pagination={pagination}
+                      onPageChange={handlePageChange}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {currentTab === 'units' && (
+            <UnitManagement />
+          )}
+
+          {currentTab === 'prices' && (
+            <PriceManagement />
+          )}
+
+          {currentTab === 'inventory' && (
+            <InventoryManagement />
+          )}
+
+          {currentTab === 'warehouses' && (
+            <WarehouseTab />
+          )}
+
+          {currentTab === 'accounts' && (
+            <AccountManagement />
+          )}
+
+          {currentTab === 'promotions' && (
+            <PromotionManagement />
+          )}
+
+          {currentTab === 'orders' && (
+            <OrderManagement />
+          )}
+        </div>
+      </main>
+
+      {/* Product Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        title={editingProduct ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}
+        size="lg"
+      >
+        <ProductForm
+          product={editingProduct}
+          categories={categories}
+          onSubmit={handleSubmitProduct}
+          onCancel={handleCloseModal}
+          isLoading={isSubmitting}
+        />
+      </Modal>
+    </div>
+  )
+}
+
+export default Admin

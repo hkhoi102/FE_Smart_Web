@@ -3,11 +3,12 @@ import { HTMLAttributes } from 'react'
 interface CategoryCardProps extends HTMLAttributes<HTMLDivElement> {
   imageUrl?: string
   name: string
+  description?: string
   items?: number
   selected?: boolean
 }
 
-const CategoryCard = ({ imageUrl, name, items, selected = false, className = '', ...props }: CategoryCardProps) => {
+const CategoryCard = ({ imageUrl, name, description, items, selected = false, className = '', ...props }: CategoryCardProps) => {
   return (
     <div className={`group bg-white border ${selected ? 'border-primary-500' : 'border-gray-200'} rounded-xl hover:border-primary-500 hover:shadow-sm transition-all duration-200 ${className}`} {...props}>
       <div className="p-5">
@@ -20,6 +21,9 @@ const CategoryCard = ({ imageUrl, name, items, selected = false, className = '',
         </div>
         <div className="mt-4 text-center">
           <h3 className="text-gray-900 font-medium group-hover:text-primary-600 transition-colors">{name}</h3>
+          {description && (
+            <p className="text-xs text-gray-500 mt-1">{description}</p>
+          )}
           {typeof items === 'number' && (
             <p className="text-sm text-gray-500">{items} items</p>
           )}

@@ -15,18 +15,12 @@ import dishDetergentsImg from '@/images/Dish_Detergents.png'
 import oilImg from '@/images/oil.png'
 
 const categories = [
-  { name: 'Fresh Fruit', imageUrl: freshFruit },
-  { name: 'Fresh Vegetables', imageUrl: freshVegetables },
-  { name: 'Meat & Fish', imageUrl: meatFish },
-  { name: 'Snacks', imageUrl: snacksImg },
-  { name: 'Beverages', imageUrl: beveragesImg },
-  { name: 'Beauty & Health', imageUrl: beautyHealthImg },
-  { name: 'Bread & Bakery', imageUrl: breadBakeryImg },
-  { name: 'Baking Needs', imageUrl: bakingNeedsImg },
-  { name: 'Cooking', imageUrl: cookingImg },
-  { name: 'Diabetic Food', imageUrl: diabeticFoodImg },
-  { name: 'Dish Detergents', imageUrl: dishDetergentsImg },
-  { name: 'Oil', imageUrl: oilImg },
+  { name: 'Đồ uống', imageUrl: beveragesImg, description: 'Các loại đồ uống giải khát' },
+  { name: 'Đồ ăn vặt', imageUrl: snacksImg, description: 'Các loại snack, bánh kẹo' },
+  { name: 'Sữa và sản phẩm từ sữa', imageUrl: freshFruit, description: 'Sữa tươi, sữa chua, phô mai' },
+  { name: 'Hàng gia dụng', imageUrl: dishDetergentsImg, description: 'Các sản phẩm gia dụng' },
+  { name: 'Do Uong', imageUrl: beveragesImg, description: 'Các loại đồ uống giải khát' },
+  { name: 'Banh', imageUrl: breadBakeryImg, description: 'Các loại đồ Banh Ngọt' },
 ]
 
 const products = [
@@ -88,7 +82,7 @@ const Home = () => {
         <SectionHeader title="Danh mục" action={<Link to="#" className="text-green-600 flex items-center gap-1">Tất cả <span>→</span></Link>} />
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {categories.map((c) => (
-            <CategoryCard key={c.name} name={c.name} imageUrl={c.imageUrl} />
+            <CategoryCard key={c.name} name={c.name} imageUrl={c.imageUrl} description={c.description} />
           ))}
         </div>
       </section>

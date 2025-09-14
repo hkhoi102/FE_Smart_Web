@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import Input from './Input'
 import CategoryMenu from './CategoryMenu'
+import AccountDropdown from './AccountDropdown'
 
 interface LayoutProps {
   children: ReactNode
@@ -69,10 +70,9 @@ const Layout = ({ children }: LayoutProps) => {
 
             {/* Icons */}
             <div className="flex items-center gap-4">
-              <Link to="/account" className="hidden md:flex items-center gap-2 text-gray-700 hover:text-primary-600">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A7 7 0 0112 15a7 7 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <span className="text-sm">Account</span>
-              </Link>
+              <div className="hidden md:block">
+                <AccountDropdown />
+              </div>
               <Link to="/wishlist" className="hidden md:flex items-center gap-2 text-gray-700 hover:text-primary-600">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                 <span className="text-sm">Wishlist</span>
