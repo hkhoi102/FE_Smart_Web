@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { InventoryService, type WarehouseDto, type StockLocationDto, type StockBalanceDto } from '@/services/inventoryService'
+import { ProductService } from '@/services/productService'
 
 interface Warehouse {
   id: number
@@ -32,134 +34,84 @@ interface InventoryItem {
 const InventoryManagement = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [locations, setLocations] = useState<StockLocationDto[]>([])
+  const [notify, setNotify] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [selectedWarehouse, setSelectedWarehouse] = useState<number | 'all'>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
+  const [txnType, setTxnType] = useState<'INBOUND' | 'OUTBOUND'>('INBOUND')
   const [formData, setFormData] = useState({
-    productId: '',
+    productUnitId: '',
     warehouseId: '',
-    currentStock: '',
-    minStock: '',
-    maxStock: '',
-    unitPrice: ''
+    stockLocationId: '',
+    quantity: '',
+    referenceNumber: '',
+    note: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
 
-  // Mock data for warehouses
-  const mockWarehouses: Warehouse[] = [
-    {
-      id: 1,
-      name: 'Kho Trung tâm HCM',
-      address: '123 Nguyễn Huệ, Q1, TP.HCM',
-      phone: '0900000001',
-      contact_person: null,
-      description: null,
-      active: true,
-      created_at: '2025-09-07 03:17:44.739836',
-      updated_at: '2025-09-07 03:17:44.740834'
-    },
-    {
-      id: 2,
-      name: 'Kho Chi nhánh Hà Nội',
-      address: '456 Lê Lợi, Hoàn Kiếm, Hà Nội',
-      phone: '0900000002',
-      contact_person: null,
-      description: null,
-      active: true,
-      created_at: '2025-09-07 03:18:10.124190',
-      updated_at: '2025-09-07 03:18:10.124190'
-    }
-  ]
-
-  // Mock data for inventory
-  const mockInventory: InventoryItem[] = [
-    {
-      id: 1,
-      productId: 1,
-      productName: 'Coca Cola',
-      category: 'Đồ uống',
-      unit: 'Lon',
-      warehouseId: 1,
-      warehouseName: 'Kho Trung tâm HCM',
-      currentStock: 150,
-      minStock: 50,
-      maxStock: 500,
-      unitPrice: 12000,
-      totalValue: 1800000,
-      lastUpdated: '2024-01-15 10:30:00',
-      status: 'in_stock'
-    },
-    {
-      id: 2,
-      productId: 2,
-      productName: 'Pepsi',
-      category: 'Đồ uống',
-      unit: 'Chai',
-      warehouseId: 1,
-      warehouseName: 'Kho Trung tâm HCM',
-      currentStock: 25,
-      minStock: 30,
-      maxStock: 200,
-      unitPrice: 15000,
-      totalValue: 375000,
-      lastUpdated: '2024-01-14 14:20:00',
-      status: 'low_stock'
-    },
-    {
-      id: 3,
-      productId: 3,
-      productName: 'Bánh mì',
-      category: 'Thực phẩm',
-      unit: 'Cái',
-      warehouseId: 2,
-      warehouseName: 'Kho Chi nhánh Hà Nội',
-      currentStock: 0,
-      minStock: 20,
-      maxStock: 100,
-      unitPrice: 8000,
-      totalValue: 0,
-      lastUpdated: '2024-01-13 09:15:00',
-      status: 'out_of_stock'
-    },
-    {
-      id: 4,
-      productId: 4,
-      productName: 'Sữa tươi',
-      category: 'Sản phẩm sữa',
-      unit: 'Hộp',
-      warehouseId: 2,
-      warehouseName: 'Kho Chi nhánh Hà Nội',
-      currentStock: 80,
-      minStock: 40,
-      maxStock: 300,
-      unitPrice: 25000,
-      totalValue: 2000000,
-      lastUpdated: '2024-01-15 08:45:00',
-      status: 'in_stock'
-    },
-    {
-      id: 5,
-      productId: 5,
-      productName: 'Kẹo',
-      category: 'Đồ ngọt',
-      unit: 'Gói',
-      warehouseId: 1,
-      warehouseName: 'Kho Trung tâm HCM',
-      currentStock: 200,
-      minStock: 100,
-      maxStock: 1000,
-      unitPrice: 5000,
-      totalValue: 1000000,
-      lastUpdated: '2024-01-15 16:30:00',
-      status: 'in_stock'
-    }
-  ]
 
   useEffect(() => {
-    setInventory(mockInventory)
-    setWarehouses(mockWarehouses)
+    const load = async () => {
+      try {
+        console.log('🔄 Loading inventory data...')
+        const [whs, stocks] = await Promise.all([
+          InventoryService.getWarehouses(),
+          InventoryService.getStock(),
+        ])
+        console.log('📦 Warehouses loaded:', whs)
+        console.log('📊 Stock data loaded:', stocks)
+        setWarehouses(
+          whs.map(w => ({
+            id: w.id,
+            name: w.name,
+            address: w.address || '',
+            phone: w.phone || '',
+            contact_person: (w as any).manager || null,
+            description: (w as any).description || null,
+            active: w.active,
+            created_at: (w as any).createdAt || '',
+            updated_at: (w as any).updatedAt || '',
+          }))
+        )
+        // Map stock rows into UI inventory rows (best-effort; BE may not return names)
+        const mapped: InventoryItem[] = await Promise.all((stocks as StockBalanceDto[]).map(async (s, idx) => {
+          let productName = s.productName as string | undefined
+          let unitName = s.unitName as string | undefined
+          if (!productName || !unitName) {
+            const detail = await ProductService.getProductUnitById(s.productUnitId)
+            productName = productName || detail?.productName || `PU#${s.productUnitId}`
+            unitName = unitName || detail?.unitName || '-'
+          }
+          return {
+            id: s.id ?? idx + 1,
+            productId: s.productUnitId,
+            productName,
+            category: '-',
+            unit: unitName,
+            warehouseId: s.warehouseId,
+            warehouseName: s.warehouseName || `Kho #${s.warehouseId}`,
+            currentStock: s.quantity,
+            minStock: 0,
+            maxStock: 0,
+            unitPrice: 0,
+            totalValue: 0,
+            lastUpdated: s.updatedAt || '',
+            status: s.quantity === 0 ? 'out_of_stock' : 'in_stock',
+          }
+        }))
+        setInventory(mapped)
+        } catch (e) {
+          console.error('❌ Error loading inventory data:', e)
+          // Show error notification instead of falling back to mock
+          setNotify({ type: 'error', message: 'Không thể tải dữ liệu kho. Vui lòng thử lại.' })
+          setInventory([])
+          setWarehouses([])
+        }
+    }
+    load()
   }, [])
 
   const filteredInventory = inventory.filter(item => {
@@ -174,25 +126,28 @@ const InventoryManagement = () => {
   const handleAddItem = () => {
     setEditingItem(null)
     setFormData({
-      productId: '',
+      productUnitId: '',
       warehouseId: '',
-      currentStock: '',
-      minStock: '',
-      maxStock: '',
-      unitPrice: ''
+      stockLocationId: '',
+      quantity: '',
+      referenceNumber: '',
+      note: ''
     })
+    setTxnType('INBOUND')
     setIsModalOpen(true)
   }
 
   const handleEditItem = (item: InventoryItem) => {
+    // repurpose edit to open outbound by default for quick deduction
     setEditingItem(item)
+    setTxnType('OUTBOUND')
     setFormData({
-      productId: item.productId.toString(),
-      warehouseId: item.warehouseId.toString(),
-      currentStock: item.currentStock.toString(),
-      minStock: item.minStock.toString(),
-      maxStock: item.maxStock.toString(),
-      unitPrice: item.unitPrice.toString()
+      productUnitId: String(item.productId),
+      warehouseId: String(item.warehouseId),
+      stockLocationId: '',
+      quantity: '',
+      referenceNumber: '',
+      note: ''
     })
     setIsModalOpen(true)
   }
@@ -201,85 +156,75 @@ const InventoryManagement = () => {
     setIsModalOpen(false)
     setEditingItem(null)
     setFormData({
-      productId: '',
+      productUnitId: '',
       warehouseId: '',
-      currentStock: '',
-      minStock: '',
-      maxStock: '',
-      unitPrice: ''
+      stockLocationId: '',
+      quantity: '',
+      referenceNumber: '',
+      note: ''
     })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.productId || !formData.warehouseId || !formData.currentStock || !formData.minStock || !formData.maxStock || !formData.unitPrice) {
-      alert('Vui lòng điền đầy đủ thông tin')
+    const required = [formData.productUnitId, formData.warehouseId, formData.stockLocationId, formData.quantity]
+    if (required.some(v => !v)) {
+      setNotify({ type: 'error', message: 'Vui lòng điền đầy đủ thông tin bắt buộc' })
       return
     }
 
     setIsSubmitting(true)
-    
-    // Simulate API call
-    setTimeout(() => {
-      const currentStock = parseInt(formData.currentStock)
-      const minStock = parseInt(formData.minStock)
-      const maxStock = parseInt(formData.maxStock)
-      const unitPrice = parseInt(formData.unitPrice)
-      const warehouseId = parseInt(formData.warehouseId)
-      
-      let status: 'in_stock' | 'low_stock' | 'out_of_stock' = 'in_stock'
-      if (currentStock === 0) {
-        status = 'out_of_stock'
-      } else if (currentStock <= minStock) {
-        status = 'low_stock'
+    try {
+      const payload = {
+        productUnitId: Number(formData.productUnitId),
+        warehouseId: Number(formData.warehouseId),
+        stockLocationId: Number(formData.stockLocationId),
+        quantity: Number(formData.quantity),
+        transactionDate: new Date().toISOString(),
+        referenceNumber: formData.referenceNumber || undefined,
+        note: formData.note || undefined,
       }
-
-      const selectedWarehouse = warehouses.find(w => w.id === warehouseId)
-      const warehouseName = selectedWarehouse?.name || 'Kho không xác định'
-
-      if (editingItem) {
-        // Update existing item
-        setInventory(prev => prev.map(item => 
-          item.id === editingItem.id 
-            ? { 
-                ...item, 
-                warehouseId,
-                warehouseName,
-                currentStock,
-                minStock,
-                maxStock,
-                unitPrice,
-                totalValue: currentStock * unitPrice,
-                status,
-                lastUpdated: new Date().toISOString().replace('T', ' ').substring(0, 19)
-              }
-            : item
-        ))
+      if (txnType === 'INBOUND') {
+        await InventoryService.inboundProcess(payload)
+        setNotify({ type: 'success', message: 'Nhập kho thành công' })
       } else {
-        // Add new item
-        const newItem: InventoryItem = {
-          id: Math.max(...inventory.map(i => i.id)) + 1,
-          productId: parseInt(formData.productId),
-          productName: 'Sản phẩm mới',
-          category: 'Chưa phân loại',
-          unit: 'Cái',
-          warehouseId,
-          warehouseName,
-          currentStock,
-          minStock,
-          maxStock,
-          unitPrice,
-          totalValue: currentStock * unitPrice,
-          lastUpdated: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          status
-        }
-        setInventory(prev => [...prev, newItem])
+        await InventoryService.outbound(payload)
+        setNotify({ type: 'success', message: 'Xuất kho thành công' })
       }
-      
-      setIsSubmitting(false)
+      // refresh stock
+      const stocks = await InventoryService.getStock()
+      const mapped: InventoryItem[] = await Promise.all((stocks as StockBalanceDto[]).map(async (s, idx) => {
+        let productName = s.productName as string | undefined
+        let unitName = s.unitName as string | undefined
+        if (!productName || !unitName) {
+          const detail = await ProductService.getProductUnitById(s.productUnitId)
+          productName = productName || detail?.productName || `PU#${s.productUnitId}`
+          unitName = unitName || detail?.unitName || '-'
+        }
+        return {
+          id: s.id ?? idx + 1,
+          productId: s.productUnitId,
+          productName,
+          category: '-',
+          unit: unitName,
+          warehouseId: s.warehouseId,
+          warehouseName: s.warehouseName || `Kho #${s.warehouseId}`,
+          currentStock: s.quantity,
+          minStock: 0,
+          maxStock: 0,
+          unitPrice: 0,
+          totalValue: 0,
+          lastUpdated: s.updatedAt || '',
+          status: s.quantity === 0 ? 'out_of_stock' : 'in_stock',
+        }
+      }))
+      setInventory(mapped)
       handleCloseModal()
-    }, 500)
+    } catch (err: any) {
+      setNotify({ type: 'error', message: err?.message || 'Thao tác thất bại' })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleDeleteItem = (id: number) => {
@@ -322,12 +267,65 @@ const InventoryManagement = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Quản lý kho</h2>
-        <button
-          onClick={handleAddItem}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-        >
-          Thêm mục kho
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              // quick refresh from BE
+              const [whs, stocks] = await Promise.all([
+                InventoryService.getWarehouses(),
+                InventoryService.getStock(),
+              ])
+              setWarehouses(
+                (whs as any).map((w: WarehouseDto) => ({
+                  id: w.id,
+                  name: w.name,
+                  address: (w as any).address || '',
+                  phone: (w as any).phone || '',
+                  contact_person: (w as any).manager || null,
+                  description: (w as any).description || null,
+                  active: w.active,
+                  created_at: (w as any).createdAt || '',
+                  updated_at: (w as any).updatedAt || '',
+                }))
+              )
+              const mapped: InventoryItem[] = await Promise.all((stocks as StockBalanceDto[]).map(async (s, idx) => {
+                let productName = s.productName as string | undefined
+                let unitName = s.unitName as string | undefined
+                if (!productName || !unitName) {
+                  const detail = await ProductService.getProductUnitById(s.productUnitId)
+                  productName = productName || detail?.productName || `PU#${s.productUnitId}`
+                  unitName = unitName || detail?.unitName || '-'
+                }
+                return {
+                  id: s.id ?? idx + 1,
+                  productId: s.productUnitId,
+                  productName,
+                  category: '-',
+                  unit: unitName,
+                  warehouseId: s.warehouseId,
+                  warehouseName: s.warehouseName || `Kho #${s.warehouseId}`,
+                  currentStock: s.quantity,
+                  minStock: 0,
+                  maxStock: 0,
+                  unitPrice: 0,
+                  totalValue: 0,
+                  lastUpdated: s.updatedAt || '',
+                  status: s.quantity === 0 ? 'out_of_stock' : 'in_stock',
+                }
+              }))
+              setInventory(mapped)
+            }}
+            className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm font-medium"
+          >
+            Làm mới
+          </button>
+          <button
+            onClick={handleAddItem}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+          >
+            Thêm mục kho
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -439,9 +437,6 @@ const InventoryManagement = () => {
                   Kho
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Danh mục
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Tồn kho
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -464,9 +459,7 @@ const InventoryManagement = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {item.warehouseName}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {item.category}
-                  </td>
+
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                     {item.currentStock}
                   </td>
@@ -498,12 +491,49 @@ const InventoryManagement = () => {
         </div>
       </div>
 
+      {/* Notification Modal */}
+      {notify && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setNotify(null)} />
+            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6">
+                <div className={`flex items-center ${notify.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                  <div className="flex-shrink-0">
+                    {notify.type === 'error' ? (
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium">{notify.message}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={() => setNotify(null)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleCloseModal} />
-            
+
             <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="flex items-center justify-between p-6 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -518,31 +548,57 @@ const InventoryManagement = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="p-6">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        ID Sản phẩm *
+                        Loại giao dịch
+                      </label>
+                      <select
+                        value={txnType}
+                        onChange={(e) => setTxnType(e.target.value === 'INBOUND' ? 'INBOUND' : 'OUTBOUND')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      >
+                        <option value="INBOUND">Nhập kho</option>
+                        <option value="OUTBOUND">Xuất kho</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        ProductUnitId *
                       </label>
                       <input
                         type="number"
-                        value={formData.productId}
-                        onChange={(e) => setFormData(prev => ({ ...prev, productId: e.target.value }))}
+                        value={formData.productUnitId}
+                        onChange={(e) => setFormData(prev => ({ ...prev, productUnitId: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        placeholder="Nhập ID sản phẩm"
+                        placeholder="Nhập ProductUnitId"
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Kho *
                       </label>
                       <select
                         value={formData.warehouseId}
-                        onChange={(e) => setFormData(prev => ({ ...prev, warehouseId: e.target.value }))}
+                        onChange={async (e) => {
+                          const warehouseId = e.target.value
+                          setFormData(prev => ({ ...prev, warehouseId, stockLocationId: '' }))
+                          if (warehouseId) {
+                            try {
+                              const locs = await InventoryService.getStockLocations(Number(warehouseId))
+                              setLocations(locs)
+                            } catch {}
+                          } else {
+                            setLocations([])
+                          }
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         required
                       >
@@ -555,31 +611,32 @@ const InventoryManagement = () => {
                       </select>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tồn kho hiện tại *
+                        Vị trí kho *
                       </label>
-                      <input
-                        type="number"
-                        value={formData.currentStock}
-                        onChange={(e) => setFormData(prev => ({ ...prev, currentStock: e.target.value }))}
+                      <select
+                        value={formData.stockLocationId}
+                        onChange={(e) => setFormData(prev => ({ ...prev, stockLocationId: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        placeholder="0"
-                        min="0"
                         required
-                      />
+                      >
+                        <option value="">Chọn vị trí</option>
+                        {locations.map(loc => (
+                          <option key={loc.id} value={loc.id}>{loc.name}</option>
+                        ))}
+                      </select>
                     </div>
-                    
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tồn kho tối thiểu *
+                        Số lượng *
                       </label>
                       <input
                         type="number"
-                        value={formData.minStock}
-                        onChange={(e) => setFormData(prev => ({ ...prev, minStock: e.target.value }))}
+                        value={formData.quantity}
+                        onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         placeholder="0"
                         min="0"
@@ -587,40 +644,35 @@ const InventoryManagement = () => {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tồn kho tối đa *
+                        Số tham chiếu
                       </label>
                       <input
-                        type="number"
-                        value={formData.maxStock}
-                        onChange={(e) => setFormData(prev => ({ ...prev, maxStock: e.target.value }))}
+                        type="text"
+                        value={formData.referenceNumber}
+                        onChange={(e) => setFormData(prev => ({ ...prev, referenceNumber: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        placeholder="0"
-                        min="0"
-                        required
+                        placeholder="VD: NK-001"
                       />
                     </div>
-                    
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Đơn giá (VND) *
+                        Ghi chú
                       </label>
                       <input
-                        type="number"
-                        value={formData.unitPrice}
-                        onChange={(e) => setFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                        type="text"
+                        value={formData.note}
+                        onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        placeholder="0"
-                        min="0"
-                        required
+                        placeholder=""
                       />
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"

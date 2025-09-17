@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 
 const AccountDropdown = () => {
   const [isOpen, setIsOpen] = useState(false)
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -30,23 +30,25 @@ const AccountDropdown = () => {
     setError('')
     setIsLoading(true)
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const success = login(username, password)
+    try {
+      const success = await login(email, password)
       if (success) {
         setIsOpen(false)
-        setUsername('')
+        setEmail('')
         setPassword('')
         navigate('/admin')
       } else {
-        setError('Tên đăng nhập hoặc mật khẩu không đúng')
+        setError('Email hoặc mật khẩu không đúng, hoặc tài khoản không có quyền truy cập')
       }
+    } catch (error) {
+      setError('Có lỗi xảy ra, vui lòng thử lại sau')
+    } finally {
       setIsLoading(false)
-    }, 500)
+    }
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     setIsOpen(false)
   }
 
@@ -84,11 +86,11 @@ const AccountDropdown = () => {
                   </svg>
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{user?.username}</p>
-                  <p className="text-sm text-gray-500">Administrator</p>
+                  <p className="font-medium text-gray-900">{user?.fullName}</p>
+                  <p className="text-sm text-gray-500">{user?.role}</p>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <button
                   onClick={handleAdminClick}
@@ -100,7 +102,7 @@ const AccountDropdown = () => {
                   </svg>
                   Trang quản trị
                 </button>
-                
+
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md flex items-center gap-2"
@@ -116,19 +118,19 @@ const AccountDropdown = () => {
             // Chưa đăng nhập - hiển thị form đăng nhập
             <div className="p-4">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Đăng nhập Admin</h3>
-              
+
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label htmlFor="dropdown-username" className="block text-sm font-medium text-gray-700 mb-1">
-                    Tên đăng nhập
+                  <label htmlFor="dropdown-email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
                   </label>
                   <input
-                    id="dropdown-username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="dropdown-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
-                    placeholder="Nhập tên đăng nhập"
+                    placeholder="Nhập email"
                     required
                   />
                 </div>
@@ -164,10 +166,9 @@ const AccountDropdown = () => {
               </form>
 
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                <h4 className="text-sm font-medium text-blue-800 mb-1">Thông tin đăng nhập:</h4>
+                <h4 className="text-sm font-medium text-blue-800 mb-1">Lưu ý:</h4>
                 <p className="text-xs text-blue-700">
-                  <strong>Username:</strong> admin<br />
-                  <strong>Password:</strong> admin123
+                  Chỉ tài khoản có role <strong>ADMIN</strong> hoặc <strong>MANAGER</strong> mới có thể đăng nhập.
                 </p>
               </div>
             </div>

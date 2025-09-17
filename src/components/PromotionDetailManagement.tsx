@@ -1,72 +1,17 @@
-import React, { useState } from 'react'
-import { PromotionDetail, PromotionLine } from './PromotionManagement'
+import React, { useEffect, useState } from 'react'
 import Modal from './Modal'
+import { PromotionServiceApi, PromotionDetailDto } from '@/services/promotionService'
 
 const PromotionDetailManagement: React.FC = () => {
-  const [details, setDetails] = useState<PromotionDetail[]>([
-    {
-      id: 1,
-      promotion_line_id: 1,
-      discount_percent: 20,
-      min_amount: 200000,
-      max_discount: 100000,
-      active: 1
-    },
-    {
-      id: 2,
-      promotion_line_id: 3,
-      discount_amount: 50000,
-      min_amount: 200000,
-      max_discount: 2000000,
-      active: 1
-    },
-    {
-      id: 3,
-      promotion_line_id: 2,
-      condition_quantity: 3,
-      free_quantity: 1,
-      max_discount: 100000,
-      active: 1
-    }
-  ])
-
-  const [lines] = useState<PromotionLine[]>([
-    {
-      id: 1,
-      promotion_header_id: 1,
-      target_id: 1,
-      target_type: 'PRODUCT',
-      type: 'DISCOUNT_PERCENT',
-      start_date: '2025-09-01',
-      end_date: '2025-12-31',
-      active: 1
-    },
-    {
-      id: 2,
-      promotion_header_id: 1,
-      target_id: 2,
-      target_type: 'PRODUCT',
-      type: 'BUY_X_GET_Y',
-      start_date: '2025-09-01',
-      end_date: '2025-12-31',
-      active: 1
-    },
-    {
-      id: 3,
-      promotion_header_id: 1,
-      target_id: 1,
-      target_type: 'PRODUCT',
-      type: 'DISCOUNT_AMOUNT',
-      start_date: '2025-09-01',
-      end_date: '2025-12-31',
-      active: 1
-    }
-  ])
+  const [details, setDetails] = useState<PromotionDetailDto[]>([])
+  const [lines, setLines] = useState<any[]>([])
+  const [headers, setHeaders] = useState<any[]>([])
+  const [selectedHeaderId, setSelectedHeaderId] = useState<number | ''>('')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingDetail, setEditingDetail] = useState<PromotionDetail | null>(null)
+  const [editingDetail, setEditingDetail] = useState<PromotionDetailDto | null>(null)
   const [formData, setFormData] = useState({
-    promotion_line_id: 1,
+    promotion_line_id: 0,
     discount_percent: '',
     discount_amount: '',
     min_amount: '',
@@ -76,10 +21,61 @@ const PromotionDetailManagement: React.FC = () => {
     active: 1
   })
 
+  const mapLine = (l: any) => ({ id: l.id, type: l.type || l.promotionType, targetType: l.targetType })
+  const mapDetailToDto = (d: any): PromotionDetailDto => ({
+    id: d.id,
+    promotionLineId: d.promotionLineId,
+    discountPercent: d.discountPercent,
+    discountAmount: d.discountAmount,
+    minAmount: d.minAmount,
+    maxDiscount: d.maxDiscount,
+    conditionQuantity: d.conditionQuantity,
+    freeQuantity: d.freeQuantity,
+    active: Boolean(d.active),
+  })
+
+  const loadHeaders = async () => {
+    const hs = await PromotionServiceApi.getHeaders()
+    setHeaders(hs)
+    if (hs.length) {
+      setSelectedHeaderId(hs[0].id)
+      const ls = await PromotionServiceApi.getLinesAll(hs[0].id)
+      const mappedLines = ls.map(mapLine)
+      setLines(mappedLines)
+      if (mappedLines.length) {
+        setFormData(prev => ({ ...prev, promotion_line_id: mappedLines[0].id }))
+        const ds = await PromotionServiceApi.getDetailsAll(mappedLines[0].id)
+        setDetails(ds.map(mapDetailToDto))
+      }
+    }
+  }
+
+  useEffect(() => { loadHeaders() }, [])
+
+  const handleHeaderChange = async (headerId: number) => {
+    setSelectedHeaderId(headerId)
+    const ls = await PromotionServiceApi.getLinesAll(headerId)
+    const mappedLines = ls.map(mapLine)
+    setLines(mappedLines)
+    if (mappedLines.length) {
+      setFormData(prev => ({ ...prev, promotion_line_id: mappedLines[0].id }))
+      const ds = await PromotionServiceApi.getDetailsAll(mappedLines[0].id)
+      setDetails(ds.map(mapDetailToDto))
+    } else {
+      setDetails([])
+    }
+  }
+
+  const handleLineChange = async (lineId: number) => {
+    setFormData(prev => ({ ...prev, promotion_line_id: lineId }))
+    const ds = await PromotionServiceApi.getDetailsAll(lineId)
+    setDetails(ds.map(mapDetailToDto))
+  }
+
   const handleAddNew = () => {
     setEditingDetail(null)
     setFormData({
-      promotion_line_id: 1,
+      promotion_line_id: lines[0]?.id || 0,
       discount_percent: '',
       discount_amount: '',
       min_amount: '',
@@ -91,51 +87,39 @@ const PromotionDetailManagement: React.FC = () => {
     setIsModalOpen(true)
   }
 
-  const handleEdit = (detail: PromotionDetail) => {
+  const handleEdit = (detail: PromotionDetailDto) => {
     setEditingDetail(detail)
     setFormData({
-      promotion_line_id: detail.promotion_line_id,
-      discount_percent: detail.discount_percent?.toString() || '',
-      discount_amount: detail.discount_amount?.toString() || '',
-      min_amount: detail.min_amount?.toString() || '',
-      max_discount: detail.max_discount?.toString() || '',
-      condition_quantity: detail.condition_quantity?.toString() || '',
-      free_quantity: detail.free_quantity?.toString() || '',
-      active: detail.active
+      promotion_line_id: detail.promotionLineId,
+      discount_percent: detail.discountPercent?.toString() || '',
+      discount_amount: detail.discountAmount?.toString() || '',
+      min_amount: detail.minAmount?.toString() || '',
+      max_discount: detail.maxDiscount?.toString() || '',
+      condition_quantity: detail.conditionQuantity?.toString() || '',
+      free_quantity: detail.freeQuantity?.toString() || '',
+      active: detail.active ? 1 : 0,
     })
     setIsModalOpen(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    const submitData = {
-      promotion_line_id: formData.promotion_line_id,
-      discount_percent: formData.discount_percent ? parseFloat(formData.discount_percent) : undefined,
-      discount_amount: formData.discount_amount ? parseFloat(formData.discount_amount) : undefined,
-      min_amount: formData.min_amount ? parseFloat(formData.min_amount) : undefined,
-      max_discount: formData.max_discount ? parseFloat(formData.max_discount) : undefined,
-      condition_quantity: formData.condition_quantity ? parseInt(formData.condition_quantity) : undefined,
-      free_quantity: formData.free_quantity ? parseInt(formData.free_quantity) : undefined,
-      active: formData.active
+
+    const submitData: any = {
+      promotionLineId: formData.promotion_line_id,
+      discountPercent: formData.discount_percent ? parseFloat(formData.discount_percent) : undefined,
+      discountAmount: formData.discount_amount ? parseFloat(formData.discount_amount) : undefined,
+      minAmount: formData.min_amount ? parseFloat(formData.min_amount) : undefined,
+      maxDiscount: formData.max_discount ? parseFloat(formData.max_discount) : undefined,
+      conditionQuantity: formData.condition_quantity ? parseInt(formData.condition_quantity) : undefined,
+      freeQuantity: formData.free_quantity ? parseInt(formData.free_quantity) : undefined,
+      active: formData.active === 1
     }
-    
-    if (editingDetail) {
-      // Update existing detail
-      setDetails(details.map(d => 
-        d.id === editingDetail.id 
-          ? { ...d, ...submitData }
-          : d
-      ))
-    } else {
-      // Add new detail
-      const newDetail: PromotionDetail = {
-        id: Math.max(...details.map(d => d.id)) + 1,
-        ...submitData
-      }
-      setDetails([...details, newDetail])
-    }
-    
+
+    await PromotionServiceApi.createDetail(submitData)
+    const ds = await PromotionServiceApi.getDetailsAll(formData.promotion_line_id)
+    setDetails(ds.map(mapDetailToDto))
+
     setIsModalOpen(false)
   }
 
@@ -146,19 +130,17 @@ const PromotionDetailManagement: React.FC = () => {
   }
 
   const handleToggleActive = (id: number) => {
-    setDetails(details.map(d => 
-      d.id === id ? { ...d, active: d.active === 1 ? 0 : 1 } : d
+    setDetails(details.map(d =>
+      d.id === id ? { ...d, active: !d.active } : d
     ))
   }
 
-  const getStatusColor = (active: number) => {
-    return active === 1 
-      ? 'bg-green-100 text-green-800' 
-      : 'bg-red-100 text-red-800'
+  const getStatusColor = (active: boolean) => {
+    return active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
   }
 
-  const getStatusLabel = (active: number) => {
-    return active === 1 ? 'Kích hoạt' : 'Tạm dừng'
+  const getStatusLabel = (active: boolean) => {
+    return active ? 'Kích hoạt' : 'Tạm dừng'
   }
 
   const getLineInfo = (lineId: number) => {
@@ -167,7 +149,7 @@ const PromotionDetailManagement: React.FC = () => {
   }
 
   const formatCurrency = (amount?: number) => {
-    if (!amount) return '-'
+    if (!amount && amount !== 0) return '-'
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND'
@@ -208,7 +190,7 @@ const PromotionDetailManagement: React.FC = () => {
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Đang hoạt động</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {details.filter(d => d.active === 1).length}
+                    {details.filter(d => d.active).length}
                   </dd>
                 </dl>
               </div>
@@ -228,7 +210,7 @@ const PromotionDetailManagement: React.FC = () => {
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Giảm %</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {details.filter(d => d.discount_percent).length}
+                    {details.filter(d => typeof d.discountPercent === 'number').length}
                   </dd>
                 </dl>
               </div>
@@ -248,7 +230,7 @@ const PromotionDetailManagement: React.FC = () => {
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Mua tặng</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {details.filter(d => d.free_quantity).length}
+                    {details.filter(d => d.freeQuantity).length}
                   </dd>
                 </dl>
               </div>
@@ -261,7 +243,41 @@ const PromotionDetailManagement: React.FC = () => {
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="px-4 py-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Danh sách Chi tiết Khuyến mãi</h3>
+            <div className="flex items-center gap-4">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Danh sách Chi tiết Khuyến mãi</h3>
+              <div className="relative">
+                <select
+                  value={selectedHeaderId || ''}
+                  onChange={(e) => handleHeaderChange(Number(e.target.value))}
+                  className="appearance-none pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {headers.map(h => (
+                    <option key={h.id} value={h.id}>{h.name}</option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
+              </div>
+              <div className="relative">
+                <select
+                  value={formData.promotion_line_id || 0}
+                  onChange={(e) => handleLineChange(Number(e.target.value))}
+                  className="appearance-none pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {lines.map(l => (
+                    <option key={l.id} value={l.id}>Line #{l.id} - {l.targetType}</option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
+              </div>
+            </div>
             <button
               onClick={handleAddNew}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -314,25 +330,25 @@ const PromotionDetailManagement: React.FC = () => {
                       {detail.id}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {getLineInfo(detail.promotion_line_id)}
+                      {getLineInfo(detail.promotionLineId)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {detail.discount_percent ? `${detail.discount_percent}%` : '-'}
+                      {typeof detail.discountPercent === 'number' ? `${detail.discountPercent}%` : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatCurrency(detail.discount_amount)}
+                      {formatCurrency(detail.discountAmount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatCurrency(detail.min_amount)}
+                      {formatCurrency(detail.minAmount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatCurrency(detail.max_discount)}
+                      {formatCurrency(detail.maxDiscount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {detail.condition_quantity || '-'}
+                      {detail.conditionQuantity || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {detail.free_quantity || '-'}
+                      {detail.freeQuantity || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(detail.active)}`}>
@@ -348,13 +364,13 @@ const PromotionDetailManagement: React.FC = () => {
                           Sửa
                         </button>
                         <button
-                          onClick={() => handleToggleActive(detail.id)}
-                          className={`${detail.active === 1 ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
+                          onClick={() => handleToggleActive(Number(detail.id))}
+                          className={`${detail.active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
                         >
-                          {detail.active === 1 ? 'Tạm dừng' : 'Kích hoạt'}
+                          {detail.active ? 'Tạm dừng' : 'Kích hoạt'}
                         </button>
                         <button
-                          onClick={() => handleDelete(detail.id)}
+                          onClick={() => handleDelete(Number(detail.id))}
                           className="text-red-600 hover:text-red-900"
                         >
                           Xóa
@@ -374,24 +390,32 @@ const PromotionDetailManagement: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingDetail ? 'Sửa Chi tiết Khuyến mãi' : 'Thêm Chi tiết Khuyến mãi mới'}
+        size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Promotion Line *
             </label>
-            <select
-              required
-              value={formData.promotion_line_id}
-              onChange={(e) => setFormData({ ...formData, promotion_line_id: parseInt(e.target.value) })}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-              {lines.map(line => (
-                <option key={line.id} value={line.id}>
-                  Line #{line.id} - {line.type}
-                </option>
-              ))}
-            </select>
+            <div className="relative mt-1">
+              <select
+                required
+                value={formData.promotion_line_id}
+                onChange={(e) => setFormData({ ...formData, promotion_line_id: Number(e.target.value) })}
+                className="appearance-none w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                {lines.map(line => (
+                  <option key={line.id} value={line.id}>
+                    Line #{line.id} - {line.type}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -429,7 +453,7 @@ const PromotionDetailManagement: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text sm font-medium text-gray-700">
                 Số tiền tối thiểu (VNĐ)
               </label>
               <input
@@ -493,14 +517,21 @@ const PromotionDetailManagement: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700">
               Trạng thái
             </label>
-            <select
-              value={formData.active}
-              onChange={(e) => setFormData({ ...formData, active: parseInt(e.target.value) })}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-              <option value={1}>Kích hoạt</option>
-              <option value={0}>Tạm dừng</option>
-            </select>
+            <div className="relative mt-1">
+              <select
+                value={formData.active}
+                onChange={(e) => setFormData({ ...formData, active: Number(e.target.value) })}
+                className="appearance-none w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                <option value={1}>Kích hoạt</option>
+                <option value={0}>Tạm dừng</option>
+              </select>
+              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">

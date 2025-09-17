@@ -1,27 +1,42 @@
-import React, { useState } from 'react'
-import { PromotionHeader } from './PromotionManagement'
+import React, { useEffect, useState } from 'react'
 import Modal from './Modal'
+import { PromotionServiceApi, PromotionMutations } from '@/services/promotionService'
 
 const PromotionHeaderManagement: React.FC = () => {
-  const [headers, setHeaders] = useState<PromotionHeader[]>([
-    {
-      id: 1,
-      name: 'KM Thang 9',
-      start_date: '2025-09-01',
-      end_date: '2025-12-31',
-      active: 1,
-      created_at: '2025-09-08 12:46:32.333914'
-    }
-  ])
+  const [headers, setHeaders] = useState<any[]>([])
+  const [filterText, setFilterText] = useState('')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
+  const [filterStart, setFilterStart] = useState('')
+  const [filterEnd, setFilterEnd] = useState('')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingHeader, setEditingHeader] = useState<PromotionHeader | null>(null)
+  const [editingHeader, setEditingHeader] = useState<any | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     start_date: '',
     end_date: '',
     active: 1
   })
+
+  const loadHeaders = async () => {
+    try {
+      const data = await PromotionServiceApi.getHeaders()
+      // Map BE to UI model
+      const mapped = data.map((h: any) => ({
+        id: h.id,
+        name: h.name,
+        start_date: h.startDate,
+        end_date: h.endDate,
+        active: h.active ? 1 : 0,
+        created_at: h.createdAt || h.created_at || new Date().toISOString(),
+      }))
+      setHeaders(mapped)
+    } catch {
+      setHeaders([])
+    }
+  }
+
+  useEffect(() => { loadHeaders() }, [])
 
   const handleAddNew = () => {
     setEditingHeader(null)
@@ -34,7 +49,7 @@ const PromotionHeaderManagement: React.FC = () => {
     setIsModalOpen(true)
   }
 
-  const handleEdit = (header: PromotionHeader) => {
+  const handleEdit = (header: any) => {
     setEditingHeader(header)
     setFormData({
       name: header.name,
@@ -45,39 +60,92 @@ const PromotionHeaderManagement: React.FC = () => {
     setIsModalOpen(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (editingHeader) {
-      // Update existing header
-      setHeaders(headers.map(h => 
-        h.id === editingHeader.id 
-          ? { ...h, ...formData, created_at: h.created_at }
-          : h
-      ))
-    } else {
-      // Add new header
-      const newHeader: PromotionHeader = {
-        id: Math.max(...headers.map(h => h.id)) + 1,
-        ...formData,
-        created_at: new Date().toISOString()
-      }
-      setHeaders([...headers, newHeader])
+    const payload = {
+      name: formData.name,
+      startDate: formData.start_date,
+      endDate: formData.end_date,
+      active: formData.active === 1,
     }
-    
+    if (editingHeader) {
+      await PromotionMutations.updateHeader(editingHeader.id, payload)
+    } else {
+      await PromotionMutations.createHeader(payload)
+    }
+    await loadHeaders()
     setIsModalOpen(false)
   }
 
-  const handleDelete = (id: number) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa header khuyến mãi này?')) {
-      setHeaders(headers.filter(h => h.id !== id))
-    }
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa header khuyến mãi này?')) return
+    await PromotionMutations.deleteHeader(id)
+    await loadHeaders()
   }
 
-  const handleToggleActive = (id: number) => {
-    setHeaders(headers.map(h => 
-      h.id === id ? { ...h, active: h.active === 1 ? 0 : 1 } : h
-    ))
+  const handleToggleActive = async (id: number) => {
+    const current = headers.find(h => h.id === id)
+    if (!current) return
+    await PromotionMutations.updateHeader(id, { active: !(current.active === 1) })
+    await loadHeaders()
+  }
+
+  const [viewModalOpen, setViewModalOpen] = useState(false)
+  const [viewHeader, setViewHeader] = useState<any | null>(null)
+  const [viewLines, setViewLines] = useState<any[]>([])
+  const [viewDetailsByLine, setViewDetailsByLine] = useState<Record<number, any[]>>({})
+  const [viewLoading, setViewLoading] = useState(false)
+
+  const handleView = async (id: number) => {
+    try {
+      setViewLoading(true)
+      setViewModalOpen(true)
+      const h = await PromotionServiceApi.getHeaderById(id)
+      setViewHeader({
+        id: h.id,
+        name: h.name,
+        start_date: (h as any).startDate || '',
+        end_date: (h as any).endDate || '',
+        active: h.active ? 1 : 0,
+      })
+      const lines = await PromotionServiceApi.getLinesAll(id)
+      const mappedLines = lines.map((l: any) => ({
+        id: l.id,
+        promotion_header_id: l.promotionHeaderId,
+        target_id: l.targetId,
+        target_type: l.targetType,
+        type: l.type || l.promotionType,
+        start_date: l.startDate,
+        end_date: l.endDate,
+        active: l.active ? 1 : 0,
+      }))
+      setViewLines(mappedLines)
+      const detailsEntries = await Promise.all(mappedLines.map(async (ln: any) => {
+        try {
+          const ds = await PromotionServiceApi.getDetailsAll(ln.id)
+          const mapped = (Array.isArray(ds) ? ds : []).map((d: any) => ({
+            id: d.id,
+            discount_percent: d.discountPercent,
+            discount_amount: d.discountAmount,
+            min_amount: d.minAmount,
+            max_discount: d.maxDiscount,
+            condition_quantity: d.conditionQuantity,
+            free_quantity: d.freeQuantity,
+            active: d.active ? 1 : 0,
+          }))
+          return [ln.id, mapped] as [number, any[]]
+        } catch {
+          return [ln.id, []] as [number, any[]]
+        }
+      }))
+      const asRecord: Record<number, any[]> = {}
+      detailsEntries.forEach(([lineId, arr]) => { asRecord[lineId] = arr })
+      setViewDetailsByLine(asRecord)
+    } catch (e) {
+      // noop
+    } finally {
+      setViewLoading(false)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -85,14 +153,26 @@ const PromotionHeaderManagement: React.FC = () => {
   }
 
   const getStatusColor = (active: number) => {
-    return active === 1 
-      ? 'bg-green-100 text-green-800' 
+    return active === 1
+      ? 'bg-green-100 text-green-800'
       : 'bg-red-100 text-red-800'
   }
 
   const getStatusLabel = (active: number) => {
     return active === 1 ? 'Kích hoạt' : 'Tạm dừng'
   }
+
+  const filteredHeaders = headers.filter(h => {
+    const matchText = filterText.trim()
+      ? (h.name?.toLowerCase().includes(filterText.toLowerCase()))
+      : true
+    const matchStatus = filterStatus === 'all'
+      ? true
+      : filterStatus === 'active' ? h.active === 1 : h.active === 0
+    const matchStart = filterStart ? new Date(h.start_date) >= new Date(filterStart) : true
+    const matchEnd = filterEnd ? new Date(h.end_date) <= new Date(filterEnd) : true
+    return matchText && matchStatus && matchStart && matchEnd
+  })
 
   return (
     <div className="space-y-6">
@@ -182,6 +262,61 @@ const PromotionHeaderManagement: React.FC = () => {
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tìm kiếm</label>
+              <input
+                type="text"
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                placeholder="Nhập tên khuyến mãi..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+              <div className="relative">
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  className="appearance-none w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                >
+                  <option value="all">Tất cả</option>
+                  <option value="active">Kích hoạt</option>
+                  <option value="inactive">Tạm dừng</option>
+                </select>
+                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Từ ngày</label>
+              <input
+                type="date"
+                value={filterStart}
+                onChange={(e) => setFilterStart(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Đến ngày</label>
+              <input
+                type="date"
+                value={filterEnd}
+                onChange={(e) => setFilterEnd(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="px-4 py-5 sm:p-6">
@@ -224,7 +359,7 @@ const PromotionHeaderManagement: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {headers.map((header) => (
+                {filteredHeaders.map((header) => (
                   <tr key={header.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {header.id}
@@ -248,6 +383,12 @@ const PromotionHeaderManagement: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleView(header.id)}
+                          className="text-gray-700 hover:text-gray-900"
+                        >
+                          Xem
+                        </button>
                         <button
                           onClick={() => handleEdit(header)}
                           className="text-blue-600 hover:text-blue-900"
@@ -281,6 +422,7 @@ const PromotionHeaderManagement: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingHeader ? 'Sửa Header Khuyến mãi' : 'Thêm Header Khuyến mãi mới'}
+        size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -329,14 +471,21 @@ const PromotionHeaderManagement: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700">
               Trạng thái
             </label>
-            <select
-              value={formData.active}
-              onChange={(e) => setFormData({ ...formData, active: parseInt(e.target.value) })}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-              <option value={1}>Kích hoạt</option>
-              <option value={0}>Tạm dừng</option>
-            </select>
+            <div className="relative mt-1">
+              <select
+                value={formData.active}
+                onChange={(e) => setFormData({ ...formData, active: parseInt(e.target.value) })}
+                className="appearance-none w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                <option value={1}>Kích hoạt</option>
+                <option value={0}>Tạm dừng</option>
+              </select>
+              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
@@ -355,6 +504,116 @@ const PromotionHeaderManagement: React.FC = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* View Detail Modal */}
+      <Modal
+        isOpen={viewModalOpen}
+        onClose={() => setViewModalOpen(false)}
+        title={viewHeader ? `Chi tiết: ${viewHeader.name}` : 'Chi tiết khuyến mãi'}
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-gray-500">ID</div>
+              <div className="text-sm font-medium text-gray-900">{viewHeader?.id}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500">Trạng thái</div>
+              <div>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${viewHeader?.active === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {viewHeader?.active === 1 ? 'Kích hoạt' : 'Tạm dừng'}
+                </span>
+              </div>
+            </div>
+            <div className="col-span-2">
+              <div className="text-sm text-gray-500">Tên</div>
+              <div className="text-sm font-medium text-gray-900">{viewHeader?.name}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500">Ngày bắt đầu</div>
+              <div className="text-sm font-medium text-gray-900">{viewHeader?.start_date ? new Date(viewHeader.start_date).toLocaleDateString('vi-VN') : '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500">Ngày kết thúc</div>
+              <div className="text-sm font-medium text-gray-900">{viewHeader?.end_date ? new Date(viewHeader.end_date).toLocaleDateString('vi-VN') : '-'}</div>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <div className="text-sm font-semibold text-gray-900 mb-2">Các dòng khuyến mãi</div>
+            {viewLoading ? (
+              <div className="text-sm text-gray-500">Đang tải...</div>
+            ) : (
+              <div className="space-y-4">
+                {viewLines.map((ln) => (
+                  <div key={ln.id} className="border rounded-md">
+                    <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
+                      <div className="text-sm font-medium text-gray-900">
+                        Line #{ln.id} • {ln.type} • {ln.target_type} #{ln.target_id}
+                      </div>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ln.active === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {ln.active === 1 ? 'Kích hoạt' : 'Tạm dừng'}
+                      </span>
+                    </div>
+                    <div className="px-4 py-3">
+                      <div className="text-xs text-gray-500 mb-2">Chi tiết</div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Giảm %</th>
+                              <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Giảm tiền</th>
+                              <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Tối thiểu</th>
+                              <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Giảm tối đa</th>
+                              <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">SL điều kiện</th>
+                              <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">SL tặng</th>
+                              <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {(viewDetailsByLine[ln.id] || []).map((d) => (
+                              <tr key={d.id}>
+                                <td className="px-3 py-2 text-sm text-gray-700">{d.discount_percent ?? '-'}</td>
+                                <td className="px-3 py-2 text-sm text-gray-700">{d.discount_amount?.toLocaleString('vi-VN') ?? '-'}</td>
+                                <td className="px-3 py-2 text-sm text-gray-700">{d.min_amount?.toLocaleString('vi-VN') ?? '-'}</td>
+                                <td className="px-3 py-2 text-sm text-gray-700">{d.max_discount?.toLocaleString('vi-VN') ?? '-'}</td>
+                                <td className="px-3 py-2 text-sm text-gray-700">{d.condition_quantity ?? '-'}</td>
+                                <td className="px-3 py-2 text-sm text-gray-700">{d.free_quantity ?? '-'}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${d.active === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    {d.active === 1 ? 'Kích hoạt' : 'Tạm dừng'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                            {(!viewDetailsByLine[ln.id] || viewDetailsByLine[ln.id].length === 0) && (
+                              <tr>
+                                <td className="px-3 py-2 text-sm text-gray-500" colSpan={7}>Chưa có chi tiết</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {viewLines.length === 0 && (
+                  <div className="text-sm text-gray-500">Chưa có dòng khuyến mãi</div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => setViewModalOpen(false)}
+              className="px-4 py-2 text-sm font-medium rounded-md bg-gray-800 text-white hover:bg-gray-900"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

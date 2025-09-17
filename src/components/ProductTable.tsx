@@ -1,6 +1,4 @@
-import { Product, ProductCategory } from '@/types/product'
-import { ProductService } from '@/services/productService'
-import { useState } from 'react'
+import { Product, ProductCategory, ProductUnit } from '@/services/productService'
 
 interface ProductTableProps {
   products: Product[]
@@ -10,22 +8,33 @@ interface ProductTableProps {
 }
 
 const ProductTable = ({ products, categories, onEdit, onDelete }: ProductTableProps) => {
-  const [expandedProduct, setExpandedProduct] = useState<number | null>(null)
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(price)
+  const formatPrice = (price?: number) => {
+    if (price === undefined || price === null) return '—'
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
   }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN')
   }
 
-  const getCategoryName = (categoryId: number) => {
-    const category = categories.find(cat => cat.id === categoryId)
-    return category ? category.name : `ID: ${categoryId}`
+  const getCategoryName = (product: Product) => {
+    if (product.categoryName) return product.categoryName
+    const category = categories.find(cat => cat.id === product.categoryId)
+    return category ? category.name : `ID: ${product.categoryId}`
+  }
+
+  const buildRows = () => {
+    const rows: { product: Product; unit: ProductUnit | null }[] = []
+    for (const product of products) {
+      const units = product.productUnits && product.productUnits.length > 0
+        ? product.productUnits
+        : [null]
+      for (const unit of units) {
+        rows.push({ product, unit })
+      }
+    }
+    return rows
   }
 
   return (
@@ -57,19 +66,18 @@ const ProductTable = ({ products, categories, onEdit, onDelete }: ProductTablePr
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {products.map((product) => (
-            <>
-              <tr key={product.id} className="hover:bg-gray-50">
+          {buildRows().map(({ product, unit }) => (
+              <tr key={`${product.id}-${unit ? unit.id : 'nou'}`} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   #{product.id}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-12 w-12">
-                      {product.image_url ? (
+                      {product.imageUrl ? (
                         <img
                           className="h-12 w-12 rounded-lg object-cover"
-                          src={product.image_url}
+                          src={product.imageUrl}
                           alt={product.name}
                         />
                       ) : (
@@ -87,26 +95,14 @@ const ProductTable = ({ products, categories, onEdit, onDelete }: ProductTablePr
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {getCategoryName(product.category_id)}
+                  {getCategoryName(product)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{unit ? unit.unitName : '—'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {formatPrice(unit?.currentPrice)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {product.unit}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center gap-2">
-                    <span>{formatPrice(product.prices.find(p => p.is_default)?.price || 0)}</span>
-                    {product.prices.length > 1 && (
-                      <button
-                        onClick={() => setExpandedProduct(expandedProduct === product.id ? null : product.id)}
-                        className="text-green-600 hover:text-green-800 text-xs"
-                      >
-                        {expandedProduct === product.id ? 'Thu gọn' : 'Xem thêm'}
-                      </button>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {product.expiration_date ? formatDate(product.expiration_date) : 'Không có'}
+                  {product.expirationDate ? formatDate(product.expirationDate) : 'Không có'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex space-x-2">
@@ -125,42 +121,6 @@ const ProductTable = ({ products, categories, onEdit, onDelete }: ProductTablePr
                   </div>
                 </td>
               </tr>
-              
-              {/* Expanded row for price details */}
-              {expandedProduct === product.id && (
-                <tr>
-                  <td colSpan={7} className="px-6 py-4 bg-gray-50">
-                    <div className="bg-white rounded-lg p-4 shadow-sm">
-                      <h4 className="text-sm font-medium text-gray-900 mb-3">Bảng giá theo đơn vị tính</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {product.prices.map((price) => (
-                          <div
-                            key={price.id}
-                            className={`p-3 rounded-lg border ${
-                              price.is_default
-                                ? 'border-green-200 bg-green-50'
-                                : 'border-gray-200 bg-white'
-                            }`}
-                          >
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-medium text-gray-900">
-                                {price.unit}
-                                {price.is_default && (
-                                  <span className="ml-2 text-xs text-green-600">(Mặc định)</span>
-                                )}
-                              </span>
-                              <span className="text-sm font-bold text-green-600">
-                                {formatPrice(price.price)}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </>
           ))}
         </tbody>
       </table>

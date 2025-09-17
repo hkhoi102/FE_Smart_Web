@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { InventoryService, type TransactionDto, type WarehouseDto } from '@/services/inventoryService'
+import { ProductService } from '@/services/productService'
 
 interface ImportExportTransaction {
   id: number
@@ -17,8 +19,16 @@ interface ImportExportTransaction {
   warehouse_name: string
 }
 
+interface ProductUnit {
+  id: number
+  productName: string
+  unitName: string
+}
+
 const ImportExportManagement = () => {
   const [transactions, setTransactions] = useState<ImportExportTransaction[]>([])
+  const [warehouses, setWarehouses] = useState<WarehouseDto[]>([])
+  const [productUnits, setProductUnits] = useState<ProductUnit[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<ImportExportTransaction | null>(null)
   const [formData, setFormData] = useState({
@@ -28,129 +38,107 @@ const ImportExportManagement = () => {
     reference_number: '',
     transaction_date: '',
     transaction_type: 'IMPORT' as 'IMPORT' | 'EXPORT',
-    warehouse_id: ''
+    warehouse_id: '',
+    stock_location_id: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [warehouseFilter, setWarehouseFilter] = useState<number | 'all'>('all')
+  const [notify, setNotify] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  // Mock data for warehouses
-  const mockWarehouses = [
-    { id: 1, name: 'Kho Trung tâm HCM' },
-    { id: 2, name: 'Kho Chi nhánh Hà Nội' }
-  ]
+  // Load data from API
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      console.log('🔄 Loading import/export data...')
 
-  // Mock data for product units
-  const mockProductUnits = [
-    { id: 1, name: 'Coca Cola', unit: 'Lon' },
-    { id: 2, name: 'Pepsi', unit: 'Chai' },
-    { id: 3, name: 'Bánh mì', unit: 'Cái' },
-    { id: 4, name: 'Sữa tươi', unit: 'Hộp' }
-  ]
+      // Load warehouses, product units, and transactions in parallel
+      const [warehousesData, transactionsData] = await Promise.all([
+        InventoryService.getWarehouses(),
+        InventoryService.getTransactions()
+      ])
 
-  // Mock data for transactions
-  const mockTransactions: ImportExportTransaction[] = [
-    {
-      id: 1,
-      created_at: '2025-09-07 03:20:03.017057',
-      note: 'Nhập hàng Coca Cola mới',
-      product_unit_id: 1,
-      product_name: 'Coca Cola',
-      unit: 'Lon',
-      quantity: 100,
-      reference_number: 'NK-2025-001',
-      transaction_date: '2025-01-27 03:30:00.000000',
-      transaction_type: 'IMPORT',
-      updated_at: '2025-09-07 03:20:03.017057',
-      stock_location_id: 1,
-      warehouse_id: 1,
-      warehouse_name: 'Kho Trung tâm HCM'
-    },
-    {
-      id: 2,
-      created_at: '2025-09-07 03:20:03.017057',
-      note: 'Nhập hàng Coca Cola mới',
-      product_unit_id: 1,
-      product_name: 'Coca Cola',
-      unit: 'Lon',
-      quantity: 5,
-      reference_number: 'NK-2025-002_Thung',
-      transaction_date: '2025-08-25 03:30:00.000000',
-      transaction_type: 'IMPORT',
-      updated_at: '2025-09-07 03:20:03.017057',
-      stock_location_id: 1,
-      warehouse_id: 1,
-      warehouse_name: 'Kho Trung tâm HCM'
-    },
-    {
-      id: 3,
-      created_at: '2025-09-07 03:21:38.312386',
-      note: 'Nhập Pessi',
-      product_unit_id: 2,
-      product_name: 'Pepsi',
-      unit: 'Chai',
-      quantity: 200,
-      reference_number: 'NK-TEST-001',
-      transaction_date: '2025-01-07 03:30:00.000000',
-      transaction_type: 'IMPORT',
-      updated_at: '2025-09-07 03:21:38.312386',
-      stock_location_id: 1,
-      warehouse_id: 1,
-      warehouse_name: 'Kho Trung tâm HCM'
-    },
-    {
-      id: 4,
-      created_at: '2025-09-07 03:21:38.312386',
-      note: 'Nhập Pessi',
-      product_unit_id: 2,
-      product_name: 'Pepsi',
-      unit: 'Chai',
-      quantity: 3,
-      reference_number: 'NK-TEST-001',
-      transaction_date: '2025-01-07 03:30:00.000000',
-      transaction_type: 'IMPORT',
-      updated_at: '2025-09-07 03:21:38.312386',
-      stock_location_id: 1,
-      warehouse_id: 1,
-      warehouse_name: 'Kho Trung tâm HCM'
-    },
-    {
-      id: 5,
-      created_at: '2025-09-07 04:08:48.030039',
-      note: 'Xuất kho cho đơn hàng #1',
-      product_unit_id: 1,
-      product_name: 'Coca Cola',
-      unit: 'Lon',
-      quantity: 2,
-      reference_number: 'ORDER-1',
-      transaction_date: '2025-01-27 03:30:00.000000',
-      transaction_type: 'EXPORT',
-      updated_at: '2025-09-07 04:08:48.030039',
-      stock_location_id: 1,
-      warehouse_id: 1,
-      warehouse_name: 'Kho Trung tâm HCM'
-    },
-    {
-      id: 6,
-      created_at: '2025-09-07 04:08:48.030039',
-      note: 'Xuất kho cho đơn hàng #1',
-      product_unit_id: 2,
-      product_name: 'Pepsi',
-      unit: 'Chai',
-      quantity: 1,
-      reference_number: 'ORDER-1',
-      transaction_date: '2025-01-27 03:30:00.000000',
-      transaction_type: 'EXPORT',
-      updated_at: '2025-09-07 04:08:48.030039',
-      stock_location_id: 1,
-      warehouse_id: 1,
-      warehouse_name: 'Kho Trung tâm HCM'
+      console.log('📦 Warehouses loaded:', warehousesData)
+      console.log('📊 Transactions loaded:', transactionsData)
+
+      setWarehouses(warehousesData)
+
+      // Map transactions to UI format
+      const mappedTransactions: ImportExportTransaction[] = await Promise.all(
+        transactionsData.map(async (t: TransactionDto) => {
+          // Get product unit details
+          let productName = t.productName || 'Unknown Product'
+          let unitName = t.unitName || 'Unknown Unit'
+
+          if (!t.productName || !t.unitName) {
+            try {
+              const detail = await ProductService.getProductUnitById(t.productUnitId)
+              productName = detail?.productName || `PU#${t.productUnitId}`
+              unitName = detail?.unitName || '-'
+            } catch (e) {
+              console.warn(`Could not fetch product unit detail for ID ${t.productUnitId}:`, e)
+            }
+          }
+
+          // Get warehouse name
+          const warehouse = warehousesData.find(w => w.id === t.warehouseId)
+          const warehouseName = warehouse?.name || `Kho #${t.warehouseId}`
+
+          return {
+            id: t.id,
+            created_at: t.createdAt || '',
+            note: t.note || '',
+            product_unit_id: t.productUnitId,
+            product_name: productName,
+            unit: unitName,
+            quantity: t.quantity,
+            reference_number: t.referenceNumber || '',
+            transaction_date: t.transactionDate,
+            transaction_type: t.transactionType as 'IMPORT' | 'EXPORT',
+            updated_at: t.updatedAt || '',
+            stock_location_id: t.stockLocationId,
+            warehouse_id: t.warehouseId,
+            warehouse_name: warehouseName
+          }
+        })
+      )
+
+      console.log('📦 Mapped transactions:', mappedTransactions)
+      setTransactions(mappedTransactions)
+
+      // Load product units for dropdown
+      const productUnitsData = await ProductService.getProducts()
+      const allProductUnits: ProductUnit[] = []
+
+      if (productUnitsData.products) {
+        productUnitsData.products.forEach((product: any) => {
+          if (product.productUnits) {
+            product.productUnits.forEach((pu: any) => {
+              allProductUnits.push({
+                id: pu.id,
+                productName: product.name,
+                unitName: pu.unitName
+              })
+            })
+          }
+        })
+      }
+
+      console.log('📦 Product units loaded:', allProductUnits)
+      setProductUnits(allProductUnits)
+
+    } catch (error) {
+      console.error('❌ Error loading data:', error)
+      setNotify({ type: 'error', message: 'Không thể tải dữ liệu. Vui lòng thử lại.' })
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
 
   useEffect(() => {
-    setTransactions(mockTransactions)
+    loadData()
   }, [])
 
   const filteredTransactions = transactions.filter(transaction => {
@@ -171,7 +159,8 @@ const ImportExportManagement = () => {
       reference_number: '',
       transaction_date: new Date().toISOString().slice(0, 16),
       transaction_type: 'IMPORT',
-      warehouse_id: ''
+      warehouse_id: '',
+      stock_location_id: ''
     })
     setIsModalOpen(true)
   }
@@ -185,7 +174,8 @@ const ImportExportManagement = () => {
       reference_number: transaction.reference_number,
       transaction_date: transaction.transaction_date.slice(0, 16),
       transaction_type: transaction.transaction_type,
-      warehouse_id: transaction.warehouse_id.toString()
+      warehouse_id: transaction.warehouse_id.toString(),
+      stock_location_id: transaction.stock_location_id.toString()
     })
     setIsModalOpen(true)
   }
@@ -200,74 +190,72 @@ const ImportExportManagement = () => {
       reference_number: '',
       transaction_date: '',
       transaction_type: 'IMPORT',
-      warehouse_id: ''
+      warehouse_id: '',
+      stock_location_id: ''
     })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.note || !formData.product_unit_id || !formData.quantity || !formData.reference_number || !formData.transaction_date || !formData.warehouse_id) {
-      alert('Vui lòng điền đầy đủ thông tin')
+      setNotify({ type: 'error', message: 'Vui lòng điền đầy đủ thông tin bắt buộc' })
       return
     }
 
     setIsSubmitting(true)
-    
-    // Simulate API call
-    setTimeout(() => {
-      const selectedProduct = mockProductUnits.find(p => p.id === parseInt(formData.product_unit_id))
-      const selectedWarehouse = mockWarehouses.find(w => w.id === parseInt(formData.warehouse_id))
-      
+
+    try {
+      const payload = {
+        productUnitId: parseInt(formData.product_unit_id),
+        warehouseId: parseInt(formData.warehouse_id),
+        stockLocationId: parseInt(formData.stock_location_id) || 1, // Default to 1 if not provided
+        quantity: parseInt(formData.quantity),
+        transactionType: formData.transaction_type,
+        transactionDate: formData.transaction_date,
+        note: formData.note,
+        referenceNumber: formData.reference_number
+      }
+
+      console.log('📝 Submitting transaction:', payload)
+
       if (editingTransaction) {
         // Update existing transaction
-        setTransactions(prev => prev.map(transaction => 
-          transaction.id === editingTransaction.id 
-            ? { 
-                ...transaction, 
-                note: formData.note,
-                product_unit_id: parseInt(formData.product_unit_id),
-                product_name: selectedProduct?.name || 'Sản phẩm không xác định',
-                unit: selectedProduct?.unit || 'Cái',
-                quantity: parseInt(formData.quantity),
-                reference_number: formData.reference_number,
-                transaction_date: formData.transaction_date + ':00.000000',
-                transaction_type: formData.transaction_type,
-                warehouse_id: parseInt(formData.warehouse_id),
-                warehouse_name: selectedWarehouse?.name || 'Kho không xác định',
-                updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
-              }
-            : transaction
-        ))
+        await InventoryService.updateTransaction(editingTransaction.id, payload)
+        console.log('✅ Transaction updated:', editingTransaction.id)
+        setNotify({ type: 'success', message: 'Cập nhật giao dịch thành công' })
       } else {
-        // Add new transaction
-        const newTransaction: ImportExportTransaction = {
-          id: Math.max(...transactions.map(t => t.id)) + 1,
-          created_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          note: formData.note,
-          product_unit_id: parseInt(formData.product_unit_id),
-          product_name: selectedProduct?.name || 'Sản phẩm không xác định',
-          unit: selectedProduct?.unit || 'Cái',
-          quantity: parseInt(formData.quantity),
-          reference_number: formData.reference_number,
-          transaction_date: formData.transaction_date + ':00.000000',
-          transaction_type: formData.transaction_type,
-          updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          stock_location_id: 1,
-          warehouse_id: parseInt(formData.warehouse_id),
-          warehouse_name: selectedWarehouse?.name || 'Kho không xác định'
-        }
-        setTransactions(prev => [...prev, newTransaction])
+        // Create new transaction
+        await InventoryService.createTransaction(payload)
+        console.log('✅ Transaction created')
+        setNotify({ type: 'success', message: 'Thêm giao dịch thành công' })
       }
-      
-      setIsSubmitting(false)
+
+      // Refresh data
+      await loadData()
       handleCloseModal()
-    }, 500)
+
+    } catch (error) {
+      console.error('❌ Error saving transaction:', error)
+      setNotify({ type: 'error', message: 'Không thể lưu giao dịch. Vui lòng thử lại.' })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleDeleteTransaction = (id: number) => {
+  const handleDeleteTransaction = async (id: number) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa giao dịch này?')) {
-      setTransactions(prev => prev.filter(transaction => transaction.id !== id))
+      try {
+        await InventoryService.deleteTransaction(id)
+        console.log('✅ Transaction deleted:', id)
+        setNotify({ type: 'success', message: 'Xóa giao dịch thành công' })
+
+        // Refresh data
+        await loadData()
+      } catch (error) {
+        console.error('❌ Error deleting transaction:', error)
+        setNotify({ type: 'error', message: 'Không thể xóa giao dịch. Vui lòng thử lại.' })
+      }
     }
   }
 
@@ -280,8 +268,8 @@ const ImportExportManagement = () => {
   }
 
   const getTypeColor = (type: string) => {
-    return type === 'IMPORT' 
-      ? 'bg-green-100 text-green-800' 
+    return type === 'IMPORT'
+      ? 'bg-green-100 text-green-800'
       : 'bg-red-100 text-red-800'
   }
 
@@ -294,12 +282,21 @@ const ImportExportManagement = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Nhập/Xuất Kho</h2>
-        <button
-          onClick={handleAddTransaction}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-        >
-          Thêm giao dịch
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+          >
+            {loading ? 'Đang tải...' : 'Làm mới'}
+          </button>
+          <button
+            onClick={handleAddTransaction}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+          >
+            Thêm giao dịch
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -379,7 +376,7 @@ const ImportExportManagement = () => {
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           >
             <option value="all">Tất cả kho</option>
-            {mockWarehouses.map(warehouse => (
+            {warehouses.map(warehouse => (
               <option key={warehouse.id} value={warehouse.id}>
                 {warehouse.name}
               </option>
@@ -433,7 +430,26 @@ const ImportExportManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredTransactions.map((transaction) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
+                    <div className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Đang tải dữ liệu...
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
+                    Không có dữ liệu giao dịch
+                  </td>
+                </tr>
+              ) : (
+                filteredTransactions.map((transaction) => (
                 <tr key={transaction.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {transaction.id}
@@ -481,18 +497,56 @@ const ImportExportManagement = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Notification Modal */}
+      {notify && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setNotify(null)} />
+            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6">
+                <div className={`flex items-center ${notify.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                  <div className="flex-shrink-0">
+                    {notify.type === 'error' ? (
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium">{notify.message}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={() => setNotify(null)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleCloseModal} />
-            
+
             <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full">
               <div className="flex items-center justify-between p-6 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -507,7 +561,7 @@ const ImportExportManagement = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="p-6">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -525,7 +579,7 @@ const ImportExportManagement = () => {
                         <option value="EXPORT">Xuất kho</option>
                       </select>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Kho *
@@ -537,7 +591,7 @@ const ImportExportManagement = () => {
                         required
                       >
                         <option value="">Chọn kho</option>
-                        {mockWarehouses.map(warehouse => (
+                        {warehouses.map(warehouse => (
                           <option key={warehouse.id} value={warehouse.id}>
                             {warehouse.name}
                           </option>
@@ -545,7 +599,7 @@ const ImportExportManagement = () => {
                       </select>
                     </div>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Ghi chú *
@@ -559,7 +613,7 @@ const ImportExportManagement = () => {
                       required
                     />
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -572,14 +626,14 @@ const ImportExportManagement = () => {
                         required
                       >
                         <option value="">Chọn sản phẩm</option>
-                        {mockProductUnits.map(product => (
+                        {productUnits.map(product => (
                           <option key={product.id} value={product.id}>
-                            {product.name} ({product.unit})
+                            {product.productName} ({product.unitName})
                           </option>
                         ))}
                       </select>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Số lượng *
@@ -595,7 +649,7 @@ const ImportExportManagement = () => {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -610,7 +664,7 @@ const ImportExportManagement = () => {
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Ngày giao dịch *
@@ -625,7 +679,7 @@ const ImportExportManagement = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
