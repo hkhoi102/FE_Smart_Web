@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Order } from './OrderManagement'
 import Modal from './Modal'
 import OrderStatusTracker from './OrderStatusTracker'
+import { OrderApi } from '../services/orderService'
 
 interface OrderDetail {
   id: number
@@ -14,200 +15,9 @@ interface OrderDetail {
 }
 
 const OrderListManagement: React.FC = () => {
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: 1,
-      created_at: '2025-09-08 10:32:36.088934',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'COMPLETED',
-      total_amount: 100000,
-      updated_at: '2025-09-09 08:10:41.195553',
-      discount_amount: 0,
-      payment_method: 'COD',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 2,
-      created_at: '2025-09-08 10:33:15.123456',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'COMPLETED',
-      total_amount: 500000,
-      updated_at: '2025-09-09 08:11:20.234567',
-      discount_amount: 0,
-      payment_method: 'COD',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 3,
-      created_at: '2025-09-08 10:34:22.345678',
-      customer_id: 2,
-      promotion_applied_id: 1,
-      status: 'PENDING',
-      total_amount: 3,
-      updated_at: '2025-09-09 08:12:15.345678',
-      discount_amount: 100000,
-      payment_method: 'COD',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 4,
-      created_at: '2025-09-08 10:35:30.456789',
-      customer_id: 2,
-      promotion_applied_id: 1,
-      status: 'PENDING',
-      total_amount: 2000,
-      updated_at: '2025-09-09 08:13:25.456789',
-      discount_amount: 210000,
-      payment_method: 'COD',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 5,
-      created_at: '2025-09-08 10:36:45.567890',
-      customer_id: 2,
-      promotion_applied_id: 1,
-      status: 'PENDING',
-      total_amount: 3,
-      updated_at: '2025-09-09 08:14:35.567890',
-      discount_amount: 1,
-      payment_method: 'COD',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 6,
-      created_at: '2025-09-08 10:37:55.678901',
-      customer_id: 2,
-      promotion_applied_id: 1,
-      status: 'PENDING',
-      total_amount: 2000,
-      updated_at: '2025-09-09 08:15:45.678901',
-      discount_amount: 1000,
-      payment_method: 'COD',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 7,
-      created_at: '2025-09-08 10:38:10.789012',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 100000,
-      updated_at: '2025-09-09 08:16:55.789012',
-      discount_amount: 0,
-      payment_method: 'COD',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 8,
-      created_at: '2025-09-08 10:39:20.890123',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 200000,
-      updated_at: '2025-09-09 08:17:05.890123',
-      discount_amount: 0,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 9,
-      created_at: '2025-09-08 10:40:30.901234',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 300000,
-      updated_at: '2025-09-09 08:18:15.901234',
-      discount_amount: 0,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 10,
-      created_at: '2025-09-08 10:41:40.012345',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 150000,
-      updated_at: '2025-09-09 08:19:25.012345',
-      discount_amount: 0,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 11,
-      created_at: '2025-09-08 10:42:50.123456',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 250000,
-      updated_at: '2025-09-09 08:20:35.123456',
-      discount_amount: 0,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'PAID'
-    },
-    {
-      id: 12,
-      created_at: '2025-09-08 10:43:00.234567',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 180000,
-      updated_at: '2025-09-09 08:21:45.234567',
-      discount_amount: 0,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 13,
-      created_at: '2025-09-08 10:44:10.345678',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 320000,
-      updated_at: '2025-09-09 08:22:55.345678',
-      discount_amount: 0,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 14,
-      created_at: '2025-09-08 10:45:20.456789',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 400000,
-      updated_at: '2025-09-09 08:23:05.456789',
-      discount_amount: 0,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 15,
-      created_at: '2025-09-08 10:46:30.567890',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 280000,
-      updated_at: '2025-09-09 08:24:15.567890',
-      discount_amount: 0,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 16,
-      created_at: '2025-09-08 10:47:40.678901',
-      customer_id: 2,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 350000,
-      updated_at: '2025-09-09 08:25:25.678901',
-      discount_amount: 0,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'UNPAID'
-    }
-  ])
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Mock order details data
   const [orderDetails] = useState<OrderDetail[]>([
@@ -283,10 +93,58 @@ const OrderListManagement: React.FC = () => {
   const [selectedOrders, setSelectedOrders] = useState<number[]>([])
   const [bulkStatus, setBulkStatus] = useState<'PENDING' | 'COMPLETED' | 'CANCELLED' | 'PROCESSING'>('PENDING')
   const [bulkPaymentStatus, setBulkPaymentStatus] = useState<'PAID' | 'UNPAID' | 'PARTIAL'>('UNPAID')
-  
+
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED' | 'CANCELLED' | 'PROCESSING'>('ALL')
+  const mapBackendStatusToUI = (status: string): Order['status'] => {
+    switch (status) {
+      case 'PENDING': return 'PENDING'
+      case 'CONFIRMED':
+      case 'DELIVERING': return 'PROCESSING'
+      case 'COMPLETED': return 'COMPLETED'
+      case 'CANCELLED': return 'CANCELLED'
+      default: return 'PENDING'
+    }
+  }
+
+  const mapUIStatusToBackend = (status: Order['status']): 'PENDING' | 'CONFIRMED' | 'DELIVERING' | 'COMPLETED' | 'CANCELLED' => {
+    switch (status) {
+      case 'PENDING': return 'PENDING'
+      case 'PROCESSING': return 'DELIVERING'
+      case 'COMPLETED': return 'COMPLETED'
+      case 'CANCELLED': return 'CANCELLED'
+      default: return 'PENDING'
+    }
+  }
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const res = await OrderApi.list({ page: 0, size: 50 })
+      const arr = Array.isArray(res?.data) ? res.data : []
+      const mapped: Order[] = arr.map((o: any) => ({
+        id: o.id,
+        created_at: o.createdAt ?? new Date().toISOString(),
+        customer_id: o.customerId,
+        promotion_applied_id: o.promotionAppliedId ?? undefined,
+        status: mapBackendStatusToUI(o.status),
+        total_amount: o.totalAmount ?? 0,
+        updated_at: o.updatedAt ?? o.createdAt ?? new Date().toISOString(),
+        discount_amount: o.discountAmount ?? 0,
+        payment_method: (o.paymentMethod ?? 'COD') as any,
+        payment_status: (o.paymentStatus ?? 'UNPAID') as any,
+      }))
+      setOrders(mapped)
+    } catch (e: any) {
+      setError(e?.message || 'Không thể tải danh sách đơn hàng')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchOrders() }, [])
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<'ALL' | 'PAID' | 'UNPAID' | 'PARTIAL'>('ALL')
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'COD' | 'BANK_TRANSFER' | 'CREDIT_CARD'>('ALL')
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' })
@@ -324,20 +182,20 @@ const OrderListManagement: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (editingOrder) {
-      setOrders(orders.map(o => 
-        o.id === editingOrder.id 
-          ? { 
-              ...o, 
-              ...formData, 
+      setOrders(orders.map(o =>
+        o.id === editingOrder.id
+          ? {
+              ...o,
+              ...formData,
               promotion_applied_id: formData.promotion_applied_id ? parseInt(formData.promotion_applied_id) : undefined,
               updated_at: new Date().toISOString()
             }
           : o
       ))
     }
-    
+
     setIsModalOpen(false)
   }
 
@@ -347,23 +205,16 @@ const OrderListManagement: React.FC = () => {
     }
   }
 
-  const handleStatusChange = (id: number, newStatus: 'PENDING' | 'COMPLETED' | 'CANCELLED' | 'PROCESSING') => {
-    setOrders(orders.map(o => 
-      o.id === id 
-        ? { 
-            ...o, 
-            status: newStatus,
-            updated_at: new Date().toISOString()
-          }
-        : o
-    ))
+  const handleStatusChange = async (id: number, newStatus: 'PENDING' | 'COMPLETED' | 'CANCELLED' | 'PROCESSING') => {
+    await OrderApi.updateStatus(id, mapUIStatusToBackend(newStatus) as any)
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus, updated_at: new Date().toISOString() } : o))
   }
 
   const handlePaymentStatusChange = (id: number, newPaymentStatus: 'PAID' | 'UNPAID' | 'PARTIAL') => {
-    setOrders(orders.map(o => 
-      o.id === id 
-        ? { 
-            ...o, 
+    setOrders(orders.map(o =>
+      o.id === id
+        ? {
+            ...o,
             payment_status: newPaymentStatus,
             updated_at: new Date().toISOString()
           }
@@ -372,8 +223,8 @@ const OrderListManagement: React.FC = () => {
   }
 
   const handleSelectOrder = (id: number) => {
-    setSelectedOrders(prev => 
-      prev.includes(id) 
+    setSelectedOrders(prev =>
+      prev.includes(id)
         ? prev.filter(orderId => orderId !== id)
         : [...prev, id]
     )
@@ -387,24 +238,17 @@ const OrderListManagement: React.FC = () => {
     }
   }
 
-  const handleBulkStatusChange = () => {
-    setOrders(orders.map(o => 
-      selectedOrders.includes(o.id)
-        ? { 
-            ...o, 
-            status: bulkStatus,
-            updated_at: new Date().toISOString()
-          }
-        : o
-    ))
+  const handleBulkStatusChange = async () => {
+    await Promise.all(selectedOrders.map(id => OrderApi.updateStatus(id, mapUIStatusToBackend(bulkStatus) as any)))
+    setOrders(prev => prev.map(o => selectedOrders.includes(o.id) ? { ...o, status: bulkStatus, updated_at: new Date().toISOString() } : o))
     setSelectedOrders([])
   }
 
   const handleBulkPaymentStatusChange = () => {
-    setOrders(orders.map(o => 
+    setOrders(orders.map(o =>
       selectedOrders.includes(o.id)
-        ? { 
-            ...o, 
+        ? {
+            ...o,
             payment_status: bulkPaymentStatus,
             updated_at: new Date().toISOString()
           }
@@ -476,12 +320,12 @@ const OrderListManagement: React.FC = () => {
     // Search term filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
-      const matchesSearch = 
+      const matchesSearch =
         order.id.toString().includes(searchLower) ||
         order.customer_id.toString().includes(searchLower) ||
         order.total_amount.toString().includes(searchLower) ||
         order.discount_amount.toString().includes(searchLower)
-      
+
       if (!matchesSearch) return false
     }
 
@@ -654,7 +498,7 @@ const OrderListManagement: React.FC = () => {
       {/* Search and Filter */}
       <div className="bg-white shadow rounded-lg p-6 mb-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Tìm kiếm và Lọc</h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {/* Search */}
           <div>
@@ -778,15 +622,15 @@ const OrderListManagement: React.FC = () => {
       {/* Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="px-4 py-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg leading-6 font-medium text-gray-900">Danh sách Đơn hàng</h3>
-            
+
             {selectedOrders.length > 0 && (
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-gray-600">
                   Đã chọn {selectedOrders.length} đơn hàng
                 </span>
-                
+
                 <div className="flex items-center space-x-2">
                   <select
                     value={bulkStatus}
@@ -798,7 +642,7 @@ const OrderListManagement: React.FC = () => {
                     <option value="COMPLETED">Hoàn thành</option>
                     <option value="CANCELLED">Đã hủy</option>
                   </select>
-                  
+
                   <button
                     onClick={handleBulkStatusChange}
                     className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
@@ -807,24 +651,7 @@ const OrderListManagement: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <select
-                    value={bulkPaymentStatus}
-                    onChange={(e) => setBulkPaymentStatus(e.target.value as any)}
-                    className="text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="UNPAID">Chưa thanh toán</option>
-                    <option value="PAID">Đã thanh toán</option>
-                    <option value="PARTIAL">Thanh toán một phần</option>
-                  </select>
-                  
-                  <button
-                    onClick={handleBulkPaymentStatusChange}
-                    className="px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700"
-                  >
-                    Chuyển thanh toán
-                  </button>
-                </div>
+                {/* Cột thanh toán chỉ hiển thị, không cho sửa hàng loạt */}
 
                 <button
                   onClick={() => setSelectedOrders([])}
@@ -837,6 +664,12 @@ const OrderListManagement: React.FC = () => {
           </div>
 
           <div className="overflow-x-auto">
+            {loading && (
+              <div className="p-4 text-sm text-gray-500">Đang tải danh sách đơn hàng...</div>
+            )}
+            {error && (
+              <div className="p-4 text-sm text-red-600">{error}</div>
+            )}
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -879,8 +712,8 @@ const OrderListManagement: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredOrders.map((order) => (
-                  <tr 
-                    key={order.id} 
+                  <tr
+                    key={order.id}
                     className="hover:bg-gray-50 cursor-pointer"
                     onClick={() => handleViewDetails(order)}
                   >
@@ -920,15 +753,9 @@ const OrderListManagement: React.FC = () => {
                       </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={order.payment_status}
-                        onChange={(e) => handlePaymentStatusChange(order.id, e.target.value as any)}
-                        className={`text-xs font-medium rounded-full px-2.5 py-0.5 border-0 focus:ring-2 focus:ring-blue-500 ${getPaymentStatusColor(order.payment_status)}`}
-                      >
-                        <option value="UNPAID">Chưa thanh toán</option>
-                        <option value="PAID">Đã thanh toán</option>
-                        <option value="PARTIAL">Thanh toán một phần</option>
-                      </select>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}>
+                        {getPaymentStatusLabel(order.payment_status)}
+                      </span>
                     </td>
                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                        {getPaymentMethodLabel(order.payment_method)}
@@ -1166,7 +993,7 @@ const OrderListManagement: React.FC = () => {
                     <p className="mt-1 text-sm text-gray-900">{selectedOrder.promotion_applied_id}</p>
                   </div>
                 )}
-                
+
                 {/* Order Status Tracker */}
                 <div className="mt-6">
                   <label className="block text-sm font-medium text-gray-700 mb-3">Tiến trình đơn hàng</label>
@@ -1187,11 +1014,11 @@ const OrderListManagement: React.FC = () => {
                 <div className="bg-white shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Danh sách sản phẩm</h3>
-                    
+
                     {(() => {
                       const details = getOrderDetails(selectedOrder.id)
                       const total = calculateOrderTotal(details)
-                      
+
                       return (
                         <>
                           <div className="overflow-x-auto">
@@ -1244,7 +1071,7 @@ const OrderListManagement: React.FC = () => {
                               </tbody>
                             </table>
                           </div>
-                          
+
                           {/* Summary */}
                           <div className="mt-6 border-t pt-4">
                             <div className="flex justify-between items-center">
