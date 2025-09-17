@@ -3,11 +3,13 @@ import { Order } from './OrderManagement'
 import Modal from './Modal'
 import OrderStatusTracker from './OrderStatusTracker'
 import { OrderApi } from '../services/orderService'
+import { CustomerService } from '../services/customerService'
 
 const OrderProcessingManagement: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [detailMap, setDetailMap] = useState<Record<number, { customerName?: string }>>({})
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -53,6 +55,19 @@ const OrderProcessingManagement: React.FC = () => {
           payment_status: (o.paymentStatus ?? 'UNPAID') as any,
         }))
         if (mounted) setOrders(mapped)
+
+        // Enrich customerName from order detail
+        // Prefer fetching names via customer service to ensure consistency
+        const nameMap = await CustomerService.preloadNames(mapped.map(o => o.customer_id))
+        const details = await Promise.all(mapped.map(o => OrderApi.getById(o.id).catch(() => null)))
+        const map: Record<number, { customerName?: string }> = {}
+        details.forEach(d => {
+          const data = (d as any)?.data
+          if (data && typeof data.id === 'number') {
+            map[data.id] = { customerName: nameMap[data.customerId] || data.customerName }
+          }
+        })
+        if (mounted) setDetailMap(map)
       } catch (e: any) {
         if (mounted) setError(e?.message || 'Không thể tải danh sách đơn hàng')
       } finally {
@@ -399,7 +414,7 @@ const OrderProcessingManagement: React.FC = () => {
                     {formatDate(order.created_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    #{order.customer_id}
+                    {detailMap[order.id]?.customerName ? detailMap[order.id]?.customerName : `#${order.customer_id}`}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {formatCurrency(order.total_amount)}

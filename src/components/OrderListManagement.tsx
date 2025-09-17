@@ -3,6 +3,7 @@ import { Order } from './OrderManagement'
 import Modal from './Modal'
 import OrderStatusTracker from './OrderStatusTracker'
 import { OrderApi } from '../services/orderService'
+import { CustomerService } from '../services/customerService'
 
 interface OrderDetail {
   id: number
@@ -18,6 +19,7 @@ const OrderListManagement: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [detailMap, setDetailMap] = useState<Record<number, { customerName?: string; paymentMethod?: 'COD' | 'BANK_TRANSFER' | 'CREDIT_CARD'; paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL'; discountAmount?: number }>>({})
 
   // Mock order details data
   const [orderDetails] = useState<OrderDetail[]>([
@@ -137,6 +139,26 @@ const OrderListManagement: React.FC = () => {
         payment_status: (o.paymentStatus ?? 'UNPAID') as any,
       }))
       setOrders(mapped)
+
+      // Preload customer names
+      const customerIds = mapped.map(o => o.customer_id)
+      const nameMap = await CustomerService.preloadNames(customerIds)
+
+      // Enrich with details (payment, discount, customer name) which are not included in summary
+      const details = await Promise.all(mapped.map(o => OrderApi.getById(o.id).catch(() => null)))
+      const map: Record<number, { customerName?: string; paymentMethod?: 'COD' | 'BANK_TRANSFER' | 'CREDIT_CARD'; paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL'; discountAmount?: number }> = {}
+      details.forEach(d => {
+        const data = (d as any)?.data
+        if (data && typeof data.id === 'number') {
+          map[data.id] = {
+            customerName: nameMap[data.customerId] || data.customerName,
+            paymentMethod: data.paymentMethod,
+            paymentStatus: data.paymentStatus,
+            discountAmount: typeof data.discountAmount === 'number' ? data.discountAmount : undefined,
+          }
+        }
+      })
+      setDetailMap(map)
     } catch (e: any) {
       setError(e?.message || 'Không thể tải danh sách đơn hàng')
     } finally {
@@ -732,13 +754,13 @@ const OrderListManagement: React.FC = () => {
                       {formatDate(order.created_at)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      #{order.customer_id}
+                      {detailMap[order.id]?.customerName ? detailMap[order.id]?.customerName : `#${order.customer_id}`}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatCurrency(order.total_amount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatCurrency(order.discount_amount)}
+                      {formatCurrency(detailMap[order.id]?.discountAmount ?? order.discount_amount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <select
@@ -753,12 +775,12 @@ const OrderListManagement: React.FC = () => {
                       </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}>
-                        {getPaymentStatusLabel(order.payment_status)}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor((detailMap[order.id]?.paymentStatus as any) || order.payment_status)}`}>
+                        {getPaymentStatusLabel((detailMap[order.id]?.paymentStatus as any) || order.payment_status)}
                       </span>
                     </td>
                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                       {getPaymentMethodLabel(order.payment_method)}
+                       {getPaymentMethodLabel((detailMap[order.id]?.paymentMethod as any) || order.payment_method)}
                      </td>
                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                       <div className="flex space-x-2">
