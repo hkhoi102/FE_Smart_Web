@@ -1,90 +1,71 @@
 import { useState, useEffect } from 'react'
+import { ProductService } from '@/services/productService'
 
-interface Price {
-  id: number
-  productId: number
-  productName: string
-  unit: string
-  price: number
-  isDefault: boolean
-  startDate: string
-  endDate: string
-  createdAt: string
-}
+interface PriceRow { id: number; productId: number; productName: string; unitId: number; unitName: string; price: number; validFrom: string; validTo?: string }
 
-interface Product {
-  id: number
-  name: string
-  unit: string
-}
+interface Product { id: number; name: string }
 
 const PriceManagement = () => {
-  const [prices, setPrices] = useState<Price[]>([])
+  const [prices, setPrices] = useState<PriceRow[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingPrice, setEditingPrice] = useState<Price | null>(null)
+  const [editingPrice, setEditingPrice] = useState<PriceRow | null>(null)
   const [formData, setFormData] = useState({
-    productId: '',
-    unit: '',
+    productUnitId: '',
     price: '',
     startDate: '',
     endDate: ''
   })
+  const [unitOptions, setUnitOptions] = useState<Array<{ id: number; name: string; productId: number; productName: string }>>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Mock data for products
-  const mockProducts: Product[] = [
-    { id: 1, name: 'Coca Cola', unit: 'Lon' },
-    { id: 2, name: 'Pepsi', unit: 'Chai' },
-    { id: 3, name: 'Bánh mì', unit: 'Cái' },
-    { id: 4, name: 'Sữa tươi', unit: 'Hộp' },
-    { id: 5, name: 'Kẹo', unit: 'Gói' },
-    { id: 6, name: 'Nước suối', unit: 'Chai' },
-    { id: 7, name: 'Bánh quy', unit: 'Hộp' },
-    { id: 8, name: 'Nước cam', unit: 'Lon' },
-    { id: 9, name: 'Bánh ngọt', unit: 'Cái' },
-    { id: 10, name: 'Sữa chua', unit: 'Hộp' }
-  ]
+  const loadProducts = async () => {
+    const res = await ProductService.getProducts(1, 1000)
+    const mapped = res.products.map((p: any) => ({ id: p.id, name: p.name, productUnits: p.productUnits || [] }))
+    setProducts(mapped.map(p => ({ id: p.id, name: p.name })))
+    const allPU: Array<{ id: number; name: string; productId: number; productName: string }> = []
+    mapped.forEach(p => (p.productUnits || []).forEach((u: any) => allPU.push({ id: u.id, name: u.unitName, productId: p.id, productName: p.name })))
+    setUnitOptions(allPU)
+  }
+  const loadDefaultPrices = async () => {
+    // optional: can fetch for first product
+    if (products.length === 0) return
+    const list: PriceRow[] = []
+    for (const p of products) {
+      try {
+        const pr = await ProductService.getProductPrices(p.id)
+        pr.forEach((x: any) => list.push({ id: x.id, productId: p.id, productName: p.name, unitId: x.unitId, unitName: x.unitName || '', price: x.price, validFrom: x.validFrom || x.timeStart || x.startDate || '', validTo: x.validTo || x.timeEnd || x.endDate }))
+      } catch {
+        // ignore
+      }
+    }
+    setPrices(list)
+  }
+  useEffect(() => { loadProducts() }, [])
+  useEffect(() => { if (products.length) loadDefaultPrices() }, [products])
 
-  // Mock data for prices
-  const mockPrices: Price[] = [
-    { id: 1, productId: 1, productName: 'Coca Cola', unit: 'Lon', price: 12000, isDefault: true, startDate: '2024-01-01', endDate: '2024-12-31', createdAt: '2024-01-01' },
-    { id: 2, productId: 1, productName: 'Coca Cola', unit: 'Thùng', price: 120000, isDefault: false, startDate: '2024-01-01', endDate: '2024-12-31', createdAt: '2024-01-01' },
-    { id: 3, productId: 2, productName: 'Pepsi', unit: 'Chai', price: 15000, isDefault: true, startDate: '2024-01-01', endDate: '2024-12-31', createdAt: '2024-01-01' },
-    { id: 4, productId: 3, productName: 'Bánh mì', unit: 'Cái', price: 8000, isDefault: true, startDate: '2024-01-01', endDate: '2024-12-31', createdAt: '2024-01-01' },
-    { id: 5, productId: 4, productName: 'Sữa tươi', unit: 'Hộp', price: 25000, isDefault: true, startDate: '2024-01-01', endDate: '2024-12-31', createdAt: '2024-01-01' },
-    { id: 6, productId: 5, productName: 'Kẹo', unit: 'Gói', price: 5000, isDefault: true, startDate: '2024-01-01', endDate: '2024-12-31', createdAt: '2024-01-01' },
-    { id: 7, productId: 6, productName: 'Nước suối', unit: 'Chai', price: 8000, isDefault: true, startDate: '2024-01-01', endDate: '2024-12-31', createdAt: '2024-01-01' },
-    { id: 8, productId: 7, productName: 'Bánh quy', unit: 'Hộp', price: 18000, isDefault: true, startDate: '2024-01-01', endDate: '2024-12-31', createdAt: '2024-01-01' },
-    { id: 9, productId: 8, productName: 'Nước cam', unit: 'Lon', price: 10000, isDefault: true, startDate: '2024-01-01', endDate: '2024-12-31', createdAt: '2024-01-01' },
-    { id: 10, productId: 9, productName: 'Bánh ngọt', unit: 'Cái', price: 12000, isDefault: true, startDate: '2024-01-01', endDate: '2024-12-31', createdAt: '2024-01-01' }
-  ]
-
-  useEffect(() => {
-    setProducts(mockProducts)
-    setPrices(mockPrices)
-  }, [])
+  // no-op; unitOptions đã build từ products
 
   const filteredPrices = prices.filter(price =>
     price.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    price.unit.toLowerCase().includes(searchTerm.toLowerCase())
+    price.unitName.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const handleAddPrice = () => {
     setEditingPrice(null)
-    setFormData({ productId: '', unit: '', price: '', startDate: '', endDate: '' })
+    const today = new Date().toISOString().split('T')[0]
+    setFormData({ productUnitId: '', price: '', startDate: today, endDate: '' })
     setIsModalOpen(true)
   }
 
-  const handleEditPrice = (price: Price) => {
+  const handleEditPrice = (price: PriceRow) => {
     setEditingPrice(price)
     setFormData({
-      productId: price.productId.toString(),
-      unit: price.unit,
+      productUnitId: (unitOptions.find(o => o.productId === price.productId && o.name === price.unitName)?.id || '').toString(),
       price: price.price.toString(),
-      startDate: price.startDate,
-      endDate: price.endDate
+      startDate: price.validFrom,
+      endDate: price.validTo || ''
     })
     setIsModalOpen(true)
   }
@@ -92,64 +73,45 @@ const PriceManagement = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setEditingPrice(null)
-    setFormData({ productId: '', unit: '', price: '', startDate: '', endDate: '' })
+    const today = new Date().toISOString().split('T')[0]
+    setFormData({ productUnitId: '', price: '', startDate: today, endDate: '' })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.productId || !formData.unit || !formData.price || !formData.startDate || !formData.endDate) {
+
+    if (!formData.productUnitId || !formData.price || !formData.startDate) {
       alert('Vui lòng điền đầy đủ thông tin')
       return
     }
 
     setIsSubmitting(true)
-    
-    // Simulate API call
-    setTimeout(() => {
-      const selectedProduct = products.find(p => p.id === parseInt(formData.productId))
-      
-      if (editingPrice) {
-        // Update existing price
-        setPrices(prev => prev.map(price => 
-          price.id === editingPrice.id 
-            ? { 
-                ...price, 
-                productId: parseInt(formData.productId),
-                productName: selectedProduct?.name || '',
-                unit: formData.unit,
-                price: parseFloat(formData.price),
-                isDefault: false,
-                startDate: formData.startDate,
-                endDate: formData.endDate
-              }
-            : price
-        ))
-      } else {
-        // Add new price
-        const newPrice: Price = {
-          id: Math.max(...prices.map(p => p.id)) + 1,
-          productId: parseInt(formData.productId),
-          productName: selectedProduct?.name || '',
-          unit: formData.unit,
-          price: parseFloat(formData.price),
-          isDefault: false,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          createdAt: new Date().toISOString().split('T')[0]
-        }
-        setPrices(prev => [...prev, newPrice])
-      }
-      
-      setIsSubmitting(false)
+
+    try {
+      const selectedPU = unitOptions.find(o => o.id === parseInt(formData.productUnitId))
+      if (!selectedPU) return
+      const productId = selectedPU.productId
+      const validFrom = formData.startDate ? `${formData.startDate}T00:00:00` : ''
+      const validTo = formData.endDate ? `${formData.endDate}T23:59:59` : undefined
+      const payload = { unitId: parseInt(formData.productUnitId), price: parseFloat(formData.price), validFrom, validTo }
+      if (editingPrice) await ProductService.updateProductPrice(productId, editingPrice.id, payload)
+      else await ProductService.addProductPrice(productId, payload)
+      // reload prices for this product
+      const pr = await ProductService.getProductPrices(productId)
+      const name = products.find(p => p.id === productId)?.name || ''
+      setPrices(pr.map((x: any) => ({ id: x.id, productId, productName: name, unitId: x.unitId, unitName: x.unitName || '', price: x.price, validFrom: x.validFrom || x.timeStart || '', validTo: x.validTo || x.timeEnd })))
       handleCloseModal()
-    }, 500)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleDeletePrice = (id: number) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa giá này?')) {
-      setPrices(prev => prev.filter(price => price.id !== id))
-    }
+  const handleDeletePrice = async (row: PriceRow) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa giá này?')) return
+    await ProductService.deleteProductPrice(row.productId, row.id)
+    const pr = await ProductService.getProductPrices(row.productId)
+    const name = products.find(p => p.id === row.productId)?.name || ''
+    setPrices(pr.map((x: any) => ({ id: x.id, productId: row.productId, productName: name, unitId: x.unitId, unitName: x.unitName || '', price: x.price, validFrom: x.validFrom || '', validTo: x.validTo })))
   }
 
   const formatPrice = (price: number) => {
@@ -157,6 +119,13 @@ const PriceManagement = () => {
       style: 'currency',
       currency: 'VND'
     }).format(price)
+  }
+
+  const formatDateSafe = (value?: string) => {
+    if (!value) return '—'
+    const d = new Date(value)
+    if (isNaN(d.getTime())) return '—'
+    return d.toLocaleDateString('vi-VN')
   }
 
   return (
@@ -218,16 +187,16 @@ const PriceManagement = () => {
                     {price.productName}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {price.unit}
+                    {price.unitName}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                     {formatPrice(price.price)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(price.startDate).toLocaleDateString('vi-VN')}
+                    {formatDateSafe(price.validFrom)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(price.endDate).toLocaleDateString('vi-VN')}
+                    {formatDateSafe(price.validTo)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
@@ -238,7 +207,7 @@ const PriceManagement = () => {
                         Sửa
                       </button>
                       <button
-                        onClick={() => handleDeletePrice(price.id)}
+                        onClick={() => handleDeletePrice(price)}
                         className="text-red-600 hover:text-red-900"
                       >
                         Xóa
@@ -257,7 +226,7 @@ const PriceManagement = () => {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleCloseModal} />
-            
+
             <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="flex items-center justify-between p-6 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -272,42 +241,24 @@ const PriceManagement = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="p-6">
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Sản phẩm *
-                    </label>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị của sản phẩm *</label>
                     <select
-                      value={formData.productId}
-                      onChange={(e) => setFormData(prev => ({ ...prev, productId: e.target.value }))}
+                      value={formData.productUnitId}
+                      onChange={(e) => setFormData(prev => ({ ...prev, productUnitId: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       required
                     >
-                      <option value="">Chọn sản phẩm</option>
-                      {products.map(product => (
-                        <option key={product.id} value={product.id}>
-                          {product.name}
-                        </option>
+                      <option value="">Chọn Product Unit</option>
+                      {unitOptions.map(u => (
+                        <option key={u.id} value={u.id}>{u.productName} — {u.name}</option>
                       ))}
                     </select>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Đơn vị *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.unit}
-                      onChange={(e) => setFormData(prev => ({ ...prev, unit: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      placeholder="Nhập đơn vị tính"
-                      required
-                    />
-                  </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Giá (VND) *
@@ -323,7 +274,7 @@ const PriceManagement = () => {
                       required
                     />
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -337,7 +288,7 @@ const PriceManagement = () => {
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Ngày kết thúc *
@@ -352,7 +303,7 @@ const PriceManagement = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"

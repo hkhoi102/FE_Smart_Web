@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
+import { InventoryService, WarehouseDto } from '../services/inventoryService'
+import { ProductService } from '../services/productService'
 
 interface InventoryCheck {
   id: number
@@ -29,9 +31,19 @@ interface CheckItem {
   status: 'PENDING' | 'CHECKED' | 'DISCREPANCY'
 }
 
+interface ProductUnit {
+  id: number
+  productId: number
+  productName: string
+  unitName: string
+  systemQuantity?: number
+}
+
 const InventoryCheckManagement = () => {
   const [checks, setChecks] = useState<InventoryCheck[]>([])
   const [checkItems, setCheckItems] = useState<CheckItem[]>([])
+  const [warehouses, setWarehouses] = useState<WarehouseDto[]>([])
+  const [productUnits, setProductUnits] = useState<ProductUnit[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
   const [editingCheck, setEditingCheck] = useState<InventoryCheck | null>(null)
@@ -39,8 +51,7 @@ const InventoryCheckManagement = () => {
   const [formData, setFormData] = useState({
     check_date: '',
     warehouse_id: '',
-    note: '',
-    created_by: ''
+    note: ''
   })
   const [itemFormData, setItemFormData] = useState({
     product_id: '',
@@ -48,114 +59,65 @@ const InventoryCheckManagement = () => {
     note: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [notify, setNotify] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+  const showNotify = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotify({ type, message })
+    window.clearTimeout((showNotify as any)._t)
+    ;(showNotify as any)._t = window.setTimeout(() => setNotify(null), 2500)
+  }
+
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [warehouseFilter, setWarehouseFilter] = useState<number | 'all'>('all')
 
-  // Mock data for warehouses
-  const mockWarehouses = [
-    { id: 1, name: 'Kho Trung tâm HCM' },
-    { id: 2, name: 'Kho Chi nhánh Hà Nội' }
-  ]
+  const mapCheck = (dto: any): InventoryCheck => ({
+    id: dto.id,
+    check_date: (dto.stocktakingDate ?? dto.checkDate ?? dto.check_date ?? '').replace('T', ' ').substring(0, 19),
+    warehouse_id: dto.warehouseId ?? dto.warehouse_id,
+    warehouse_name: dto.warehouseName ?? dto.warehouse_name ?? '',
+    status: dto.status,
+    created_by: dto.createdBy ?? dto.created_by ?? '',
+    created_at: dto.createdAt ?? dto.created_at ?? '',
+    updated_at: dto.updatedAt ?? dto.updated_at ?? '',
+    note: dto.note ?? '',
+    total_items: dto.totalItems ?? dto.total_items ?? 0,
+    checked_items: dto.checkedItems ?? dto.checked_items ?? 0,
+    discrepancy_items: dto.discrepancyItems ?? dto.discrepancy_items ?? 0,
+  })
 
-  // Mock data for products
-  const mockProducts = [
-    { id: 1, name: 'Coca Cola', unit: 'Lon', system_quantity: 150 },
-    { id: 2, name: 'Pepsi', unit: 'Chai', system_quantity: 25 },
-    { id: 3, name: 'Bánh mì', unit: 'Cái', system_quantity: 0 },
-    { id: 4, name: 'Sữa tươi', unit: 'Hộp', system_quantity: 80 },
-    { id: 5, name: 'Kẹo', unit: 'Gói', system_quantity: 200 }
-  ]
+  // If BE returns items later we can map with this util
+  const mapItem = (dto: any): CheckItem => ({
+    id: dto.id,
+    check_id: dto.checkId ?? dto.check_id,
+    product_id: dto.productUnitId ?? dto.product_id,
+    product_name: dto.productName ?? dto.product_name ?? 'Sản phẩm',
+    unit: dto.unitName ?? dto.unit ?? '',
+    system_quantity: dto.systemQuantity ?? dto.system_quantity ?? 0,
+    actual_quantity: dto.actualQuantity ?? dto.actual_quantity ?? 0,
+    difference: dto.difference ?? 0,
+    note: dto.note ?? '',
+    status: dto.status ?? 'PENDING',
+  })
 
-  // Mock data for inventory checks
-  const mockChecks: InventoryCheck[] = [
-    {
-      id: 1,
-      check_date: '2025-01-15 08:00:00',
-      warehouse_id: 1,
-      warehouse_name: 'Kho Trung tâm HCM',
-      status: 'COMPLETED',
-      created_by: 'Nguyễn Văn A',
-      created_at: '2025-01-15 07:30:00',
-      updated_at: '2025-01-15 10:30:00',
-      note: 'Kiểm kê định kỳ tháng 1',
-      total_items: 5,
-      checked_items: 5,
-      discrepancy_items: 2
-    },
-    {
-      id: 2,
-      check_date: '2025-01-20 14:00:00',
-      warehouse_id: 2,
-      warehouse_name: 'Kho Chi nhánh Hà Nội',
-      status: 'IN_PROGRESS',
-      created_by: 'Trần Thị B',
-      created_at: '2025-01-20 13:30:00',
-      updated_at: '2025-01-20 15:00:00',
-      note: 'Kiểm kê đột xuất',
-      total_items: 3,
-      checked_items: 1,
-      discrepancy_items: 0
-    },
-    {
-      id: 3,
-      check_date: '2025-01-25 09:00:00',
-      warehouse_id: 1,
-      warehouse_name: 'Kho Trung tâm HCM',
-      status: 'PENDING',
-      created_by: 'Lê Văn C',
-      created_at: '2025-01-25 08:30:00',
-      updated_at: '2025-01-25 08:30:00',
-      note: 'Kiểm kê cuối tháng',
-      total_items: 5,
-      checked_items: 0,
-      discrepancy_items: 0
+  const loadInitial = async () => {
+    setLoading(true)
+    try {
+      const [whs, checksDto] = await Promise.all([
+        InventoryService.getWarehouses(),
+        InventoryService.getInventoryChecks().catch(() => []),
+      ])
+      setWarehouses(whs)
+      setChecks(Array.isArray(checksDto) ? checksDto.map(mapCheck) : [])
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
     }
-  ]
-
-  // Mock data for check items
-  const mockCheckItems: CheckItem[] = [
-    {
-      id: 1,
-      check_id: 1,
-      product_id: 1,
-      product_name: 'Coca Cola',
-      unit: 'Lon',
-      system_quantity: 150,
-      actual_quantity: 148,
-      difference: -2,
-      note: 'Thiếu 2 lon do vỡ',
-      status: 'DISCREPANCY'
-    },
-    {
-      id: 2,
-      check_id: 1,
-      product_id: 2,
-      product_name: 'Pepsi',
-      unit: 'Chai',
-      system_quantity: 25,
-      actual_quantity: 25,
-      difference: 0,
-      note: 'Khớp với hệ thống',
-      status: 'CHECKED'
-    },
-    {
-      id: 3,
-      check_id: 1,
-      product_id: 4,
-      product_name: 'Sữa tươi',
-      unit: 'Hộp',
-      system_quantity: 80,
-      actual_quantity: 82,
-      difference: 2,
-      note: 'Thừa 2 hộp do nhập thêm',
-      status: 'DISCREPANCY'
-    }
-  ]
+  }
 
   useEffect(() => {
-    setChecks(mockChecks)
-    setCheckItems(mockCheckItems)
+    loadInitial()
   }, [])
 
   const filteredChecks = checks.filter(check => {
@@ -173,7 +135,7 @@ const InventoryCheckManagement = () => {
       check_date: new Date().toISOString().slice(0, 16),
       warehouse_id: '',
       note: '',
-      created_by: 'Admin'
+
     })
     setIsModalOpen(true)
   }
@@ -183,15 +145,50 @@ const InventoryCheckManagement = () => {
     setFormData({
       check_date: check.check_date.slice(0, 16),
       warehouse_id: check.warehouse_id.toString(),
-      note: check.note,
-      created_by: check.created_by
+      note: check.note
     })
     setIsModalOpen(true)
   }
 
-  const handleViewItems = (check: InventoryCheck) => {
+  const handleViewItems = async (check: InventoryCheck) => {
     setSelectedCheck(check)
     setIsItemModalOpen(true)
+    try {
+      // Load details from API
+      const details = await InventoryService.getInventoryCheckDetails(check.id)
+      const mapped = (details.items || []).map((it: any) => ({
+        id: it.id ?? Date.now() + Math.random(),
+        check_id: check.id,
+        product_id: it.productUnitId,
+        product_name: it.productName ?? 'Sản phẩm',
+        unit: it.unitName ?? '',
+        system_quantity: it.systemQuantity ?? 0,
+        actual_quantity: it.actualQuantity ?? 0,
+        difference: (it.actualQuantity ?? 0) - (it.systemQuantity ?? 0),
+        note: it.note ?? '',
+        status: (it.status ?? ((it.actualQuantity ?? 0) === (it.systemQuantity ?? 0) ? 'CHECKED' : 'DISCREPANCY')),
+      }))
+      setCheckItems(mapped)
+
+      const stock = await InventoryService.getStock({ warehouseId: check.warehouse_id }).catch(() => [])
+      // Build product unit list from stock and enrich names
+      const units: ProductUnit[] = []
+      for (const s of stock as any[]) {
+        const pid = s.productUnitId ?? s.product_unit_id
+        if (!pid) continue
+        const enriched = await ProductService.getProductUnitById(Number(pid)).catch(() => null)
+        units.push({
+          id: Number(pid),
+          productId: enriched?.productId ?? 0,
+          productName: enriched?.productName ?? `PU#${pid}`,
+          unitName: enriched?.unitName ?? '',
+          systemQuantity: s.quantity ?? 0,
+        })
+      }
+      setProductUnits(units)
+    } catch (e) {
+      console.error(e)
+    }
   }
 
 
@@ -206,63 +203,41 @@ const InventoryCheckManagement = () => {
 
   const handleSaveCheckItem = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!itemFormData.product_id || !itemFormData.actual_quantity) {
-      alert('Vui lòng điền đầy đủ thông tin')
+      showNotify('Vui lòng điền đầy đủ thông tin sản phẩm', 'error')
       return
     }
 
     if (!selectedCheck) return
 
     setIsSubmitting(true)
-    
-    // Simulate API call
-    setTimeout(() => {
-      const selectedProduct = mockProducts.find(p => p.id === parseInt(itemFormData.product_id))
-      const systemQuantity = selectedProduct?.system_quantity || 0
+    try {
+      const pu = productUnits.find(p => p.id === parseInt(itemFormData.product_id))
+      const systemQuantity = pu?.systemQuantity ?? 0
       const actualQuantity = parseInt(itemFormData.actual_quantity)
       const difference = actualQuantity - systemQuantity
-      
       const newItem: CheckItem = {
-        id: Math.max(...checkItems.map(i => i.id)) + 1,
+        id: Date.now(),
         check_id: selectedCheck.id,
         product_id: parseInt(itemFormData.product_id),
-        product_name: selectedProduct?.name || 'Sản phẩm không xác định',
-        unit: selectedProduct?.unit || 'Cái',
+        product_name: pu?.productName ?? 'Sản phẩm',
+        unit: pu?.unitName ?? '',
         system_quantity: systemQuantity,
         actual_quantity: actualQuantity,
-        difference: difference,
+        difference,
         note: itemFormData.note,
         status: difference === 0 ? 'CHECKED' : 'DISCREPANCY'
       }
-      
       setCheckItems(prev => [...prev, newItem])
-      
-      // Update check progress
-      const updatedCheck = checks.find(c => c.id === selectedCheck.id)
-      if (updatedCheck) {
-        const newCheckedItems = updatedCheck.checked_items + 1
-        const newDiscrepancyItems = updatedCheck.discrepancy_items + (difference !== 0 ? 1 : 0)
-        
-        setChecks(prev => prev.map(check => 
-          check.id === selectedCheck.id 
-            ? { 
-                ...check, 
-                checked_items: newCheckedItems,
-                discrepancy_items: newDiscrepancyItems,
-                status: newCheckedItems === check.total_items ? 'COMPLETED' : check.status
-              }
-            : check
-        ))
-      }
-      
+      setItemFormData({ product_id: '', actual_quantity: '', note: '' })
+      showNotify('Đã thêm sản phẩm vào phiếu kiểm kê', 'success')
+    } catch (e) {
+      console.error(e)
+      showNotify('Không thể thêm sản phẩm. Vui lòng thử lại', 'error')
+    } finally {
       setIsSubmitting(false)
-      setItemFormData({
-        product_id: '',
-        actual_quantity: '',
-        note: ''
-      })
-    }, 500)
+    }
   }
 
   const handleCloseModal = () => {
@@ -271,8 +246,7 @@ const InventoryCheckManagement = () => {
     setFormData({
       check_date: '',
       warehouse_id: '',
-      note: '',
-      created_by: ''
+      note: ''
     })
   }
 
@@ -283,248 +257,85 @@ const InventoryCheckManagement = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.check_date || !formData.warehouse_id || !formData.note) {
-      alert('Vui lòng điền đầy đủ thông tin')
+      showNotify('Vui lòng điền đầy đủ thông tin phiếu kiểm kê', 'error')
       return
     }
 
     setIsSubmitting(true)
-    
-    // Simulate API call
-    setTimeout(() => {
-      const selectedWarehouse = mockWarehouses.find(w => w.id === parseInt(formData.warehouse_id))
-      
-      if (editingCheck) {
-        // Update existing check
-        setChecks(prev => prev.map(check => 
-          check.id === editingCheck.id 
-            ? { 
-                ...check, 
-                check_date: formData.check_date + ':00',
-                warehouse_id: parseInt(formData.warehouse_id),
-                warehouse_name: selectedWarehouse?.name || 'Kho không xác định',
-                note: formData.note,
-                created_by: formData.created_by,
-                updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
-              }
-            : check
-        ))
-      } else {
-        // Add new check
-        const newCheck: InventoryCheck = {
-          id: Math.max(...checks.map(c => c.id)) + 1,
-          check_date: formData.check_date + ':00',
-          warehouse_id: parseInt(formData.warehouse_id),
-          warehouse_name: selectedWarehouse?.name || 'Kho không xác định',
-          status: 'PENDING',
-          created_by: formData.created_by,
-          created_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
+    try {
+      if (!editingCheck) {
+        // Choose first stock location of warehouse as default
+        const stockLocations = await InventoryService.getStockLocations(parseInt(formData.warehouse_id)).catch(() => []) as any[]
+        const stockLocationId = (stockLocations?.[0]?.id) || 1
+        await InventoryService.createInventoryCheck({
+          stocktakingDate: formData.check_date,
+          warehouseId: parseInt(formData.warehouse_id),
+          stockLocationId,
           note: formData.note,
-          total_items: mockProducts.length,
-          checked_items: 0,
-          discrepancy_items: 0
-        }
-        setChecks(prev => [...prev, newCheck])
+        })
+        showNotify('Tạo phiếu kiểm kê thành công', 'success')
+      } else {
+        // No dedicated update endpoint per spec; re-create not ideal, so skip
       }
-      
-      setIsSubmitting(false)
+      const dto = await InventoryService.getInventoryChecks()
+      setChecks(dto.map(mapCheck))
       handleCloseModal()
-    }, 500)
+    } catch (e) {
+      console.error(e)
+      showNotify('Có lỗi khi tạo phiếu kiểm kê', 'error')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleDeleteCheck = (id: number) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa phiếu kiểm kê này?')) {
+  const handleDeleteCheck = async (id: number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa phiếu kiểm kê này?')) return
+    try {
+      await InventoryService.deleteInventoryCheck(id)
       setChecks(prev => prev.filter(check => check.id !== id))
       setCheckItems(prev => prev.filter(item => item.check_id !== id))
+    } catch (e) {
+      console.error(e)
     }
   }
 
-  const handleStartCheck = (id: number) => {
-    setChecks(prev => prev.map(check => 
-      check.id === id 
-        ? { ...check, status: 'IN_PROGRESS' as const }
-        : check
-    ))
+  const handleStartCheck = async (id: number) => {
+    setChecks(prev => prev.map(check => check.id === id ? { ...check, status: 'IN_PROGRESS' } : check))
   }
 
-  const handleCompleteCheck = (id: number) => {
-    setChecks(prev => prev.map(check => 
-      check.id === id 
-        ? { ...check, status: 'COMPLETED' as const }
-        : check
-    ))
-  }
-
-  const handleExportReport = (check: InventoryCheck) => {
-    const checkItemsForReport = checkItems.filter(item => item.check_id === check.id)
-    
-    // Create Excel workbook
-    const workbook = XLSX.utils.book_new()
-    
-    // Create summary sheet (horizontal layout)
-    const summaryData = [
-      ['BÁO CÁO KIỂM KÊ KHO'],
-      [''],
-      ['Thông tin phiếu kiểm kê:'],
-      ['ID phiếu', 'Kho', 'Ngày kiểm', 'Người tạo', 'Ghi chú'],
-      [check.id, check.warehouse_name, check.check_date, check.created_by, check.note],
-      [''],
-      ['Thống kê tổng quan:'],
-      ['Tổng sản phẩm', 'Đã kiểm', 'Chênh lệch'],
-      [check.total_items, check.checked_items, check.discrepancy_items],
-      [''],
-      ['Chi tiết sản phẩm:']
-    ]
-    
-    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
-    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Tổng quan')
-    
-    // Create detailed sheet
-    const detailData = [
-      ['Sản phẩm', 'Đơn vị', 'Tồn hệ thống', 'Thực tế', 'Chênh lệch', 'Ghi chú', 'Trạng thái'],
-      ...checkItemsForReport.map(item => [
-        item.product_name,
-        item.unit,
-        item.system_quantity,
-        item.actual_quantity,
-        item.difference,
-        item.note,
-        item.status === 'CHECKED' ? 'Đã kiểm' : item.status === 'DISCREPANCY' ? 'Chênh lệch' : 'Chờ kiểm'
-      ])
-    ]
-    
-    const detailSheet = XLSX.utils.aoa_to_sheet(detailData)
-    
-    // Set column widths
-    detailSheet['!cols'] = [
-      { wch: 20 }, // Sản phẩm
-      { wch: 10 }, // Đơn vị
-      { wch: 15 }, // Tồn hệ thống
-      { wch: 15 }, // Thực tế
-      { wch: 15 }, // Chênh lệch
-      { wch: 30 }, // Ghi chú
-      { wch: 15 }  // Trạng thái
-    ]
-    
-    XLSX.utils.book_append_sheet(workbook, detailSheet, 'Chi tiết')
-    
-    // Create horizontal layout sheet
-    const horizontalData = [
-      ['BÁO CÁO KIỂM KÊ KHO - LAYOUT NGANG'],
-      [''],
-      ['THÔNG TIN PHIẾU KIỂM KÊ'],
-      ['ID phiếu', check.id],
-      ['Kho', check.warehouse_name],
-      ['Ngày kiểm', check.check_date],
-      ['Người tạo', check.created_by],
-      ['Ghi chú', check.note],
-      [''],
-      ['THỐNG KÊ TỔNG QUAN'],
-      ['Tổng sản phẩm', check.total_items],
-      ['Đã kiểm', check.checked_items],
-      ['Chênh lệch', check.discrepancy_items],
-      [''],
-      ['CHI TIẾT SẢN PHẨM'],
-      ['Sản phẩm', 'Đơn vị', 'Tồn hệ thống', 'Thực tế', 'Chênh lệch', 'Ghi chú', 'Trạng thái'],
-      ...checkItemsForReport.map(item => [
-        item.product_name,
-        item.unit,
-        item.system_quantity,
-        item.actual_quantity,
-        item.difference,
-        item.note,
-        item.status === 'CHECKED' ? 'Đã kiểm' : item.status === 'DISCREPANCY' ? 'Chênh lệch' : 'Chờ kiểm'
-      ])
-    ]
-    
-    const horizontalSheet = XLSX.utils.aoa_to_sheet(horizontalData)
-    horizontalSheet['!cols'] = [
-      { wch: 20 }, // Sản phẩm
-      { wch: 10 }, // Đơn vị
-      { wch: 15 }, // Tồn hệ thống
-      { wch: 15 }, // Thực tế
-      { wch: 15 }, // Chênh lệch
-      { wch: 30 }, // Ghi chú
-      { wch: 15 }  // Trạng thái
-    ]
-    XLSX.utils.book_append_sheet(workbook, horizontalSheet, 'Layout ngang')
-    
-    // Create discrepancy sheet (only items with differences)
-    const discrepancyItems = checkItemsForReport.filter(item => item.difference !== 0)
-    if (discrepancyItems.length > 0) {
-      const discrepancyData = [
-        ['SẢN PHẨM CÓ CHÊNH LỆCH'],
-        [''],
-        ['Sản phẩm', 'Đơn vị', 'Tồn hệ thống', 'Thực tế', 'Chênh lệch', 'Ghi chú'],
-        ...discrepancyItems.map(item => [
-          item.product_name,
-          item.unit,
-          item.system_quantity,
-          item.actual_quantity,
-          item.difference,
-          item.note
-        ])
-      ]
-      
-      const discrepancySheet = XLSX.utils.aoa_to_sheet(discrepancyData)
-      discrepancySheet['!cols'] = [
-        { wch: 20 }, // Sản phẩm
-        { wch: 10 }, // Đơn vị
-        { wch: 15 }, // Tồn hệ thống
-        { wch: 15 }, // Thực tế
-        { wch: 15 }, // Chênh lệch
-        { wch: 30 }  // Ghi chú
-      ]
-      
-      XLSX.utils.book_append_sheet(workbook, discrepancySheet, 'Chênh lệch')
+  const handleCompleteCheck = async (id: number) => {
+    try {
+      const itemsPayload = checkItems
+        .filter(i => i.check_id === id)
+        .map(i => ({
+          productUnitId: i.product_id,
+          systemQuantity: i.system_quantity,
+          actualQuantity: i.actual_quantity,
+          note: i.note,
+        }))
+      await InventoryService.confirmInventoryCheck(id, itemsPayload)
+      setChecks(prev => prev.map(check => check.id === id ? { ...check, status: 'COMPLETED' } : check))
+    } catch (e) {
+      console.error(e)
     }
-    
-    // Download Excel file
-    const fileName = `BaoCaoKiemKe_${check.id}_${check.check_date.split(' ')[0]}.xlsx`
-    XLSX.writeFile(workbook, fileName)
   }
 
-  const handleExportCSV = (check: InventoryCheck) => {
-    const checkItemsForReport = checkItems.filter(item => item.check_id === check.id)
-    
-    // Create CSV content
-    const csvContent = [
-      ['Phiếu kiểm kê', `#${check.id}`],
-      ['Kho', check.warehouse_name],
-      ['Ngày kiểm', check.check_date],
-      ['Người tạo', check.created_by],
-      ['Ghi chú', check.note],
-      [''],
-      ['Sản phẩm', 'Đơn vị', 'Tồn hệ thống', 'Thực tế', 'Chênh lệch', 'Ghi chú', 'Trạng thái'],
-      ...checkItemsForReport.map(item => [
-        item.product_name,
-        item.unit,
-        item.system_quantity,
-        item.actual_quantity,
-        item.difference,
-        item.note,
-        item.status === 'CHECKED' ? 'Đã kiểm' : item.status === 'DISCREPANCY' ? 'Chênh lệch' : 'Chờ kiểm'
-      ])
-    ].map(row => row.join(',')).join('\n')
-
-    // Download CSV
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `kiem_ke_${check.id}_${check.check_date.split(' ')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  const handleExportReport = async (check: InventoryCheck) => {
+    try {
+      await InventoryService.exportStocktakingExcel(check.id)
+    } catch (e) {
+      console.error(e)
+    }
   }
+
+  // CSV export removed per BE offering direct Excel endpoint
 
   const handleExportAllReports = () => {
     // Create Excel workbook with all checks
     const workbook = XLSX.utils.book_new()
-    
+
     // Create summary sheet for all checks (horizontal layout)
     const allChecksData = [
       ['BÁO CÁO TỔNG HỢP KIỂM KÊ KHO'],
@@ -546,7 +357,7 @@ const InventoryCheckManagement = () => {
         check.created_by
       ])
     ]
-    
+
     const allChecksSheet = XLSX.utils.aoa_to_sheet(allChecksData)
     allChecksSheet['!cols'] = [
       { wch: 8 },  // ID
@@ -559,11 +370,11 @@ const InventoryCheckManagement = () => {
       { wch: 15 }  // Người tạo
     ]
     XLSX.utils.book_append_sheet(workbook, allChecksSheet, 'Tổng hợp')
-    
+
     // Create individual sheets for each check
     checks.forEach(check => {
       const checkItemsForReport = checkItems.filter(item => item.check_id === check.id)
-      
+
       const checkData = [
         [`PHIẾU KIỂM KÊ #${check.id}`],
         [''],
@@ -587,7 +398,7 @@ const InventoryCheckManagement = () => {
           item.status === 'CHECKED' ? 'Đã kiểm' : item.status === 'DISCREPANCY' ? 'Chênh lệch' : 'Chờ kiểm'
         ])
       ]
-      
+
       const checkSheet = XLSX.utils.aoa_to_sheet(checkData)
       checkSheet['!cols'] = [
         { wch: 20 }, // Sản phẩm
@@ -598,10 +409,10 @@ const InventoryCheckManagement = () => {
         { wch: 30 }, // Ghi chú
         { wch: 15 }  // Trạng thái
       ]
-      
+
       XLSX.utils.book_append_sheet(workbook, checkSheet, `Phiếu ${check.id}`)
     })
-    
+
     // Download Excel file
     const fileName = `BaoCaoTongHopKiemKe_${new Date().toISOString().split('T')[0]}.xlsx`
     XLSX.writeFile(workbook, fileName)
@@ -637,6 +448,14 @@ const InventoryCheckManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {notify && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded shadow text-sm text-white ${
+          notify.type === 'success' ? 'bg-green-600' : notify.type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+        }`}>
+          {notify.message}
+        </div>
+      )}
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Kiểm kê kho</h2>
@@ -733,7 +552,7 @@ const InventoryCheckManagement = () => {
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           >
             <option value="all">Tất cả kho</option>
-            {mockWarehouses.map(warehouse => (
+            {warehouses.map(warehouse => (
               <option key={warehouse.id} value={warehouse.id}>
                 {warehouse.name}
               </option>
@@ -835,37 +654,12 @@ const InventoryCheckManagement = () => {
                       >
                         Sửa
                       </button>
-                      <div className="relative inline-block text-left">
-                        <button
-                          className="text-purple-600 hover:text-purple-900 flex items-center"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const dropdown = e.currentTarget.nextElementSibling as HTMLElement
-                            dropdown.classList.toggle('hidden')
-                          }}
-                        >
-                          Xuất báo cáo
-                          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        <div className="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
-                          <div className="py-1">
-                            <button
-                              onClick={() => handleExportReport(check)}
-                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            >
-                              📊 Xuất Excel
-                            </button>
-                            <button
-                              onClick={() => handleExportCSV(check)}
-                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            >
-                              📄 Xuất CSV
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                      <button
+                        onClick={() => handleExportReport(check)}
+                        className="text-purple-600 hover:text-purple-900"
+                      >
+                        Xuất báo cáo
+                      </button>
                       <button
                         onClick={() => handleDeleteCheck(check.id)}
                         className="text-red-600 hover:text-red-900"
@@ -886,7 +680,7 @@ const InventoryCheckManagement = () => {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleCloseModal} />
-            
+
             <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full">
               <div className="flex items-center justify-between p-6 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -901,7 +695,7 @@ const InventoryCheckManagement = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="p-6">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -917,7 +711,7 @@ const InventoryCheckManagement = () => {
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Kho *
@@ -929,7 +723,7 @@ const InventoryCheckManagement = () => {
                         required
                       >
                         <option value="">Chọn kho</option>
-                        {mockWarehouses.map(warehouse => (
+                        {warehouses.map(warehouse => (
                           <option key={warehouse.id} value={warehouse.id}>
                             {warehouse.name}
                           </option>
@@ -937,7 +731,7 @@ const InventoryCheckManagement = () => {
                       </select>
                     </div>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Ghi chú *
@@ -951,21 +745,10 @@ const InventoryCheckManagement = () => {
                       required
                     />
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Người tạo
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.created_by}
-                      onChange={(e) => setFormData(prev => ({ ...prev, created_by: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      placeholder="Tên người tạo phiếu"
-                    />
-                  </div>
+
+                  {/* Người tạo lấy từ JWT, không nhập tay */}
                 </div>
-                
+
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
@@ -993,7 +776,7 @@ const InventoryCheckManagement = () => {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleCloseItemModal} />
-            
+
             <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full">
               <div className="flex items-center justify-between p-6 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -1008,7 +791,7 @@ const InventoryCheckManagement = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <div className="p-6">
                 {/* Add Item Form */}
                 {selectedCheck.status === 'IN_PROGRESS' && (
@@ -1026,14 +809,14 @@ const InventoryCheckManagement = () => {
                           required
                         >
                           <option value="">Chọn sản phẩm</option>
-                          {mockProducts.map(product => (
-                            <option key={product.id} value={product.id}>
-                              {product.name} ({product.unit}) - Tồn: {product.system_quantity}
+                          {productUnits.map(pu => (
+                            <option key={pu.id} value={pu.id}>
+                              {pu.productName} ({pu.unitName}) - Tồn: {pu.systemQuantity ?? 0}
                             </option>
                           ))}
                         </select>
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Số lượng thực tế *
@@ -1048,7 +831,7 @@ const InventoryCheckManagement = () => {
                           required
                         />
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Ghi chú
@@ -1061,7 +844,7 @@ const InventoryCheckManagement = () => {
                           placeholder="Ghi chú kiểm kê"
                         />
                       </div>
-                      
+
                       <div className="flex items-end">
                         <button
                           type="submit"

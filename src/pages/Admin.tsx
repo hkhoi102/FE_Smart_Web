@@ -1,14 +1,14 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { ProductService } from '@/services/productService'
-import { Product, ProductCategory } from '@/types/product'
+import { ProductService, Product, ProductCategory, CreateProductRequest, UpdateProductRequest } from '@/services/productService'
 import { Pagination, ProductTable, ProductForm, Modal, UnitManagement, ManagementDropdown, PriceManagement, AccountManagement, InventoryManagement, WarehouseTab, PromotionManagement, OrderManagement } from '@/components'
+import CategoryManagement from '@/components/CategoryManagement'
 
 const Admin = () => {
   const { user, logout, isAuthenticated } = useAuth()
   const navigate = useNavigate()
-  
+
   // State for products
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<ProductCategory[]>([])
@@ -21,13 +21,29 @@ const Admin = () => {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>()
-  const [currentTab, setCurrentTab] = useState<'overview' | 'products' | 'units' | 'prices' | 'inventory' | 'warehouses' | 'accounts' | 'promotions' | 'orders'>('overview')
-  
+  const [currentTab, setCurrentTab] = useState<'overview' | 'products' | 'categories' | 'units' | 'prices' | 'inventory' | 'warehouses' | 'accounts' | 'promotions' | 'orders'>('overview')
+
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+  const [isUnitModalOpen, setIsUnitModalOpen] = useState(false)
+  const [unitForm, setUnitForm] = useState<{ productId: number | ''; unitId: number | ''; conversionFactor: number; isDefault: boolean }>({ productId: '', unitId: '', conversionFactor: 1, isDefault: false })
+  const [allUnits, setAllUnits] = useState<Array<{ id: number; name: string; isDefault?: boolean }>>([])
+
+  useEffect(() => {
+    if (!isUnitModalOpen) return
+    // Load all units once when modal opens
+    ProductService.getUnits()
+      .then(res => setAllUnits(res.map((u: any) => ({ id: u.id, name: u.name, isDefault: u.isDefault }))))
+      .catch(() => setAllUnits([]))
+  }, [isUnitModalOpen])
+
+  // Notification modal
+  const [notify, setNotify] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' }>({ open: false, title: '', message: '', type: 'success' })
+  const openNotify = (title: string, message: string, type: 'success' | 'error' = 'success') => setNotify({ open: true, title, message, type })
+  const closeNotify = () => setNotify(prev => ({ ...prev, open: false }))
+
   // Stats for overview
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -96,17 +112,14 @@ const Admin = () => {
       // Get all products for stats calculation
       const allProductsResponse = await ProductService.getProducts(1, 1000) // Get all products
       const allProducts = allProductsResponse.products
-      
+
       const totalProducts = allProducts.length
-      const activeProducts = allProducts.filter(p => p.active === 1).length
+      const activeProducts = allProducts.filter(p => p.active).length
       const totalCategories = categories.length
-      
-      // Calculate total revenue (sum of all default prices)
-      const totalRevenue = allProducts.reduce((sum, product) => {
-        const defaultPrice = product.prices.find(p => p.is_default)
-        return sum + (defaultPrice?.price || 0)
-      }, 0)
-      
+
+      // Backend giá sẽ xử lý sau; tạm thời đặt 0
+      const totalRevenue = 0
+
       setStats({
         totalProducts,
         activeProducts,
@@ -147,23 +160,40 @@ const Admin = () => {
     setEditingProduct(null)
   }
 
-  const handleSubmitProduct = async (productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
+  const handleSubmitProduct = async (productData: any) => {
     setIsSubmitting(true)
     try {
-      if (editingProduct) {
-        // Update existing product
-        await ProductService.updateProduct(editingProduct.id, productData)
-      } else {
-        // Create new product
-        await ProductService.createProduct(productData)
+      // Nếu form báo lỗi validation
+      if (productData && productData.__error) {
+        openNotify('Thiếu thông tin', String(productData.__error), 'error')
+        return
       }
-      
+      // Nếu productData đã có id (được tạo kèm ảnh từ form) coi như thành công, không gọi API lần nữa
+      if (productData && productData.id) {
+        await loadProducts()
+        handleCloseModal()
+        openNotify('Thành công', 'Đã thêm sản phẩm thành công', 'success')
+        return
+      }
+      const payload: CreateProductRequest | UpdateProductRequest = {
+        name: productData.name,
+        description: productData.description,
+        imageUrl: productData.image_url || productData.imageUrl,
+        expirationDate: productData.expiration_date || productData.expirationDate,
+        categoryId: productData.category_id || productData.categoryId,
+        active: (productData.active === 1) ? true : !!productData.active,
+      }
+      if (editingProduct) await ProductService.updateProduct(editingProduct.id, payload)
+      else await ProductService.createProduct(payload)
+
       // Reload products
       await loadProducts()
       handleCloseModal()
+      openNotify('Thành công', 'Đã thêm sản phẩm thành công', 'success')
     } catch (error) {
-      console.error('Error saving product:', error)
-      alert('Có lỗi xảy ra khi lưu sản phẩm')
+      // Thất bại rõ ràng: hiện thông báo lỗi
+      handleCloseModal()
+      openNotify('Thất bại', 'Không thể lưu sản phẩm. Vui lòng kiểm tra dữ liệu và thử lại.', 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -198,7 +228,7 @@ const Admin = () => {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Trang quản trị</h1>
-              <p className="text-gray-600">Chào mừng, {user?.username}</p>
+              <p className="text-gray-600">Chào mừng, {user?.fullName} ({user?.role})</p>
             </div>
             <button
               onClick={handleLogout}
@@ -294,6 +324,7 @@ const Admin = () => {
                     </dl>
                   </div>
                 </div>
+
               </div>
             </div>
 
@@ -368,19 +399,19 @@ const Admin = () => {
             <div className="px-4 py-5 sm:p-6">
               <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Thao tác nhanh</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button 
+                <button
                   onClick={handleAddProduct}
                   className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
                 >
                   Thêm sản phẩm mới
                 </button>
-                <button 
+                <button
                   onClick={() => setCurrentTab('products')}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
                 >
                   Quản lý sản phẩm
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     calculateStats()
                     alert('Dữ liệu đã được làm mới!')
@@ -398,7 +429,7 @@ const Admin = () => {
             <div className="px-4 py-5 sm:p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">Sản phẩm gần đây</h3>
-                <button 
+                <button
                   onClick={() => setCurrentTab('products')}
                   className="text-green-600 hover:text-green-800 text-sm font-medium"
                 >
@@ -435,10 +466,10 @@ const Admin = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-8 w-8">
-                              {product.image_url ? (
+                              {product.imageUrl ? (
                                 <img
                                   className="h-8 w-8 rounded object-cover"
-                                  src={product.image_url}
+                                  src={product.imageUrl}
                                   alt={product.name}
                                 />
                               ) : (
@@ -455,16 +486,13 @@ const Admin = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {categories.find(cat => cat.id === product.category_id)?.name || `ID: ${product.category_id}`}
+                          {product.categoryName || categories.find(cat => cat.id === product.categoryId)?.name || `ID: ${product.categoryId}`}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Intl.NumberFormat('vi-VN', {
-                            style: 'currency',
-                            currency: 'VND'
-                          }).format(product.prices.find(p => p.is_default)?.price || 0)}
+                          —
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(product.created_at).toLocaleDateString('vi-VN')}
+                          {new Date(product.createdAt).toLocaleDateString('vi-VN')}
                         </td>
                       </tr>
                     ))}
@@ -493,7 +521,7 @@ const Admin = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Danh mục
@@ -511,7 +539,7 @@ const Admin = () => {
                       ))}
                     </select>
                   </div>
-                  
+
                   <div className="flex items-end">
                     <button
                       onClick={() => {
@@ -534,15 +562,23 @@ const Admin = () => {
                     <h3 className="text-lg font-medium text-gray-900">
                       Danh sách sản phẩm ({pagination.total_items})
                     </h3>
-                    <button 
-                      onClick={handleAddProduct}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                    >
-                      Thêm sản phẩm mới
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setIsUnitModalOpen(true)}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                      >
+                        Thêm đơn vị tính cho sản phẩm
+                      </button>
+                      <button
+                        onClick={handleAddProduct}
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                      >
+                        Thêm sản phẩm mới
+                      </button>
+                    </div>
                   </div>
                 </div>
-                
+
                 {loading ? (
                   <div className="flex justify-center items-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
@@ -563,6 +599,10 @@ const Admin = () => {
                 )}
               </div>
             </div>
+          )}
+
+          {currentTab === 'categories' && (
+            <CategoryManagement />
           )}
 
           {currentTab === 'units' && (
@@ -603,12 +643,130 @@ const Admin = () => {
         size="lg"
       >
         <ProductForm
-          product={editingProduct}
-          categories={categories}
+          product={editingProduct as any}
+          categories={categories as any}
           onSubmit={handleSubmitProduct}
           onCancel={handleCloseModal}
           isLoading={isSubmitting}
         />
+      </Modal>
+
+      {/* Modal thêm đơn vị tính cho sản phẩm */}
+      <Modal
+        isOpen={isUnitModalOpen}
+        onClose={() => setIsUnitModalOpen(false)}
+        title="Thêm đơn vị tính cho sản phẩm"
+        size="md"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            if (!unitForm.productId || !unitForm.unitId) {
+              openNotify('Thiếu thông tin', 'Vui lòng chọn sản phẩm và đơn vị tính', 'error')
+              return
+            }
+            try {
+              const pid = Number(unitForm.productId)
+              const uid = Number(unitForm.unitId)
+              await ProductService.addProductUnit(pid, {
+                unitId: uid,
+                conversionFactor: Number(unitForm.conversionFactor),
+                isDefault: false,
+              })
+              setIsUnitModalOpen(false)
+              openNotify('Thành công', 'Đã thêm đơn vị tính cho sản phẩm', 'success')
+              await loadProducts()
+            } catch (err) {
+              openNotify('Thất bại', 'Không thể thêm đơn vị tính. Vui lòng thử lại.', 'error')
+            }
+          }}
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Chọn sản phẩm</label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                value={unitForm.productId}
+                onChange={(e) => setUnitForm(prev => ({ ...prev, productId: Number(e.target.value) }))}
+              >
+                <option value="">-- Chọn sản phẩm --</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị tính</label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                value={unitForm.unitId}
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+                  let cf = unitForm.conversionFactor
+                  const selected = e.target.options[e.target.selectedIndex]?.text?.toLowerCase()
+                  if (selected?.includes('thùng')) cf = 24
+                  else if (selected?.includes('lốc') || selected?.includes('pack')) cf = 6
+                  setUnitForm(prev => ({ ...prev, unitId: value, conversionFactor: cf }))
+                }}
+              >
+                <option value="">-- Chọn đơn vị --</option>
+                {(() => {
+                  const selectedProduct = products.find(p => p.id === Number(unitForm.productId))
+                  const existingUnitIds = new Set((selectedProduct?.productUnits || []).map(u => u.unitId))
+                  return allUnits
+                    .filter(u => !existingUnitIds.has(u.id) && !u.isDefault)
+                    .map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))
+                })()}
+              </select>
+              <div className="mt-2 text-xs text-gray-500">Chỉ hiển thị các đơn vị chưa có trong sản phẩm và không đặt mặc định.</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Hệ số quy đổi</label>
+              <input
+                type="number"
+                min={1}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                value={unitForm.conversionFactor}
+                onChange={(e) => setUnitForm(prev => ({ ...prev, conversionFactor: Number(e.target.value) }))}
+              />
+              <p className="text-xs text-gray-500 mt-1">Gợi ý: Thùng = 24, Lốc = 6</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="isDefaultUnit" checked={unitForm.isDefault} onChange={(e) => setUnitForm(prev => ({ ...prev, isDefault: e.target.checked }))} className="h-4 w-4 text-green-600 border-gray-300 rounded" />
+              <label htmlFor="isDefaultUnit" className="text-sm text-gray-700">Đặt làm đơn vị mặc định</label>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <button type="button" onClick={() => setIsUnitModalOpen(false)} className="px-4 py-2 rounded-md border text-gray-700">Hủy</button>
+            <button type="submit" className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700">Hoàn thành</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Notification Modal */}
+      <Modal
+        isOpen={notify.open}
+        onClose={closeNotify}
+        title={notify.title}
+        size="sm"
+      >
+        <div className={`flex items-start gap-3 ${notify.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
+          <div className={`mt-0.5 rounded-full h-6 w-6 flex items-center justify-center ${notify.type === 'success' ? 'bg-green-100' : 'bg-red-100'}`}>
+            {notify.type === 'success' ? (
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            )}
+          </div>
+          <div className="text-sm">
+            {notify.message}
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button onClick={closeNotify} className={`px-4 py-2 rounded-md text-white ${notify.type === 'success' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>Đóng</button>
+        </div>
       </Modal>
     </div>
   )

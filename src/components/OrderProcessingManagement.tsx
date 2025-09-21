@@ -1,123 +1,177 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Order } from './OrderManagement'
 import Modal from './Modal'
 import OrderStatusTracker from './OrderStatusTracker'
+import { OrderApi } from '../services/orderService'
+import { CustomerService } from '../services/customerService'
+import { ProductService } from '../services/productService'
+import { ReturnService } from '../services/returnService'
+import ReturnProcessingManagement from './ReturnProcessingManagement'
 
 const OrderProcessingManagement: React.FC = () => {
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: 101,
-      created_at: '2025-01-15 14:30:25.123456',
-      customer_id: 5,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 150000,
-      updated_at: '2025-01-15 14:30:25.123456',
-      discount_amount: 0,
-      payment_method: 'COD',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 102,
-      created_at: '2025-01-15 15:45:12.234567',
-      customer_id: 8,
-      promotion_applied_id: 2,
-      status: 'PENDING',
-      total_amount: 320000,
-      updated_at: '2025-01-15 15:45:12.234567',
-      discount_amount: 50000,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 103,
-      created_at: '2025-01-15 16:20:33.345678',
-      customer_id: 12,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 75000,
-      updated_at: '2025-01-15 16:20:33.345678',
-      discount_amount: 0,
-      payment_method: 'COD',
-      payment_status: 'UNPAID'
-    },
-    {
-      id: 104,
-      created_at: '2025-01-15 17:10:45.456789',
-      customer_id: 3,
-      promotion_applied_id: 1,
-      status: 'PENDING',
-      total_amount: 450000,
-      updated_at: '2025-01-15 17:10:45.456789',
-      discount_amount: 100000,
-      payment_method: 'BANK_TRANSFER',
-      payment_status: 'PAID'
-    },
-    {
-      id: 105,
-      created_at: '2025-01-15 18:25:18.567890',
-      customer_id: 7,
-      promotion_applied_id: undefined,
-      status: 'PENDING',
-      total_amount: 200000,
-      updated_at: '2025-01-15 18:25:18.567890',
-      discount_amount: 0,
-      payment_method: 'COD',
-      payment_status: 'UNPAID'
-    }
-  ])
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [detailMap, setDetailMap] = useState<Record<number, { customerName?: string; paymentMethod?: 'COD' | 'BANK_TRANSFER' | 'CREDIT_CARD'; paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL'; discountAmount?: number; totalAmount?: number; updatedAt?: string }>>({})
+  const [rawStatusMap, setRawStatusMap] = useState<Record<number, string>>({})
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<any | null>(null)
+  const [unitInfoCache, setUnitInfoCache] = useState<Record<number, { productName?: string; unitName?: string }>>({})
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [selectedOrders, setSelectedOrders] = useState<number[]>([])
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'PROCESSING'>('ALL')
+  // Deprecated local filter; use orderStatusFilter instead
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'ALL' | 'PENDING' | 'PROCESSING' | 'DELIVERING'>('PENDING')
+  const [activeSubTab, setActiveSubTab] = useState<'newOrders' | 'returnOrders'>('newOrders')
 
-  const handleViewDetails = (order: Order) => {
-    setSelectedOrder(order)
-    setIsModalOpen(true)
-  }
-
-  const handleConfirmOrder = (id: number) => {
-    setOrders(orders.map(o => 
-      o.id === id 
-        ? { 
-            ...o, 
-            status: 'PROCESSING',
-            updated_at: new Date().toISOString()
-          }
-        : o
-    ))
-  }
-
-  const handleRejectOrder = (id: number) => {
-    if (window.confirm('Bạn có chắc chắn muốn từ chối đơn hàng này?')) {
-      setOrders(orders.map(o => 
-        o.id === id 
-          ? { 
-              ...o, 
-              status: 'CANCELLED',
-              updated_at: new Date().toISOString()
-            }
-          : o
-      ))
+  // Map backend status to UI status
+  const mapBackendStatusToUI = (status: string): Order['status'] => {
+    switch (status) {
+      case 'PENDING':
+        return 'PENDING'
+      case 'CONFIRMED':
+      case 'DELIVERING':
+        return 'PROCESSING'
+      case 'COMPLETED':
+        return 'COMPLETED'
+      case 'CANCELLED':
+        return 'CANCELLED'
+      default:
+        return 'PENDING'
     }
   }
 
-  const handleCompleteOrder = (id: number) => {
-    setOrders(orders.map(o => 
-      o.id === id 
-        ? { 
-            ...o, 
-            status: 'COMPLETED',
-            updated_at: new Date().toISOString()
+  // Fetch orders from backend (pending/processing)
+  useEffect(() => {
+    let mounted = true
+    const fetchOrders = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        let arr: any[] = []
+        if (orderStatusFilter === 'PENDING') {
+          const res = await OrderApi.list({ page: 0, size: 20, status: 'PENDING' as any })
+          arr = Array.isArray(res?.data) ? res.data : []
+        } else if (orderStatusFilter === 'PROCESSING') {
+          const c1 = await OrderApi.list({ page: 0, size: 20, status: 'CONFIRMED' as any })
+          arr = Array.isArray(c1?.data) ? c1.data : []
+        } else if (orderStatusFilter === 'DELIVERING') {
+          const c2 = await OrderApi.list({ page: 0, size: 20, status: 'DELIVERING' as any })
+          arr = Array.isArray(c2?.data) ? c2.data : []
+        } else {
+          const [p, c1, c2] = await Promise.all([
+            OrderApi.list({ page: 0, size: 20, status: 'PENDING' as any }),
+            OrderApi.list({ page: 0, size: 20, status: 'CONFIRMED' as any }),
+            OrderApi.list({ page: 0, size: 20, status: 'DELIVERING' as any }),
+          ])
+          const a0 = Array.isArray(p?.data) ? p.data : []
+          const a1 = Array.isArray(c1?.data) ? c1.data : []
+          const a2 = Array.isArray(c2?.data) ? c2.data : []
+          arr = [...a0, ...a1, ...a2]
+        }
+        const mapped: Order[] = arr.map((o: any) => ({
+          id: o.id,
+          created_at: o.createdAt ?? new Date().toISOString(),
+          customer_id: o.customerId,
+          promotion_applied_id: o.promotionAppliedId ?? undefined,
+          status: mapBackendStatusToUI(o.status),
+          total_amount: o.totalAmount ?? 0,
+          updated_at: o.updatedAt ?? o.createdAt ?? new Date().toISOString(),
+          discount_amount: o.discountAmount ?? 0,
+          payment_method: (o.paymentMethod ?? 'COD') as any,
+          payment_status: (o.paymentStatus ?? 'UNPAID') as any,
+        }))
+        if (mounted) {
+          setOrders(mapped)
+          const statusMap: Record<number, string> = {}
+          arr.forEach((o: any) => { statusMap[o.id] = o.status })
+          setRawStatusMap(statusMap)
+        }
+
+        // Enrich customerName from order detail
+        // Prefer fetching names via customer service to ensure consistency
+        const nameMap = await CustomerService.preloadNames(mapped.map(o => o.customer_id))
+        const details = await Promise.all(mapped.map(o => OrderApi.getById(o.id).catch(() => null)))
+        const map: Record<number, { customerName?: string; paymentMethod?: 'COD' | 'BANK_TRANSFER' | 'CREDIT_CARD'; paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL'; discountAmount?: number; totalAmount?: number; updatedAt?: string }> = {}
+        details.forEach(d => {
+          const data = (d as any)?.data
+          if (data && typeof data.id === 'number') {
+            map[data.id] = {
+              customerName: nameMap[data.customerId] || data.customerName,
+              paymentMethod: data.paymentMethod,
+              paymentStatus: data.paymentStatus,
+              discountAmount: typeof data.discountAmount === 'number' ? data.discountAmount : undefined,
+              totalAmount: typeof data.totalAmount === 'number' ? data.totalAmount : undefined,
+              updatedAt: data.updatedAt,
+            }
           }
-        : o
-    ))
+        })
+        if (mounted) setDetailMap(map)
+      } catch (e: any) {
+        if (mounted) setError(e?.message || 'Không thể tải danh sách đơn hàng')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    fetchOrders()
+    return () => { mounted = false }
+  }, [orderStatusFilter])
+
+  const handleViewDetails = async (order: Order) => {
+    setSelectedOrder(order)
+    setIsModalOpen(true)
+    try {
+      const resp = await OrderApi.getById(order.id)
+      const data = resp?.data || null
+      setSelectedOrderDetail(data)
+      // Preload unit info for items in this order
+      if (data && Array.isArray(data.orderDetails)) {
+        const unitIds = Array.from(new Set(data.orderDetails.map((d: any) => d.productUnitId))) as number[]
+        const missing = unitIds.filter(id => !unitInfoCache[id])
+        if (missing.length) {
+          const results = await Promise.all(missing.map(id => ProductService.getProductUnitById(id)))
+          const next = { ...unitInfoCache }
+          results.forEach((info, idx) => {
+            const key = missing[idx]
+            if (info) next[key] = { productName: info.productName, unitName: info.unitName }
+          })
+          setUnitInfoCache(next)
+        }
+      }
+    } catch {
+      setSelectedOrderDetail(null)
+    }
+  }
+
+  const handleConfirmOrder = async (id: number) => {
+    // Bước xác nhận: chuyển trạng thái sang CONFIRMED (an toàn, không xuất kho)
+    await OrderApi.updateStatus(id, 'CONFIRMED')
+    // Remove from list since page chỉ hiển thị đơn chờ xử lý
+    setOrders(prev => prev.filter(o => o.id !== id))
+  }
+
+  const handleRejectOrder = async (id: number) => {
+    if (window.confirm('Bạn có chắc chắn muốn từ chối đơn hàng này?')) {
+      await OrderApi.updateStatus(id, 'CANCELLED')
+      // Remove from list since không còn ở trạng thái chờ xử lý
+      setOrders(prev => prev.filter(o => o.id !== id))
+    }
+  }
+
+  const handleCompleteOrder = async (id: number) => {
+    await OrderApi.updateStatus(id, 'COMPLETED')
+    setOrders(prev => prev.filter(o => o.id !== id))
+  }
+
+  const handleStartDelivery = async (id: number) => {
+    await OrderApi.updateStatus(id, 'DELIVERING')
+    // Remove from current list if filtering PENDING/PROCESSING
+    setOrders(prev => prev.filter(o => o.id !== id))
   }
 
   const handleSelectOrder = (id: number) => {
-    setSelectedOrders(prev => 
-      prev.includes(id) 
+    setSelectedOrders(prev =>
+      prev.includes(id)
         ? prev.filter(orderId => orderId !== id)
         : [...prev, id]
     )
@@ -131,30 +185,16 @@ const OrderProcessingManagement: React.FC = () => {
     }
   }
 
-  const handleBulkConfirm = () => {
-    setOrders(orders.map(o => 
-      selectedOrders.includes(o.id)
-        ? { 
-            ...o, 
-            status: 'PROCESSING',
-            updated_at: new Date().toISOString()
-          }
-        : o
-    ))
+  const handleBulkConfirm = async () => {
+    await Promise.all(selectedOrders.map(id => OrderApi.updateStatus(id, 'CONFIRMED')))
+    setOrders(prev => prev.filter(o => !selectedOrders.includes(o.id)))
     setSelectedOrders([])
   }
 
-  const handleBulkReject = () => {
+  const handleBulkReject = async () => {
     if (window.confirm(`Bạn có chắc chắn muốn từ chối ${selectedOrders.length} đơn hàng đã chọn?`)) {
-      setOrders(orders.map(o => 
-        selectedOrders.includes(o.id)
-          ? { 
-              ...o, 
-              status: 'CANCELLED',
-              updated_at: new Date().toISOString()
-            }
-          : o
-      ))
+      await Promise.all(selectedOrders.map(id => OrderApi.updateStatus(id, 'CANCELLED')))
+      setOrders(prev => prev.filter(o => !selectedOrders.includes(o.id)))
       setSelectedOrders([])
     }
   }
@@ -223,27 +263,44 @@ const OrderProcessingManagement: React.FC = () => {
     }
   }
 
-  // Filter orders based on status
-  const filteredOrders = orders.filter(order => {
-    if (filterStatus === 'ALL') return true
-    return order.status === filterStatus
-  })
+  // Use server-side filtered list; no client filter now
+  const filteredOrders = orders
 
   // Stats
   const totalOrders = orders.length
   const pendingOrders = orders.filter(o => o.status === 'PENDING').length
   const processingOrders = orders.filter(o => o.status === 'PROCESSING').length
-  const completedToday = orders.filter(o => 
-    o.status === 'COMPLETED' && 
+  const completedToday = orders.filter(o =>
+    o.status === 'COMPLETED' &&
     new Date(o.updated_at).toDateString() === new Date().toDateString()
   ).length
-  const urgentOrders = orders.filter(o => 
-    o.status === 'PENDING' && 
+  const urgentOrders = orders.filter(o =>
+    o.status === 'PENDING' &&
     new Date().getTime() - new Date(o.created_at).getTime() > 2 * 60 * 60 * 1000 // 2 hours
   )
 
   return (
     <div className="space-y-6">
+      {/* Inner Tabs */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="border-b border-gray-200 px-6">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeSubTab === 'newOrders' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+              onClick={() => setActiveSubTab('newOrders')}
+            >Đơn hàng mới</button>
+            <button
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeSubTab === 'returnOrders' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+              onClick={() => setActiveSubTab('returnOrders')}
+            >Xử lý đơn trả về</button>
+          </nav>
+        </div>
+      </div>
+
+      {activeSubTab === 'returnOrders' ? (
+        <ReturnProcessingManagement />
+      ) : (
+      <>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -341,17 +398,14 @@ const OrderProcessingManagement: React.FC = () => {
       <div className="bg-white shadow rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg leading-6 font-medium text-gray-900">Xử lý Đơn hàng Mới</h3>
-          
-          <div className="flex items-center space-x-4">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as any)}
-              className="text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="ALL">Tất cả</option>
-              <option value="PENDING">Chờ xử lý</option>
-              <option value="PROCESSING">Đang xử lý</option>
-            </select>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Lọc:</span>
+            <div className="inline-flex rounded-md shadow-sm overflow-hidden border border-gray-300">
+              <button onClick={()=> setOrderStatusFilter('ALL')} className={`px-3 py-1.5 text-sm ${orderStatusFilter==='ALL'?'bg-blue-600 text-white':'bg-white text-gray-700 hover:bg-gray-50'}`}>Tất cả</button>
+              <button onClick={()=> setOrderStatusFilter('PENDING')} className={`px-3 py-1.5 text-sm border-l border-gray-300 ${orderStatusFilter==='PENDING'?'bg-blue-600 text-white':'bg-white text-gray-700 hover:bg-gray-50'}`}>Chờ xử lý</button>
+              <button onClick={()=> setOrderStatusFilter('PROCESSING')} className={`px-3 py-1.5 text-sm border-l border-gray-300 ${orderStatusFilter==='PROCESSING'?'bg-blue-600 text-white':'bg-white text-gray-700 hover:bg-gray-50'}`}>Đang xử lý</button>
+              <button onClick={()=> setOrderStatusFilter('DELIVERING')} className={`px-3 py-1.5 text-sm border-l border-gray-300 ${orderStatusFilter==='DELIVERING'?'bg-blue-600 text-white':'bg-white text-gray-700 hover:bg-gray-50'}`}>Đang giao</button>
+            </div>
           </div>
         </div>
 
@@ -360,14 +414,14 @@ const OrderProcessingManagement: React.FC = () => {
             <span className="text-sm text-blue-600">
               Đã chọn {selectedOrders.length} đơn hàng
             </span>
-            
+
             <button
               onClick={handleBulkConfirm}
               className="px-4 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700"
             >
               Xác nhận hàng loạt
             </button>
-            
+
             <button
               onClick={handleBulkReject}
               className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700"
@@ -385,6 +439,12 @@ const OrderProcessingManagement: React.FC = () => {
         )}
 
         <div className="overflow-x-auto">
+          {loading && (
+            <div className="p-4 text-sm text-gray-500">Đang tải danh sách đơn hàng...</div>
+          )}
+          {error && (
+            <div className="p-4 text-sm text-red-600">{error}</div>
+          )}
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -442,19 +502,19 @@ const OrderProcessingManagement: React.FC = () => {
                     {formatDate(order.created_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    #{order.customer_id}
+                    {detailMap[order.id]?.customerName ? detailMap[order.id]?.customerName : `#${order.customer_id}`}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatCurrency(order.total_amount)}
+                    {formatCurrency(detailMap[order.id]?.totalAmount ?? order.total_amount)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                      {getStatusLabel(order.status)}
+                      {rawStatusMap[order.id] === 'DELIVERING' ? 'Đang giao' : getStatusLabel(order.status)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}>
-                      {getPaymentStatusLabel(order.payment_status)}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor((detailMap[order.id]?.paymentStatus as any) || order.payment_status)}`}>
+                      {getPaymentStatusLabel((detailMap[order.id]?.paymentStatus as any) || order.payment_status)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -465,7 +525,7 @@ const OrderProcessingManagement: React.FC = () => {
                       >
                         Xem
                       </button>
-                      
+
                       {order.status === 'PENDING' && (
                         <>
                           <button
@@ -482,8 +542,16 @@ const OrderProcessingManagement: React.FC = () => {
                           </button>
                         </>
                       )}
-                      
-                      {order.status === 'PROCESSING' && (
+
+                      {rawStatusMap[order.id] === 'CONFIRMED' && (
+                        <button
+                          onClick={() => handleStartDelivery(order.id)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Bắt đầu giao
+                        </button>
+                      )}
+                      {rawStatusMap[order.id] === 'DELIVERING' && (
                         <button
                           onClick={() => handleCompleteOrder(order.id)}
                           className="text-blue-600 hover:text-blue-900"
@@ -499,6 +567,9 @@ const OrderProcessingManagement: React.FC = () => {
           </table>
         </div>
       </div>
+
+      </>
+      )}
 
       {/* Modal */}
       <Modal
@@ -518,7 +589,7 @@ const OrderProcessingManagement: React.FC = () => {
                 <p className="mt-1 text-sm text-gray-900">{selectedOrder.customer_id}</p>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Thời gian đặt</label>
@@ -529,18 +600,18 @@ const OrderProcessingManagement: React.FC = () => {
                 <p className="mt-1 text-sm text-gray-900">{formatDate(selectedOrder.updated_at)}</p>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Tổng tiền</label>
-                <p className="mt-1 text-sm text-gray-900">{formatCurrency(selectedOrder.total_amount)}</p>
+                <p className="mt-1 text-sm text-gray-900">{formatCurrency((selectedOrderDetail?.totalAmount ?? detailMap[selectedOrder.id!]?.totalAmount) ?? selectedOrder.total_amount)}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Giảm giá</label>
-                <p className="mt-1 text-sm text-gray-900">{formatCurrency(selectedOrder.discount_amount)}</p>
+                <p className="mt-1 text-sm text-gray-900">{formatCurrency((selectedOrderDetail?.discountAmount ?? detailMap[selectedOrder.id!]?.discountAmount) ?? selectedOrder.discount_amount)}</p>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Trạng thái</label>
@@ -550,24 +621,24 @@ const OrderProcessingManagement: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Trạng thái thanh toán</label>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(selectedOrder.payment_status)}`}>
-                  {getPaymentStatusLabel(selectedOrder.payment_status)}
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor((selectedOrderDetail?.paymentStatus as any) || selectedOrder.payment_status)}`}>
+                  {getPaymentStatusLabel((selectedOrderDetail?.paymentStatus as any) || selectedOrder.payment_status)}
                 </span>
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700">Phương thức thanh toán</label>
-              <p className="mt-1 text-sm text-gray-900">{getPaymentMethodLabel(selectedOrder.payment_method)}</p>
+              <p className="mt-1 text-sm text-gray-900">{getPaymentMethodLabel((selectedOrderDetail?.paymentMethod as any) || selectedOrder.payment_method)}</p>
             </div>
-            
+
             {selectedOrder.promotion_applied_id && (
               <div>
                 <label className="block text-sm font-medium text-gray-700">ID Khuyến mãi</label>
                 <p className="mt-1 text-sm text-gray-900">{selectedOrder.promotion_applied_id}</p>
               </div>
             )}
-            
+
             {/* Order Status Tracker */}
             <div className="mt-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">Tiến trình đơn hàng</label>
@@ -578,6 +649,76 @@ const OrderProcessingManagement: React.FC = () => {
                   createdAt={selectedOrder.created_at}
                   updatedAt={selectedOrder.updated_at}
                 />
+              </div>
+            </div>
+
+            {/* Return order controls */}
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">Xử lý đơn trả về (nếu có)</label>
+              <div className="bg-white border rounded-lg p-4 space-y-3">
+                {selectedOrderDetail?.returnOrder ? (
+                  <>
+                    <div className="text-sm text-gray-700">
+                      Mã trả hàng: #{selectedOrderDetail.returnOrder.id} • Trạng thái hiện tại: {selectedOrderDetail.returnOrder.status}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedOrderDetail.returnOrder.status === 'REQUESTED' && (
+                        <button
+                          onClick={async () => { await ReturnService.approve(selectedOrderDetail.returnOrder.id); const r = await ReturnService.getById(selectedOrderDetail.returnOrder.id); setSelectedOrderDetail((prev:any)=> ({...prev, returnOrder: r.data})) }}
+                          className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                        >Duyệt</button>
+                      )}
+                      {selectedOrderDetail.returnOrder.status === 'REQUESTED' && (
+                        <button
+                          onClick={async () => { await ReturnService.reject(selectedOrderDetail.returnOrder.id); const r = await ReturnService.getById(selectedOrderDetail.returnOrder.id); setSelectedOrderDetail((prev:any)=> ({...prev, returnOrder: r.data})) }}
+                          className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                        >Từ chối</button>
+                      )}
+                      {selectedOrderDetail.returnOrder.status === 'APPROVED' && (
+                        <button
+                          onClick={async () => { await ReturnService.complete(selectedOrderDetail.returnOrder.id); const r = await ReturnService.getById(selectedOrderDetail.returnOrder.id); setSelectedOrderDetail((prev:any)=> ({...prev, returnOrder: r.data})) }}
+                          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >Hoàn thành</button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-gray-500">Không có yêu cầu trả hàng cho đơn này.</div>
+                )}
+              </div>
+            </div>
+
+            {/* Products list */}
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">Danh sách sản phẩm</label>
+              <div className="bg-white border rounded-lg overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STT</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sản phẩm</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đơn vị</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số lượng</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đơn giá</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {(selectedOrderDetail?.orderDetails || []).map((item: any, idx: number) => {
+                      const unitInfo = unitInfoCache[item.productUnitId]
+                      return (
+                        <tr key={item.id || idx}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{idx + 1}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{unitInfo?.productName || `#${item.productUnitId}`}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{unitInfo?.unitName || ''}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.quantity}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(item.unitPrice)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(item.subtotal ?? (item.unitPrice * item.quantity))}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -605,7 +746,7 @@ const OrderProcessingManagement: React.FC = () => {
                   </button>
                 </>
               )}
-              
+
               {selectedOrder.status === 'PROCESSING' && (
                 <button
                   onClick={() => {
@@ -617,7 +758,7 @@ const OrderProcessingManagement: React.FC = () => {
                   Hoàn thành đơn hàng
                 </button>
               )}
-              
+
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50"

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Product, ProductCategory, ProductPrice } from '@/types/product'
+import { ProductService } from '@/services/productService'
+import type { Product, ProductCategory } from '@/services/productService'
 
 interface ProductFormProps {
   product?: Product | null
   categories: ProductCategory[]
-  onSubmit: (productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => void
+  onSubmit: (productData: any) => void
   onCancel: () => void
   isLoading?: boolean
 }
@@ -14,37 +15,54 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, isLoading = fals
     name: '',
     description: '',
     category_id: 1,
-    unit: '',
     image_url: '',
     expiration_date: '',
-    active: 1
+    active: 1,
+    unit_id: 0
   })
-  
+
+  const [units, setUnits] = useState<Array<{ id: number; name: string }>>([])
+  const [imagePreview, setImagePreview] = useState<string>('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+
 
   useEffect(() => {
     if (product) {
       setFormData({
         name: product.name,
         description: product.description,
-        category_id: product.category_id,
-        unit: product.unit,
-        image_url: product.image_url || '',
-        expiration_date: product.expiration_date || '',
-        active: product.active
+        category_id: (product as any).categoryId || (product as any).category_id,
+        image_url: (product as any).imageUrl || (product as any).image_url || '',
+        expiration_date: (product as any).expirationDate || (product as any).expiration_date || '',
+        active: (product as any).active ? 1 : 0,
+        unit_id: (product as any).defaultUnitId || 0
       })
+      setImagePreview((product as any).imageUrl || (product as any).image_url || '')
     } else {
       // Reset form for new product
       setFormData({
         name: '',
         description: '',
         category_id: 1,
-        unit: '',
         image_url: '',
         expiration_date: '',
-        active: 1
+        active: 1,
+        unit_id: 0
       })
+      setImagePreview('')
     }
   }, [product])
+
+  useEffect(() => {
+    // Load only default units from backend (is_default = true)
+    ProductService.getUnits()
+      .then((res: any[]) => {
+        const filtered = (res || []).filter((u: any) => u && (u.isDefault === true))
+        setUnits(filtered.map((u: any) => ({ id: u.id, name: u.name })))
+      })
+      .catch(() => setUnits([]))
+  }, [])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -55,34 +73,34 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, isLoading = fals
   }
 
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validate form
-    if (!formData.name.trim()) {
-      alert('Vui lòng nhập tên sản phẩm')
-      return
-    }
-    
-    if (!formData.unit.trim()) {
-      alert('Vui lòng chọn đơn vị tính')
-      return
-    }
+    if (!formData.name.trim()) return onSubmit({ __error: 'Vui lòng nhập tên sản phẩm' })
 
     const productData = {
-      ...formData,
-      expiration_date: formData.expiration_date || null,
-      image_url: formData.image_url || null,
-      prices: [{
-        id: 1,
-        product_id: product?.id || 0,
-        unit: formData.unit,
-        price: 0,
-        is_default: true
-      }]
+      name: formData.name,
+      description: formData.description,
+      expirationDate: formData.expiration_date || undefined,
+      categoryId: formData.category_id,
+      active: formData.active === 1,
+      defaultUnitId: formData.unit_id || null,
     }
 
-    onSubmit(productData)
+    // Nếu có ảnh file và API hỗ trợ tạo cùng ảnh: gửi luôn
+    if (imageFile) {
+      try {
+        const created = await ProductService.createProductWithImage(productData as any, imageFile)
+        onSubmit(created)
+        return
+      } catch (err) {
+        // fallback
+      }
+    }
+
+    // Fallback: tạo không kèm ảnh (dùng URL nếu có)
+    onSubmit({ ...productData, imageUrl: formData.image_url || undefined })
   }
 
   return (
@@ -143,16 +161,35 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, isLoading = fals
         {/* Hình ảnh */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            URL hình ảnh
+            Ảnh sản phẩm
           </label>
-          <input
-            type="url"
-            name="image_url"
-            value={formData.image_url}
-            onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            placeholder="https://example.com/image.jpg"
-          />
+          {imagePreview && (
+            <img src={imagePreview} alt="preview" className="mb-2 h-20 w-20 object-cover rounded" />
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                setUploading(true)
+                try {
+                  // Với API tạo sản phẩm kèm ảnh, chỉ cần lưu file tạm để gửi cùng payload
+                  setImageFile(file)
+                  const reader = new FileReader()
+                  reader.onload = () => setImagePreview(String(reader.result))
+                  reader.readAsDataURL(file)
+                } catch (err) {
+                  alert('Tải ảnh thất bại')
+                } finally {
+                  setUploading(false)
+                }
+              }}
+              className="block w-full text-sm text-gray-700"
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">{uploading ? 'Đang xử lý ảnh...' : 'Chọn ảnh từ máy tính; nếu có API tạo kèm ảnh sẽ gửi cùng.'}</p>
         </div>
 
         {/* Hạn sử dụng và Đơn vị tính */}
@@ -171,26 +208,17 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, isLoading = fals
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Đơn vị tính
+            Đơn vị tính (mặc định)
           </label>
           <select
-            value={formData.unit}
-            onChange={handleInputChange}
-            name="unit"
+            value={formData.unit_id}
+            onChange={(e) => setFormData(prev => ({ ...prev, unit_id: Number(e.target.value) }))}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            required
           >
-            <option value="">Chọn đơn vị tính</option>
-            <option value="Cái">Cái</option>
-            <option value="Chai">Chai</option>
-            <option value="Lon">Lon</option>
-            <option value="Gói">Gói</option>
-            <option value="Hộp">Hộp</option>
-            <option value="Túi">Túi</option>
-            <option value="Kg">Kg</option>
-            <option value="Lít">Lít</option>
-            <option value="Thùng">Thùng</option>
-            <option value="Cặp">Cặp</option>
+            <option value={0}>Chưa chọn</option>
+            {units.map(u => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
           </select>
         </div>
       </div>

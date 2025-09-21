@@ -1,59 +1,87 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-
-interface User {
-  username: string
-  role: 'admin' | 'user'
-}
+import { AuthService, UserInfo } from '@/services/authService'
 
 interface AuthContextType {
-  user: User | null
-  login: (username: string, password: string) => boolean
+  user: UserInfo | null
+  login: (email: string, password: string) => Promise<boolean>
   logout: () => void
   isAuthenticated: boolean
   isLoading: boolean
+  accessToken: string | null
+  refreshToken: string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Thông tin đăng nhập mặc định (trong thực tế sẽ gọi API)
-const ADMIN_CREDENTIALS = {
-  username: 'admin',
-  password: 'admin123'
-}
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<UserInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [refreshToken, setRefreshToken] = useState<string | null>(null)
 
   useEffect(() => {
     // Kiểm tra token trong localStorage khi khởi động
     const savedUser = localStorage.getItem('admin_user')
-    if (savedUser) {
+    const savedAccessToken = localStorage.getItem('access_token')
+    const savedRefreshToken = localStorage.getItem('refresh_token')
+
+    if (savedUser && savedAccessToken) {
       try {
         setUser(JSON.parse(savedUser))
+        setAccessToken(savedAccessToken)
+        setRefreshToken(savedRefreshToken)
       } catch (error) {
         localStorage.removeItem('admin_user')
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
       }
     }
     setIsLoading(false)
   }, [])
 
-  const login = (username: string, password: string): boolean => {
-    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-      const userData: User = {
-        username,
-        role: 'admin'
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const loginResponse = await AuthService.login({ email, password })
+
+      // Lấy thông tin user
+      const userData = await AuthService.getCurrentUser(loginResponse.accessToken)
+
+      // Kiểm tra role - chỉ cho phép ADMIN hoặc MANAGER
+      if (!AuthService.hasAdminAccess(userData)) {
+        return false
       }
+
       setUser(userData)
+      setAccessToken(loginResponse.accessToken)
+      setRefreshToken(loginResponse.refreshToken)
+
       localStorage.setItem('admin_user', JSON.stringify(userData))
+      localStorage.setItem('access_token', loginResponse.accessToken)
+      localStorage.setItem('refresh_token', loginResponse.refreshToken)
+
       return true
+    } catch (error) {
+      console.error('Login error:', error)
+      return false
     }
-    return false
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem('admin_user')
+  const logout = async () => {
+    try {
+      // Gọi API logout để thu hồi refresh token
+      if (refreshToken) {
+        await AuthService.logout(refreshToken)
+      }
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      setUser(null)
+      setAccessToken(null)
+      setRefreshToken(null)
+      localStorage.removeItem('admin_user')
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+    }
   }
 
   const value = {
@@ -61,7 +89,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     logout,
     isAuthenticated: !!user,
-    isLoading
+    isLoading,
+    accessToken,
+    refreshToken
   }
 
   return (

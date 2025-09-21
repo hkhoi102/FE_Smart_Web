@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 
 const Login = () => {
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -15,16 +15,18 @@ const Login = () => {
     setError('')
     setIsLoading(true)
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const success = login(username, password)
+    try {
+      const success = await login(email, password)
       if (success) {
         navigate('/admin')
       } else {
-        setError('Tên đăng nhập hoặc mật khẩu không đúng')
+        setError('Email hoặc mật khẩu không đúng, hoặc tài khoản không có quyền truy cập')
       }
+    } catch (error) {
+      setError('Có lỗi xảy ra, vui lòng thử lại sau')
+    } finally {
       setIsLoading(false)
-    }, 500)
+    }
   }
 
   return (
@@ -40,19 +42,19 @@ const Login = () => {
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Tên đăng nhập
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Email
               </label>
               <div className="mt-1">
                 <input
-                  id="username"
-                  name="username"
-                  type="text"
+                  id="email"
+                  name="email"
+                  type="email"
                   required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                  placeholder="Nhập tên đăng nhập"
+                  placeholder="Nhập email"
                 />
               </div>
             </div>
@@ -94,10 +96,9 @@ const Login = () => {
 
           <div className="mt-6">
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <h3 className="text-sm font-medium text-blue-800 mb-2">Thông tin đăng nhập mặc định:</h3>
+              <h3 className="text-sm font-medium text-blue-800 mb-2">Lưu ý:</h3>
               <p className="text-sm text-blue-700">
-                <strong>Tên đăng nhập:</strong> admin<br />
-                <strong>Mật khẩu:</strong> admin123
+                Chỉ tài khoản có role <strong>ADMIN</strong> hoặc <strong>MANAGER</strong> mới có thể đăng nhập vào trang quản trị.
               </p>
             </div>
           </div>

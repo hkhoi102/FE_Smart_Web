@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ProductService } from '@/services/productService'
 
 interface Unit {
   id: number
@@ -17,22 +18,17 @@ const UnitManagement = () => {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Mock data for units
-  const mockUnits: Unit[] = [
-    { id: 1, name: 'Cái', description: 'Đơn vị đếm số lượng', createdAt: '2024-01-01' },
-    { id: 2, name: 'Chai', description: 'Đơn vị cho đồ uống', createdAt: '2024-01-01' },
-    { id: 3, name: 'Lon', description: 'Đơn vị cho đồ uống có ga', createdAt: '2024-01-01' },
-    { id: 4, name: 'Gói', description: 'Đơn vị đóng gói nhỏ', createdAt: '2024-01-01' },
-    { id: 5, name: 'Hộp', description: 'Đơn vị đóng gói trung bình', createdAt: '2024-01-01' },
-    { id: 6, name: 'Túi', description: 'Đơn vị đóng gói linh hoạt', createdAt: '2024-01-01' },
-    { id: 7, name: 'Kg', description: 'Đơn vị đo khối lượng', createdAt: '2024-01-01' },
-    { id: 8, name: 'Lít', description: 'Đơn vị đo thể tích', createdAt: '2024-01-01' },
-    { id: 9, name: 'Thùng', description: 'Đơn vị đóng gói lớn', createdAt: '2024-01-01' },
-    { id: 10, name: 'Cặp', description: 'Đơn vị đếm theo cặp', createdAt: '2024-01-01' }
-  ]
+  const loadUnits = async () => {
+    try {
+      const data = await ProductService.getUnits()
+      setUnits(data.map((u: any) => ({ id: u.id, name: u.name, description: u.description, createdAt: u.createdAt || '' })))
+    } catch (err) {
+      console.error('Không thể tải đơn vị tính:', err)
+    }
+  }
 
   useEffect(() => {
-    setUnits(mockUnits)
+    loadUnits()
   }, [])
 
   const handleAddUnit = () => {
@@ -55,43 +51,33 @@ const UnitManagement = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.name.trim()) {
-      alert('Vui lòng nhập tên đơn vị tính')
-      return
-    }
+
+    if (!formData.name.trim()) return
 
     setIsSubmitting(true)
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
       if (editingUnit) {
-        // Update existing unit
-        setUnits(prev => prev.map(unit => 
-          unit.id === editingUnit.id 
-            ? { ...unit, name: formData.name, description: formData.description }
-            : unit
-        ))
+        await ProductService.updateUnit(editingUnit.id, { name: formData.name, description: formData.description })
       } else {
-        // Add new unit
-        const newUnit: Unit = {
-          id: Math.max(...units.map(u => u.id)) + 1,
-          name: formData.name,
-          description: formData.description,
-          createdAt: new Date().toISOString().split('T')[0]
-        }
-        setUnits(prev => [...prev, newUnit])
+        await ProductService.createUnit({ name: formData.name, description: formData.description })
       }
-      
-      setIsSubmitting(false)
+      await loadUnits()
       handleCloseModal()
-    }, 500)
+    } catch (err) {
+      console.error('Lỗi lưu đơn vị tính:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
 
-  const handleDeleteUnit = (id: number) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa đơn vị tính này?')) {
-      setUnits(prev => prev.filter(unit => unit.id !== id))
+  const handleDeleteUnit = async (id: number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa đơn vị tính này?')) return
+    try {
+      await ProductService.deleteUnit(id)
+      await loadUnits()
+    } catch (err) {
+      console.error('Lỗi xóa đơn vị:', err)
     }
   }
 
@@ -132,7 +118,7 @@ const UnitManagement = () => {
                 </button>
               </div>
             </div>
-            
+
             {unit.description && (
               <p className="text-sm text-gray-600">{unit.description}</p>
             )}
@@ -145,7 +131,7 @@ const UnitManagement = () => {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleCloseModal} />
-            
+
             <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="flex items-center justify-between p-6 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -160,7 +146,7 @@ const UnitManagement = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="p-6">
                 <div className="space-y-4">
                   <div>
@@ -176,7 +162,7 @@ const UnitManagement = () => {
                       required
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Mô tả
@@ -190,7 +176,7 @@ const UnitManagement = () => {
                     />
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"

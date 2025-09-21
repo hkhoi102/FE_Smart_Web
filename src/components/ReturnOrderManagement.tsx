@@ -1,113 +1,90 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ReturnOrder, ReturnDetail } from './OrderManagement'
 import Modal from './Modal'
+import { ReturnService } from '../services/returnService'
+import { CustomerService } from '../services/customerService'
+import { ProductService } from '../services/productService'
 
 const ReturnOrderManagement: React.FC = () => {
-  const [returnOrders, setReturnOrders] = useState<ReturnOrder[]>([
-    {
-      id: 1,
-      created_at: '2025-09-09 07:37:48.621282',
-      customer_id: 2,
-      processed_at: '2025-09-09 07:41:42.491318',
-      reason: 'Đối ý - trả 1 phần',
-      status: 'COMPLETED',
-      order_id: 1,
-      refund_amount: 0
-    },
-    {
-      id: 2,
-      created_at: '2025-09-09 07:58:14.412227',
-      customer_id: 2,
-      processed_at: '2025-09-09 08:00:23.863036',
-      reason: 'Đối ý - trả 1 phần',
-      status: 'COMPLETED',
-      order_id: 1,
-      refund_amount: 0
-    },
-    {
-      id: 3,
-      created_at: '2025-09-09 08:09:30.432255',
-      customer_id: 2,
-      processed_at: '2025-09-09 08:10:39.628519',
-      reason: 'Đối ý - trả 1 phần',
-      status: 'COMPLETED',
-      order_id: 1,
-      refund_amount: 0
-    },
-    {
-      id: 4,
-      created_at: '2025-09-09 08:13:41.289878',
-      customer_id: 2,
-      processed_at: '2025-09-09 08:14:36.612099',
-      reason: 'Đối ý - trả 1 phần',
-      status: 'COMPLETED',
-      order_id: 2,
-      refund_amount: 0
-    },
-    {
-      id: 5,
-      created_at: '2025-09-09 08:16:01.165794',
-      customer_id: 2,
-      processed_at: '2025-09-09 08:17:13.419403',
-      reason: 'Đối ý - trả 1 phần',
-      status: 'COMPLETED',
-      order_id: 2,
-      refund_amount: 0
-    },
-    {
-      id: 6,
-      created_at: '2025-09-09 08:19:31.739163',
-      customer_id: 2,
-      processed_at: '2025-09-09 08:20:34.591764',
-      reason: 'Đối ý - trả 1 phần',
-      status: 'COMPLETED',
-      order_id: 2,
-      refund_amount: 0
-    },
-    {
-      id: 7,
-      created_at: '2025-09-09 08:28:41.237970',
-      customer_id: 2,
-      processed_at: '2025-09-09 08:32:32.851581',
-      reason: 'Đối ý - trả 1 phần',
-      status: 'COMPLETED',
-      order_id: 2,
-      refund_amount: 0
-    },
-    {
-      id: 8,
-      created_at: '2025-09-11 08:53:29.646843',
-      customer_id: 2,
-      processed_at: '2025-09-11 08:56:17.038324',
-      reason: 'Sản phẩm bị lỗi',
-      status: 'COMPLETED',
-      order_id: 4,
-      refund_amount: 10000
-    },
-    {
-      id: 9,
-      created_at: '2025-09-11 08:58:14.849011',
-      customer_id: 2,
-      processed_at: '2025-09-11 08:59:38.067273',
-      reason: 'Sản phẩm bị lỗi',
-      status: 'COMPLETED',
-      order_id: 4,
-      refund_amount: 280000
-    }
-  ])
+  const [returnOrders, setReturnOrders] = useState<ReturnOrder[]>([])
+  const [returnDetails, setReturnDetails] = useState<ReturnDetail[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'REJECTED'>('ALL')
+  const [nameMap, setNameMap] = useState<Record<number, string>>({})
+  const [unitCache, setUnitCache] = useState<Record<number, { productName?: string; unitName?: string }>>({})
+  const [refundMap, setRefundMap] = useState<Record<number, number>>({})
 
-  const [returnDetails, setReturnDetails] = useState<ReturnDetail[]>([
-    { id: 8, order_detail_id: 7, quantity: 1, refund_amount: 300000, return_order_id: 6 },
-    { id: 10, order_detail_id: 7, quantity: 1, refund_amount: 300000, return_order_id: 7 },
-    { id: 12, order_detail_id: 9, quantity: 1, refund_amount: 300000, return_order_id: 9 },
-    { id: 11, order_detail_id: 10, quantity: 1, refund_amount: 100000, return_order_id: 8 },
-    { id: 9, order_detail_id: 6, quantity: 1, refund_amount: 15000, return_order_id: 7 }
-  ])
+  const toNumber = (v: any): number => {
+    if (typeof v === 'number') return v
+    if (typeof v === 'string') {
+      const s = v.replace(/\./g, '').replace(/,/g, '.')
+      const n = Number(s)
+      return isNaN(n) ? 0 : n
+    }
+    return 0
+  }
+  const pickRefund = (obj: any): number => {
+    if (!obj) return 0
+    return toNumber(
+      obj.refundAmount ?? obj.refund_amount ?? obj.totalRefundAmount ?? obj.total_refund_amount ?? obj.refund
+    )
+  }
+
+  useEffect(() => {
+    let mounted = true
+    const fetchReturns = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        // Only COMPLETED/REJECTED orders for this page
+        let arr: any[] = []
+        if (statusFilter === 'ALL') {
+          const [comp, rej] = await Promise.all([
+            ReturnService.list({ page: 0, size: 50, status: 'COMPLETED' }),
+            ReturnService.list({ page: 0, size: 50, status: 'REJECTED' }),
+          ])
+          const a1 = Array.isArray(comp?.data) ? comp.data : []
+          const a2 = Array.isArray(rej?.data) ? rej.data : []
+          arr = [...a1, ...a2]
+        } else {
+          const res = await ReturnService.list({ page: 0, size: 50, status: statusFilter })
+          arr = Array.isArray(res?.data) ? res.data : []
+        }
+        const mapped: ReturnOrder[] = arr.map((r: any) => ({
+          id: r.id,
+          created_at: r.createdAt || r.created_at,
+          customer_id: r.customerId || r.customer_id,
+          processed_at: r.processedAt || r.processed_at || '',
+          reason: r.reason,
+          status: (r.status || 'COMPLETED') as any,
+          order_id: r.orderId || r.order_id,
+          refund_amount: pickRefund(r),
+        }))
+        if (mounted) setReturnOrders(mapped)
+        // preload customer names
+        const nm = await CustomerService.preloadNames(mapped.map(m => m.customer_id))
+        if (mounted) setNameMap(nm)
+        // ensure refund totals from detail if not on list
+        const details = await Promise.all(mapped.map(m => ReturnService.getById(m.id).catch(()=>null)))
+        const totals: Record<number, number> = {}
+        details.forEach((resp: any) => { const d = resp?.data; if (d) totals[d.id] = pickRefund(d) })
+        if (mounted) setRefundMap(totals)
+      } catch (e: any) {
+        if (mounted) setError(e?.message || 'Không thể tải danh sách trả hàng')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    fetchReturns()
+    return () => { mounted = false }
+  }, [statusFilter])
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<ReturnOrder | null>(null)
-  const [editingOrder, setEditingOrder] = useState<ReturnOrder | null>(null)
+  // Editing state removed for read-only history page
+  const [editingOrder] = useState<ReturnOrder | null>(null)
   const [formData, setFormData] = useState({
     customer_id: 0,
     order_id: 0,
@@ -116,36 +93,49 @@ const ReturnOrderManagement: React.FC = () => {
     refund_amount: 0
   })
 
-  const handleViewDetails = (order: ReturnOrder) => {
-    setSelectedOrder(order)
-    setIsModalOpen(true)
-  }
-
-  const handleViewReturnDetails = (order: ReturnOrder) => {
+  const handleViewReturnDetails = async (order: ReturnOrder) => {
     setSelectedOrder(order)
     setIsDetailModalOpen(true)
+    try {
+      const resp = await ReturnService.getById(order.id)
+      const data = resp?.data
+      if (data && Array.isArray(data.returnDetails)) {
+        const mapped: ReturnDetail[] = data.returnDetails.map((d: any) => ({
+          id: d.id,
+          order_detail_id: d.orderDetailId,
+          quantity: d.quantity,
+          refund_amount: d.refundAmount,
+          return_order_id: order.id,
+          // @ts-ignore carry unit id for name lookup
+          product_unit_id: d.productUnitId,
+        }))
+        setReturnDetails(mapped)
+        const unitIds = Array.from(new Set(data.returnDetails.map((d: any) => d.productUnitId))) as number[]
+        const missing = unitIds.filter(id => !unitCache[id])
+        if (missing.length) {
+          const infos = await Promise.all(missing.map(id => ProductService.getProductUnitById(id)))
+          const next = { ...unitCache }
+          infos.forEach((info, idx) => { const key = missing[idx]; if (info) next[key] = { productName: info.productName, unitName: info.unitName } })
+          setUnitCache(next)
+        }
+      } else {
+        setReturnDetails([])
+      }
+    } catch {
+      setReturnDetails([])
+    }
   }
 
-  const handleEdit = (order: ReturnOrder) => {
-    setEditingOrder(order)
-    setFormData({
-      customer_id: order.customer_id,
-      order_id: order.order_id,
-      reason: order.reason,
-      status: order.status,
-      refund_amount: order.refund_amount
-    })
-    setIsModalOpen(true)
-  }
+  // Editing flow removed for history page
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (editingOrder) {
-      setReturnOrders(returnOrders.map(o => 
-        o.id === editingOrder.id 
-          ? { 
-              ...o, 
+      setReturnOrders(returnOrders.map(o =>
+        o.id === editingOrder.id
+          ? {
+              ...o,
               ...formData,
               processed_at: formData.status === 'COMPLETED' ? new Date().toISOString() : o.processed_at
             }
@@ -160,15 +150,11 @@ const ReturnOrderManagement: React.FC = () => {
       }
       setReturnOrders([...returnOrders, newOrder])
     }
-    
+
     setIsModalOpen(false)
   }
 
-  const handleDelete = (id: number) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa đơn hàng trả về này?')) {
-      setReturnOrders(returnOrders.filter(o => o.id !== id))
-    }
-  }
+  // Delete flow removed for history page
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -184,6 +170,7 @@ const ReturnOrderManagement: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'COMPLETED': return 'bg-green-100 text-green-800'
+      case 'REJECTED': return 'bg-red-100 text-red-800'
       case 'PENDING': return 'bg-yellow-100 text-yellow-800'
       case 'CANCELLED': return 'bg-red-100 text-red-800'
       default: return 'bg-gray-100 text-gray-800'
@@ -193,6 +180,7 @@ const ReturnOrderManagement: React.FC = () => {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'COMPLETED': return 'Hoàn thành'
+      case 'REJECTED': return 'Thất bại'
       case 'PENDING': return 'Chờ xử lý'
       case 'CANCELLED': return 'Đã hủy'
       default: return status
@@ -202,9 +190,8 @@ const ReturnOrderManagement: React.FC = () => {
   // Stats
   const totalReturns = returnOrders.length
   const completedReturns = returnOrders.filter(o => o.status === 'COMPLETED').length
-  const pendingReturns = returnOrders.filter(o => o.status === 'PENDING').length
-  const totalRefundAmount = returnOrders.reduce((sum, o) => sum + o.refund_amount, 0)
-  const defectiveReturns = returnOrders.filter(o => o.reason === 'Sản phẩm bị lỗi').length
+  const rejectedReturns = returnOrders.filter(o => (o as any).status === 'REJECTED').length
+  const totalRefundAmount = returnOrders.reduce((sum, o) => sum + (refundMap[o.id] ?? o.refund_amount ?? 0), 0)
 
   return (
     <div className="space-y-6">
@@ -250,37 +237,21 @@ const ReturnOrderManagement: React.FC = () => {
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">⏳</span>
+                <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
+                  <span className="text-white text-sm font-medium">✖</span>
                 </div>
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Chờ xử lý</dt>
-                  <dd className="text-lg font-medium text-gray-900">{pendingReturns}</dd>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Bị từ chối</dt>
+                  <dd className="text-lg font-medium text-gray-900">{rejectedReturns}</dd>
                 </dl>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">🔧</span>
-                </div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Sản phẩm lỗi</dt>
-                  <dd className="text-lg font-medium text-gray-900">{defectiveReturns}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Removed defectiveReturns widget to avoid undefined var */}
 
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
@@ -306,26 +277,19 @@ const ReturnOrderManagement: React.FC = () => {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg leading-6 font-medium text-gray-900">Đơn hàng Trả về</h3>
-            <button
-              onClick={() => {
-                setEditingOrder(null)
-                setFormData({
-                  customer_id: 0,
-                  order_id: 0,
-                  reason: '',
-                  status: 'PENDING',
-                  refund_amount: 0
-                })
-                setIsModalOpen(true)
-              }}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <span className="mr-2">+</span>
-              Thêm đơn trả về
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Lọc:</span>
+              <div className="inline-flex rounded-md shadow-sm overflow-hidden border border-gray-300">
+                <button onClick={()=> setStatusFilter('ALL')} className={`px-3 py-1.5 text-sm ${statusFilter==='ALL'?'bg-blue-600 text-white':'bg-white text-gray-700 hover:bg-gray-50'}`}>Tất cả</button>
+                <button onClick={()=> setStatusFilter('COMPLETED')} className={`px-3 py-1.5 text-sm border-l border-gray-300 ${statusFilter==='COMPLETED'?'bg-blue-600 text-white':'bg-white text-gray-700 hover:bg-gray-50'}`}>Hoàn thành</button>
+                <button onClick={()=> setStatusFilter('REJECTED')} className={`px-3 py-1.5 text-sm border-l border-gray-300 ${statusFilter==='REJECTED'?'bg-blue-600 text-white':'bg-white text-gray-700 hover:bg-gray-50'}`}>Từ chối</button>
+              </div>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
+            {loading && (<div className="p-4 text-sm text-gray-500">Đang tải danh sách trả hàng...</div>)}
+            {error && (<div className="p-4 text-sm text-red-600">{error}</div>)}
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -365,7 +329,7 @@ const ReturnOrderManagement: React.FC = () => {
                       {formatDate(order.created_at)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      #{order.customer_id}
+                      {nameMap[order.customer_id] || `#${order.customer_id}`}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {order.order_id}
@@ -379,35 +343,10 @@ const ReturnOrderManagement: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(order.refund_amount)}
+                      {formatCurrency(refundMap[order.id] ?? order.refund_amount ?? 0)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleViewDetails(order)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          Xem
-                        </button>
-                        <button
-                          onClick={() => handleViewReturnDetails(order)}
-                          className="text-green-600 hover:text-green-900"
-                        >
-                          Chi tiết
-                        </button>
-                        <button
-                          onClick={() => handleEdit(order)}
-                          className="text-yellow-600 hover:text-yellow-900"
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          onClick={() => handleDelete(order.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Xóa
-                        </button>
-                      </div>
+                      <button onClick={() => handleViewReturnDetails(order)} className="text-blue-600 hover:text-blue-900">Xem</button>
                     </td>
                   </tr>
                 ))}
@@ -578,7 +517,7 @@ const ReturnOrderManagement: React.FC = () => {
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               Chi tiết trả hàng cho đơn #{selectedOrder.id}
             </h3>
-            
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
