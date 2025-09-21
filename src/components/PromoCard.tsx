@@ -35,8 +35,8 @@ const PromoCard = ({
           <span className="self-start bg-yellow-400 text-gray-900 text-xs font-semibold px-2 py-1 rounded">{badgeText}</span>
         )}
         <div className="mt-auto">
-          <button className="bg-white text-green-700 hover:bg-gray-100 text-sm font-medium px-4 py-2 rounded-full">
-            Shop Now
+          <button className="bg-white text-primary-700 hover:bg-gray-100 text-sm font-medium px-4 py-2 rounded-full">
+            Mua ngay
           </button>
         </div>
       </div>
