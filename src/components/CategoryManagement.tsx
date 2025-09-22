@@ -11,6 +11,8 @@ const CategoryManagement = () => {
     name: '',
     description: ''
   })
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -54,6 +56,8 @@ const CategoryManagement = () => {
       name: '',
       description: ''
     })
+    setImageFile(null)
+    setImagePreview('')
     setIsModalOpen(true)
   }
 
@@ -73,6 +77,8 @@ const CategoryManagement = () => {
       name: '',
       description: ''
     })
+    setImageFile(null)
+    setImagePreview('')
   }
 
   const handleViewDetails = (category: Category) => {
@@ -107,12 +113,22 @@ const CategoryManagement = () => {
         await CategoryService.updateCategory(editingCategory.id, updateData)
       } else {
         // Create new category
-        const createData: CreateCategoryRequest = {
-          name: formData.name.trim(),
-          description: formData.description.trim()
-        }
+        if (imageFile) {
+          // Create with image
+          await CategoryService.createCategoryWithImage(
+            formData.name.trim(),
+            formData.description.trim(),
+            imageFile
+          )
+        } else {
+          // Create without image
+          const createData: CreateCategoryRequest = {
+            name: formData.name.trim(),
+            description: formData.description.trim()
+          }
 
-        await CategoryService.createCategory(createData)
+          await CategoryService.createCategory(createData)
+        }
       }
 
       // Reload categories after successful operation
@@ -191,14 +207,31 @@ const CategoryManagement = () => {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      {category.name}
-                    </h3>
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                      {category.description || 'Không có mô tả'}
-                    </p>
-                    <div className="flex items-center text-xs text-gray-500">
-                      <span>ID: {category.id}</span>
+                    <div className="flex items-start space-x-3">
+                      {category.imageUrl && (
+                        <div className="flex-shrink-0">
+                          <img
+                            src={category.imageUrl}
+                            alt={category.name}
+                            className="h-12 w-12 rounded-lg object-cover border border-gray-200"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          {category.name}
+                        </h3>
+                        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                          {category.description || 'Không có mô tả'}
+                        </p>
+                        <div className="flex items-center text-xs text-gray-500">
+                          <span>ID: {category.id}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div className="flex space-x-2 ml-4" onClick={(e) => e.stopPropagation()}>
@@ -284,6 +317,23 @@ const CategoryManagement = () => {
 
               <div className="p-6">
                 <div className="space-y-6">
+                  {selectedCategory.imageUrl && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Ảnh danh mục
+                      </label>
+                      <img
+                        src={selectedCategory.imageUrl}
+                        alt={selectedCategory.name}
+                        className="h-32 w-32 rounded-lg object-cover border border-gray-200"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Tên danh mục
@@ -395,6 +445,41 @@ const CategoryManagement = () => {
                       rows={3}
                     />
                   </div>
+
+                  {/* Image Upload - Only for new categories */}
+                  {!editingCategory && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Ảnh danh mục (tùy chọn)
+                      </label>
+                      {imagePreview && (
+                        <div className="mb-2">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="h-20 w-20 object-cover rounded-lg border border-gray-300"
+                          />
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            setImageFile(file)
+                            const reader = new FileReader()
+                            reader.onload = () => setImagePreview(reader.result as string)
+                            reader.readAsDataURL(file)
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Chọn ảnh để tạo danh mục với hình ảnh
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end space-x-3 mt-6">

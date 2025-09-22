@@ -2,7 +2,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { ProductService, Product, ProductCategory, CreateProductRequest, UpdateProductRequest } from '@/services/productService'
-import { Pagination, ProductTable, ProductForm, Modal, UnitManagement, ManagementDropdown, PriceManagement, AccountManagement, InventoryManagement, WarehouseTab, PromotionManagement, OrderManagement } from '@/components'
+import { InventoryService, WarehouseDto, StockLocationDto } from '@/services/inventoryService'
+import { Pagination, ProductTable, ProductForm, Modal, UnitManagement, ManagementDropdown, PriceManagement, AccountManagement, InventoryManagement, WarehouseTab, PromotionManagement, OrderManagement, BarcodeModal, AddBarcodeModal } from '@/components'
 import CategoryManagement from '@/components/CategoryManagement'
 
 const Admin = () => {
@@ -30,6 +31,21 @@ const Admin = () => {
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false)
   const [unitForm, setUnitForm] = useState<{ productId: number | ''; unitId: number | ''; conversionFactor: number; isDefault: boolean }>({ productId: '', unitId: '', conversionFactor: 1, isDefault: false })
   const [allUnits, setAllUnits] = useState<Array<{ id: number; name: string; isDefault?: boolean }>>([])
+
+  // Barcode modal states
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false)
+  const [selectedProductForBarcode, setSelectedProductForBarcode] = useState<Product | null>(null)
+  const [isAddBarcodeModalOpen, setIsAddBarcodeModalOpen] = useState(false)
+  // Import/Upload modals
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importWarehouseId, setImportWarehouseId] = useState<string>('')
+  const [importStockLocationId, setImportStockLocationId] = useState<string>('')
+  const [warehouses, setWarehouses] = useState<WarehouseDto[]>([])
+  const [stockLocations, setStockLocations] = useState<StockLocationDto[]>([])
+  const [isUploadImageModalOpen, setIsUploadImageModalOpen] = useState(false)
+  const [uploadTargetProductId, setUploadTargetProductId] = useState<number | ''>('')
+  const [uploadImageFile, setUploadImageFile] = useState<File | null>(null)
 
   useEffect(() => {
     if (!isUnitModalOpen) return
@@ -65,6 +81,20 @@ const Admin = () => {
       loadCategories()
     }
   }, [isAuthenticated])
+
+  // Preload warehouses and locations for import modal
+  useEffect(() => {
+    InventoryService.getWarehouses()
+      .then(setWarehouses)
+      .catch(() => setWarehouses([]))
+  }, [])
+
+  useEffect(() => {
+    const wid = importWarehouseId ? Number(importWarehouseId) : undefined
+    InventoryService.getStockLocations(wid)
+      .then(setStockLocations)
+      .catch(() => setStockLocations([]))
+  }, [importWarehouseId])
 
   // Calculate stats when categories and products change
   useEffect(() => {
@@ -208,6 +238,20 @@ const Admin = () => {
         console.error('Error deleting product:', error)
       }
     }
+  }
+
+  const handleAddBarcode = (product: Product) => {
+    setSelectedProductForBarcode(product)
+    setIsBarcodeModalOpen(true)
+  }
+
+  const handleBarcodeSuccess = () => {
+    // Reload products to get updated barcode information
+    loadProducts()
+  }
+
+  const handleAddBarcodeClick = () => {
+    setIsAddBarcodeModalOpen(true)
   }
 
 
@@ -564,6 +608,24 @@ const Admin = () => {
                     </h3>
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md text-sm font-medium"
+                      >
+                        Import sản phẩm (Excel)
+                      </button>
+                      <button
+                        onClick={() => setIsUploadImageModalOpen(true)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                      >
+                        Thêm ảnh cho sản phẩm
+                      </button>
+                      <button
+                        onClick={handleAddBarcodeClick}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                      >
+                        Thêm barcode
+                      </button>
+                      <button
                         onClick={() => setIsUnitModalOpen(true)}
                         className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium"
                       >
@@ -741,6 +803,157 @@ const Admin = () => {
           <div className="mt-6 flex justify-end gap-2">
             <button type="button" onClick={() => setIsUnitModalOpen(false)} className="px-4 py-2 rounded-md border text-gray-700">Hủy</button>
             <button type="submit" className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700">Hoàn thành</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Barcode Modal */}
+      <BarcodeModal
+        isOpen={isBarcodeModalOpen}
+        onClose={() => setIsBarcodeModalOpen(false)}
+        product={selectedProductForBarcode}
+        onSuccess={handleBarcodeSuccess}
+      />
+
+      {/* Add Barcode Modal */}
+      <AddBarcodeModal
+        isOpen={isAddBarcodeModalOpen}
+        onClose={() => setIsAddBarcodeModalOpen(false)}
+        products={products}
+        onSuccess={handleBarcodeSuccess}
+      />
+
+      {/* Import Products Modal */}
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        title="Import sản phẩm từ Excel"
+        size="md"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            if (!importFile) {
+              openNotify('Thiếu file', 'Vui lòng chọn tệp Excel (.xlsx, .xls)', 'error')
+              return
+            }
+            try {
+              const result = await ProductService.importProductsExcel(importFile, {
+                warehouseId: importWarehouseId ? Number(importWarehouseId) : undefined,
+                stockLocationId: importStockLocationId ? Number(importStockLocationId) : undefined,
+              })
+              setIsImportModalOpen(false)
+              setImportFile(null)
+              setImportWarehouseId('')
+              setImportStockLocationId('')
+              await loadProducts()
+              openNotify('Import thành công', `Tổng: ${result.totalRows}, Thành công: ${result.successCount}, Lỗi: ${result.errorCount}`, 'success')
+            } catch (err) {
+              openNotify('Import thất bại', 'Không thể import. Kiểm tra định dạng file hoặc dữ liệu.', 'error')
+            }
+          }}
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Chọn tệp Excel</label>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">Định dạng hỗ trợ: .xlsx, .xls. Cột mẫu: name, description, categoryId, ...</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Kho (Warehouse)</label>
+                <select
+                  value={importWarehouseId}
+                  onChange={(e) => setImportWarehouseId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  <option value="">-- Chọn kho (tùy chọn) --</option>
+                  {warehouses.map(w => (
+                    <option key={w.id} value={w.id}>{w.name || `Kho #${w.id}`}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Vị trí tồn (Stock location)</label>
+                <select
+                  value={importStockLocationId}
+                  onChange={(e) => setImportStockLocationId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  <option value="">-- Chọn vị trí (tùy chọn) --</option>
+                  {stockLocations.map(sl => (
+                    <option key={sl.id} value={sl.id}>{sl.name || `Vị trí #${sl.id}`} {sl.warehouseId ? `(Kho ${sl.warehouseId})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <button type="button" onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 rounded-md border text-gray-700">Hủy</button>
+            <button type="submit" className="px-4 py-2 rounded-md text-white bg-gray-700 hover:bg-gray-800">Import</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Upload Product Image Modal */}
+      <Modal
+        isOpen={isUploadImageModalOpen}
+        onClose={() => setIsUploadImageModalOpen(false)}
+        title="Thêm/Cập nhật ảnh cho sản phẩm"
+        size="md"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            if (!uploadTargetProductId || !uploadImageFile) {
+              openNotify('Thiếu thông tin', 'Vui lòng chọn sản phẩm và ảnh cần tải lên', 'error')
+              return
+            }
+            try {
+              await ProductService.updateProductImage(Number(uploadTargetProductId), uploadImageFile)
+              setIsUploadImageModalOpen(false)
+              setUploadTargetProductId('')
+              setUploadImageFile(null)
+              await loadProducts()
+              openNotify('Thành công', 'Đã cập nhật ảnh sản phẩm', 'success')
+            } catch (err) {
+              openNotify('Thất bại', 'Không thể cập nhật ảnh. Vui lòng thử lại.', 'error')
+            }
+          }}
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Chọn sản phẩm</label>
+              <select
+                value={uploadTargetProductId}
+                onChange={(e) => setUploadTargetProductId(e.target.value ? Number(e.target.value) : '')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value="">-- Chọn sản phẩm --</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Chọn ảnh</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setUploadImageFile(e.target.files?.[0] || null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">Hỗ trợ JPG, PNG, WEBP... dung lượng tối đa 5MB</p>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <button type="button" onClick={() => setIsUploadImageModalOpen(false)} className="px-4 py-2 rounded-md border text-gray-700">Hủy</button>
+            <button type="submit" className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Cập nhật ảnh</button>
           </div>
         </form>
       </Modal>

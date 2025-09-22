@@ -339,6 +339,60 @@ export class ProductService {
     if (!res.ok) throw new Error(`Failed to delete product: ${res.status} ${res.statusText}`)
   }
 
+  // Import products via Excel file (multipart/form-data)
+  static async importProductsExcel(
+    file: File,
+    options?: { warehouseId?: number; stockLocationId?: number }
+  ): Promise<{ totalRows: number; successCount: number; errorCount: number; errors?: any[]; createdProducts?: any[] }> {
+    const form = new FormData()
+    form.append('file', file)
+    if (options?.warehouseId !== undefined) {
+      form.append('warehouseId', String(options.warehouseId))
+    }
+    if (options?.stockLocationId !== undefined) {
+      form.append('stockLocationId', String(options.stockLocationId))
+    }
+    const res = await fetch(`${API_BASE_URL}/products/import/excel`, {
+      method: 'POST',
+      headers: (() => {
+        const headers: Record<string, string> = {}
+        const token = localStorage.getItem('access_token')
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        return headers
+      })(),
+      body: form,
+    })
+    if (!res.ok) throw new Error(`Failed to import products: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    const data = result.data ?? result
+    return {
+      totalRows: data.totalRows ?? 0,
+      successCount: data.successCount ?? 0,
+      errorCount: data.errorCount ?? 0,
+      errors: data.errors ?? [],
+      createdProducts: data.createdProducts ?? [],
+    }
+  }
+
+  // Update product image by ID (multipart PUT)
+  static async updateProductImage(productId: number, imageFile: File): Promise<Product> {
+    const form = new FormData()
+    form.append('image', imageFile)
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/image`, {
+      method: 'PUT',
+      headers: (() => {
+        const headers: Record<string, string> = {}
+        const token = localStorage.getItem('access_token')
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        return headers
+      })(),
+      body: form,
+    })
+    if (!res.ok) throw new Error(`Failed to update product image: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    return result.data ?? result
+  }
+
   // Thêm đơn vị tính cho sản phẩm
   static async addProductUnit(
     productId: number,
