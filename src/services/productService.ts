@@ -256,7 +256,18 @@ export const fetchProducts = async (
     hasNextPage: page < totalPages,
     hasPrevPage: page > 1
   }
+}
 
+const API_BASE_URL = 'http://localhost:8080/api' // Change this to your actual API URL
+
+export class ProductServiceAPI {
+  private static getAuthHeaders() {
+    const token = localStorage.getItem('authToken')
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': token ? `Bearer ${token}` : ''
+    }
+  }
   static async deleteProduct(id: number): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/products/${id}`, {
       method: 'DELETE',
