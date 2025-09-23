@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import CategoryMenu from '../components/CategoryMenu'
 import ProductCard from '../components/ProductCard'
 import Pagination from '../components/Pagination'
-import { fetchProducts, ProductsResponse } from '../services/productService'
+import { ProductService } from '../services/productService'
 
 const Products: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -14,7 +14,7 @@ const Products: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(false)
-  const [productsData, setProductsData] = useState<ProductsResponse>({
+  const [productsData, setProductsData] = useState({
     products: [],
     totalCount: 0,
     currentPage: 1,
@@ -46,17 +46,20 @@ const Products: React.FC = () => {
       const minPrice = priceRange.min ? parseInt(priceRange.min) : undefined
       const maxPrice = priceRange.max ? parseInt(priceRange.max) : undefined
       
-      const response = await fetchProducts(
+      const response = await ProductService.getProducts(
         currentPage,
-        20, // items per page
-        selectedCategory,
+        20,
         searchTerm || undefined,
-        minPrice,
-        maxPrice,
-        sortBy,
-        sortOrder
+        undefined
       )
-      setProductsData(response)
+      setProductsData({
+        products: response.products,
+        totalCount: response.pagination.total_items,
+        currentPage: response.pagination.current_page,
+        totalPages: response.pagination.total_pages,
+        hasNextPage: response.pagination.current_page < response.pagination.total_pages,
+        hasPrevPage: response.pagination.current_page > 1
+      })
       console.log('Products loaded:', {
         currentPage: response.currentPage,
         totalPages: response.totalPages,

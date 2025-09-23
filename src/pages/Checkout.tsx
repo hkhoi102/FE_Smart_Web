@@ -265,7 +265,7 @@ const Checkout: React.FC = () => {
                       </div>
                       <div>
                         <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
-                        <p className="text-xs text-gray-500">x{item.quantity}</p>
+                        <p className="text-xs text-gray-500">{item.unitName || ''} × {item.quantity}</p>
                       </div>
                     </div>
                     <span className="font-medium text-gray-900">

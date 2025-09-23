@@ -1,273 +1,336 @@
-export interface Product {
-  id: number
-  name: string
-  category_id: number
-  category_name: string
-  unit: string
-  price: number
-  status: 'ACTIVE' | 'INACTIVE'
-  description?: string
-  rating?: number
-  created_at: string
-  updated_at: string
-}
-
-// Base products template
-const baseProducts = [
-  { name: 'Coca Cola 330ml', category_id: 1, category_name: 'Đồ uống', unit: 'chai', price: 12000, description: 'Nước ngọt có gas hương cola' },
-  { name: 'Kẹo dẻo Haribo', category_id: 2, category_name: 'Đồ ăn vặt', unit: 'gói', price: 18000, description: 'Kẹo dẻo nhiều hương vị trái cây' },
-  { name: 'Sữa tươi Vinamilk', category_id: 3, category_name: 'Sữa và sản phẩm từ sữa', unit: 'hộp', price: 25000, description: 'Sữa tươi tiệt trùng không đường' },
-  { name: 'Nước rửa chén Sunlight', category_id: 4, category_name: 'Hàng gia dụng', unit: 'chai', price: 25000, description: 'Nước rửa bát đĩa khử mùi tanh' },
-  { name: 'Bánh mì sandwich', category_id: 5, category_name: 'Bánh', unit: 'cái', price: 15000, description: 'Bánh mì kẹp thịt nguội và rau' },
-  { name: 'Pepsi 330ml', category_id: 1, category_name: 'Đồ uống', unit: 'chai', price: 12000, description: 'Nước cola có gas thương hiệu Pepsi' },
-  { name: 'Snack khoai tây Pringles', category_id: 2, category_name: 'Đồ ăn vặt', unit: 'hộp', price: 35000, description: 'Snack khoai tây chiên giòn' },
-  { name: 'Yaourt Vinamilk', category_id: 3, category_name: 'Sữa và sản phẩm từ sữa', unit: 'hộp', price: 8000, description: 'Sữa chua uống có đường' },
-  { name: 'Bột giặt Ariel', category_id: 4, category_name: 'Hàng gia dụng', unit: 'túi', price: 45000, description: 'Bột giặt siêu sạch khử mùi' },
-  { name: 'Bánh quy Oreo', category_id: 5, category_name: 'Bánh', unit: 'gói', price: 22000, description: 'Bánh quy chocolate kem vani' }
-]
-
-// Generate 150 products
-export const mockProducts: Product[] = []
-for (let i = 0; i < 150; i++) {
-  const baseIndex = i % baseProducts.length
-  const base = baseProducts[baseIndex]
-  const variation = Math.floor(i / baseProducts.length) + 1
-  
-  mockProducts.push({
-    id: i + 1,
-    name: variation > 1 ? `${base.name} (${variation})` : base.name,
-    category_id: base.category_id,
-    category_name: base.category_name,
-    unit: base.unit,
-    price: base.price + (variation - 1) * 1000,
-    status: 'ACTIVE',
-    description: base.description,
-    rating: 4.0 + Math.random() * 1.0,
-    created_at: '2024-01-15',
-    updated_at: '2024-01-15'
-  })
-}
-
-export interface ProductsResponse {
-  products: Product[]
-  totalCount: number
-  currentPage: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPrevPage: boolean
-}
-
-// Legacy interfaces for compatibility
-export interface ProductCategory {
-  id: number
-  name: string
-}
+// Product Service - API calls for product management
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 export interface ProductUnit {
   id: number
+  unitId: number
+  unitName: string
+  conversionFactor: number
+  isDefault: boolean
+  currentPrice?: number
+  convertedPrice?: number
+  quantity?: number
+  availableQuantity?: number
+}
+
+export interface Barcode {
+  id: number
+  code: string
+  type?: 'BARCODE' | 'QR_CODE'
+}
+
+export interface ProductCategory {
+  id: number
   name: string
-  unitName?: string
-  isDefault?: boolean
+  description?: string
+  createdAt?: string
+  active?: boolean
+}
+
+export interface Product {
+  id: number
+  name: string
+  description: string
+  imageUrl?: string | null
+  expirationDate?: string | null
+  categoryId: number
+  categoryName?: string
+  createdAt: string
+  updatedAt: string
+  active: boolean
+  defaultUnitId?: number | null
+  productUnits?: ProductUnit[]
+  barcodes?: Barcode[] | null
+}
+
+export interface ProductResponse {
+  products: Product[]
+  pagination: {
+    current_page: number
+    total_pages: number
+    total_items: number
+    items_per_page: number
+  }
 }
 
 export interface CreateProductRequest {
   name: string
+  description: string
+  imageUrl?: string
+  expirationDate?: string
   categoryId: number
-  description?: string
+  active?: boolean
+  defaultUnitId?: number | null
 }
 
-export interface UpdateProductRequest extends CreateProductRequest {
-  id: number
-}
+export interface UpdateProductRequest extends CreateProductRequest {}
 
-// Legacy ProductService class for backward compatibility
 export class ProductService {
-  static async getAll() {
-    return mockProducts
-  }
-  
-  static async getCategories() {
-    return [
-      { id: 1, name: 'Đồ uống' },
-      { id: 2, name: 'Đồ ăn vặt' },
-      { id: 3, name: 'Sữa và sản phẩm từ sữa' },
-      { id: 4, name: 'Hàng gia dụng' },
-      { id: 5, name: 'Bánh' }
-    ]
-  }
-  
-  static async getUnits() {
-    return [
-      { id: 1, name: 'chai', unitName: 'chai', isDefault: true },
-      { id: 2, name: 'gói', unitName: 'gói', isDefault: false },
-      { id: 3, name: 'hộp', unitName: 'hộp', isDefault: false },
-      { id: 4, name: 'cái', unitName: 'cái', isDefault: false },
-      { id: 5, name: 'ly', unitName: 'ly', isDefault: false }
-    ]
-  }
-  
-  static async create(data: CreateProductRequest) {
-    const newProduct: Product = {
-      id: mockProducts.length + 1,
-      name: data.name,
-      category_id: data.categoryId,
-      category_name: 'Unknown',
-      unit: 'cái',
-      price: 0,
-      status: 'ACTIVE',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-    mockProducts.push(newProduct)
-    return newProduct
-  }
-  
-  static async update(data: UpdateProductRequest) {
-    const index = mockProducts.findIndex(p => p.id === data.id)
-    if (index >= 0) {
-      mockProducts[index] = { ...mockProducts[index], name: data.name, category_id: data.categoryId }
-      return mockProducts[index]
-    }
-    throw new Error('Product not found')
-  }
-  
-  static async delete(id: number) {
-    const index = mockProducts.findIndex(p => p.id === id)
-    if (index >= 0) {
-      mockProducts.splice(index, 1)
-      return true
-    }
-    return false
-  }
-  
-  static async getProducts() {
-    return mockProducts
-  }
-  
-  static async getProductUnitById(id: number) {
-    const units = await this.getUnits()
-    return units.find(u => u.id === id) || { id, name: 'Unknown', unitName: 'Unknown' }
-  }
-}
-
-export const fetchProducts = async (
-  page: number = 1,
-  limit: number = 20,
-  category?: string,
-  searchTerm?: string,
-  minPrice?: number,
-  maxPrice?: number,
-  sortBy: 'name' | 'price' | 'rating' = 'name',
-  sortOrder: 'asc' | 'desc' = 'asc'
-): Promise<ProductsResponse> => {
-  await new Promise(resolve => setTimeout(resolve, 500))
-
-  let filteredProducts = [...mockProducts]
-
-  if (category && category !== 'all') {
-    filteredProducts = filteredProducts.filter(product => 
-      product.category_name === category
-    )
-  }
-
-  if (searchTerm) {
-    console.log('🔍 Searching for:', searchTerm)
-    
-    const normalizeVietnamese = (str: string) => {
-      return str
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-        .replace(/đ/g, 'd')
-        .replace(/Đ/g, 'D')
-        .replace(/\s+/g, ' ') // Normalize spaces
-        .trim()
-    }
-    
-    const normalizedSearchTerm = normalizeVietnamese(searchTerm)
-    const searchWords = normalizedSearchTerm.split(' ').filter(word => word.length > 0)
-    
-    filteredProducts = filteredProducts.filter(product => {
-      const normalizedName = normalizeVietnamese(product.name)
-      const normalizedCategory = normalizeVietnamese(product.category_name)
-      const normalizedUnit = normalizeVietnamese(product.unit)
-      const normalizedDescription = product.description ? normalizeVietnamese(product.description) : ''
-      
-      // Combine all searchable text
-      const searchableText = `${normalizedName} ${normalizedCategory} ${normalizedUnit} ${normalizedDescription}`
-      
-      // Check if all search words are found in the searchable text
-      return searchWords.every(word => 
-        searchableText.includes(word)
-      ) || 
-      // Or if the full search term is found in any individual field
-      normalizedName.includes(normalizedSearchTerm) ||
-      normalizedCategory.includes(normalizedSearchTerm) ||
-      normalizedUnit.includes(normalizedSearchTerm)
-    })
-    
-    console.log(`📊 Search results: ${filteredProducts.length}/${mockProducts.length} products found`)
-  }
-
-  if (minPrice !== undefined) {
-    filteredProducts = filteredProducts.filter(product => product.price >= minPrice)
-  }
-  if (maxPrice !== undefined) {
-    filteredProducts = filteredProducts.filter(product => product.price <= maxPrice)
-  }
-
-  filteredProducts.sort((a, b) => {
-    let aValue: any, bValue: any
-    switch (sortBy) {
-      case 'name':
-        aValue = a.name.toLowerCase()
-        bValue = b.name.toLowerCase()
-        break
-      case 'price':
-        aValue = a.price
-        bValue = b.price
-        break
-      case 'rating':
-        aValue = Math.random() * 5
-        bValue = Math.random() * 5
-        break
-      default:
-        return 0
-    }
-    
-    if (sortOrder === 'asc') {
-      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0
-    } else {
-      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0
-    }
-  })
-
-  const totalCount = filteredProducts.length
-  const totalPages = Math.ceil(totalCount / limit)
-  const startIndex = (page - 1) * limit
-  const endIndex = startIndex + limit
-  const paginatedProducts = filteredProducts.slice(startIndex, endIndex)
-
-  return {
-    products: paginatedProducts,
-    totalCount,
-    currentPage: page,
-    totalPages,
-    hasNextPage: page < totalPages,
-    hasPrevPage: page > 1
-  }
-}
-
-const API_BASE_URL = 'http://localhost:8080/api' // Change this to your actual API URL
-
-export class ProductServiceAPI {
-  private static getAuthHeaders() {
-    const token = localStorage.getItem('authToken')
+  private static getAuthHeaders(): HeadersInit {
+    const token = localStorage.getItem('access_token')
     return {
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : ''
     }
   }
+
+  private static toAbsoluteUrl(url?: string | null): string | undefined {
+    if (!url) return undefined
+    if (/^https?:\/\//i.test(url)) return url
+    if (url.startsWith('/api')) return url
+    return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`
+  }
+
+  // ProductUnit detail by ID (to enrich names in Inventory)
+  static async getProductUnitById(id: number): Promise<{ id: number; productId?: number; productName?: string; unitId?: number; unitName?: string } | null> {
+    const res = await fetch(`${API_BASE_URL}/products/units/${id}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) return null
+    const result = await res.json().catch(() => null)
+    const dto = (result?.data ?? result) || null
+    if (!dto) return null
+    return {
+      id: dto.id ?? id,
+      productId: dto.productId ?? dto.product_id,
+      productName: dto.productName ?? dto.product_name ?? dto.name,
+      unitId: dto.unitId ?? dto.unit_id,
+      unitName: dto.unitName ?? dto.unit_name,
+    }
+  }
+
+  // Lấy danh sách sản phẩm với phân trang và lọc (theo format BE cung cấp)
+  static async getProducts(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    categoryId?: number
+  ): Promise<ProductResponse> {
+    const apiPage = Math.max(0, page - 1)
+    const params = new URLSearchParams({
+      page: apiPage.toString(),
+      size: limit.toString(),
+    })
+    if (search) params.append('search', search)
+    if (categoryId) params.append('categoryId', categoryId.toString())
+
+    const res = await fetch(`${API_BASE_URL}/products?${params.toString()}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(text || `Failed to fetch products: ${res.status} ${res.statusText}`)
+    }
+    const result = await res.json()
+
+    const mapUnit = (u: any): ProductUnit => ({
+      id: u.id,
+      unitId: u.unitId,
+      unitName: u.unitName,
+      conversionFactor: u.conversionFactor ?? u.conversionRate ?? 1,
+      isDefault: u.isDefault,
+      currentPrice: typeof u.currentPrice === 'number' ? u.currentPrice : undefined,
+      convertedPrice: typeof u.convertedPrice === 'number' ? u.convertedPrice : undefined,
+      quantity: typeof u.quantity === 'number' ? u.quantity : undefined,
+      availableQuantity: typeof u.availableQuantity === 'number' ? u.availableQuantity : undefined,
+    })
+
+    const mapProduct = (p: any): Product => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      imageUrl: ProductService.toAbsoluteUrl(p.imageUrl ?? p.image_url) ?? null,
+      expirationDate: p.expirationDate ?? null,
+      categoryId: p.categoryId,
+      categoryName: p.categoryName,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+      active: p.active,
+      defaultUnitId: p.defaultUnitId ?? null,
+      productUnits: Array.isArray(p.productUnits) ? p.productUnits.map(mapUnit) : [],
+      barcodes: p.barcodes ?? null,
+    })
+
+    // Expected shape per user: { data: [...], size, success, totalPages, currentPage, totalElements }
+    const dataArray = Array.isArray(result?.data) ? result.data : Array.isArray(result) ? result : []
+    const products = dataArray.map(mapProduct)
+
+    return {
+      products,
+      pagination: {
+        current_page: (result?.currentPage ?? apiPage) + 1,
+        total_pages: result?.totalPages ?? 1,
+        total_items: result?.totalElements ?? products.length,
+        items_per_page: result?.size ?? limit,
+      },
+    }
+  }
+
+  static async getCategories(): Promise<ProductCategory[]> {
+    const res = await fetch(`${API_BASE_URL}/categories`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to fetch categories: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    if (Array.isArray(result?.data)) return result.data
+    if (Array.isArray(result)) return result
+    return []
+  }
+
+  // Units (Đơn vị tính)
+  static async getUnits(): Promise<Array<{ id: number; name: string; description?: string; isDefault?: boolean }>> {
+    const res = await fetch(`${API_BASE_URL}/uoms`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to fetch units: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    const arr = Array.isArray(result?.data) ? result.data : (Array.isArray(result) ? result : [])
+    return arr.map((u: any) => ({ id: u.id, name: u.name ?? u.unitName ?? u.code ?? String(u.id), description: u.description, isDefault: (u.isDefault ?? u.is_default) ? true : false }))
+  }
+
+  static async createUnit(payload: { name: string; description?: string }): Promise<{ id: number; name: string; description?: string; createdAt?: string }> {
+    const res = await fetch(`${API_BASE_URL}/uoms`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`Failed to create unit: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  static async updateUnit(id: number, payload: { name: string; description?: string }): Promise<{ id: number; name: string; description?: string; createdAt?: string }> {
+    const res = await fetch(`${API_BASE_URL}/uoms/${id}`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`Failed to update unit: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  static async deleteUnit(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/uoms/${id}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to delete unit: ${res.status} ${res.statusText}`)
+  }
+
+  // Upload product image (multipart/form-data), return image URL
+  static async uploadProductImage(file: File): Promise<string> {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`${API_BASE_URL}/products/image`, {
+      method: 'POST',
+      headers: (() => {
+        const headers: Record<string, string> = {}
+        const token = localStorage.getItem('access_token')
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        return headers
+      })(),
+      body: form,
+    })
+    if (!res.ok) throw new Error(`Failed to upload image: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => null)
+    // Accept common shapes {url}, {data: {url}}, or plain string
+    const url = result?.data?.url || result?.url || result
+    if (!url || typeof url !== 'string') throw new Error('Upload did not return an image URL')
+    return url
+  }
+
+  static async getProductById(id: number): Promise<Product> {
+    const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to fetch product: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  static async createProduct(body: CreateProductRequest): Promise<Product> {
+    const res = await fetch(`${API_BASE_URL}/products`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) throw new Error(`Failed to create product: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  // Tạo sản phẩm kèm ảnh (multipart/form-data)
+  static async createProductWithImage(fields: CreateProductRequest, imageFile: File): Promise<Product> {
+    const form = new FormData()
+    // Đính kèm file với nhiều tên key phổ biến để BE nào cũng đọc được
+    form.append('file', imageFile, imageFile.name)
+    form.append('image', imageFile, imageFile.name)
+    form.append('imageFile', imageFile, imageFile.name)
+    form.append('multipartFile', imageFile, imageFile.name)
+    form.append('upload', imageFile, imageFile.name)
+    form.append('photo', imageFile, imageFile.name)
+    // Provide flat fields for simple parsers
+    form.append('name', fields.name)
+    form.append('description', fields.description ?? '')
+    if (fields.expirationDate) form.append('expirationDate', fields.expirationDate)
+    form.append('categoryId', String(fields.categoryId))
+    if (typeof fields.active === 'boolean') form.append('active', String(fields.active))
+    if (fields.defaultUnitId !== undefined && fields.defaultUnitId !== null && fields.defaultUnitId !== 0) {
+      form.append('defaultUnitId', String(fields.defaultUnitId))
+    }
+    // Also include a JSON blob for robust servers
+    form.append('product', new Blob([JSON.stringify(fields)], { type: 'application/json' }))
+
+    const res = await fetch(`${API_BASE_URL}/products/with-image`, {
+      method: 'POST',
+      headers: (() => {
+        const headers: Record<string, string> = {}
+        const token = localStorage.getItem('access_token')
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        return headers
+      })(),
+      body: form,
+    })
+    // Một số BE có thể trả 400 dù đã tạo xong (do validation phía sau). Hãy đọc body để xác nhận.
+    const text = await res.text().catch(() => '')
+    let result: any = null
+    try { result = text ? JSON.parse(text) : null } catch (_) { result = text }
+
+    if (!res.ok) {
+      // Chấp nhận các format thành công dù status lỗi
+      const maybe = (result && (result.data || result.product || result.created || result))
+      const candidate = Array.isArray(maybe) ? maybe[0] : maybe
+      if (candidate && (candidate.id || result?.success === true)) {
+        return candidate.id ? candidate : (result.data || candidate)
+      }
+      throw new Error(`Failed to create product with image: ${res.status} ${res.statusText}`)
+    }
+
+    const data = (result && (result.data ?? result))
+    if (data) {
+      const rawUrl = data.imageUrl || data.image_url || data.url || data.path || data.imagePath
+      if (rawUrl) data.imageUrl = ProductService.toAbsoluteUrl(rawUrl)
+    }
+    return data
+  }
+
+  static async updateProduct(id: number, body: UpdateProductRequest): Promise<Product> {
+    const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) throw new Error(`Failed to update product: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
   static async deleteProduct(id: number): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/products/${id}`, {
       method: 'DELETE',

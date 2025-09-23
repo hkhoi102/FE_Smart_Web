@@ -44,7 +44,11 @@ const ProductCard = ({
     return imageMap[product.name] || '/images/fresh_fruit.png'
   }
 
-  const hasDiscount = product.originalPrice && product.originalPrice > product.price
+  // Derive display unit and price from productUnits
+  const defaultUnit = (product.productUnits && product.productUnits.find(u => u.isDefault)) || product.productUnits?.[0]
+  const displayUnitName = defaultUnit?.unitName || ''
+  const displayPrice = defaultUnit?.currentPrice ?? defaultUnit?.convertedPrice ?? 0
+  const hasDiscount = false
 
   return (
     <>
@@ -82,10 +86,10 @@ const ProductCard = ({
       <div className="p-4 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-            {product.category_name}
+            {product.categoryName}
           </span>
           <span className="text-xs text-gray-500">
-            {product.unit}
+            {displayUnitName}
           </span>
         </div>
 
@@ -97,12 +101,10 @@ const ProductCard = ({
 
         <div className="flex items-center gap-2">
           <span className="text-primary-600 font-semibold text-lg">
-            {formatCurrency(product.price)}
+            {formatCurrency(displayPrice)}
           </span>
           {hasDiscount && (
-            <span className="text-gray-400 line-through text-sm">
-              {formatCurrency(product.originalPrice!)}
-            </span>
+            <span className="text-gray-400 line-through text-sm">{/* no original price for now */}</span>
           )}
         </div>
 

@@ -3,6 +3,10 @@ import { Product } from '../services/productService'
 
 export interface CartItem extends Product {
   quantity: number
+  // Derived for cart display/pricing
+  price: number
+  unitName?: string
+  unitId?: number
 }
 
 interface CartState {
@@ -27,17 +31,23 @@ const initialState: CartState = {
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case 'ADD_TO_CART': {
-      const existingItem = state.items.find(item => item.id === action.payload.id)
-      
+      const defaultUnit = (action.payload.productUnits && action.payload.productUnits.find(u => u.isDefault)) || action.payload.productUnits?.[0]
+      const price = defaultUnit?.currentPrice ?? defaultUnit?.convertedPrice ?? 0
+      const unitName = defaultUnit?.unitName
+      const unitId = defaultUnit?.unitId
+
+      const existingItem = state.items.find(item => item.id === action.payload.id && item.unitId === unitId)
+
       let newItems: CartItem[]
       if (existingItem) {
         newItems = state.items.map(item =>
-          item.id === action.payload.id
+          item.id === action.payload.id && item.unitId === unitId
             ? { ...item, quantity: item.quantity + 1 }
             : item
         )
       } else {
-        newItems = [...state.items, { ...action.payload, quantity: 1 }]
+        const enriched: CartItem = { ...action.payload, quantity: 1, price, unitName, unitId }
+        newItems = [...state.items, enriched]
       }
 
       const totalItems = newItems.reduce((sum, item) => sum + item.quantity, 0)

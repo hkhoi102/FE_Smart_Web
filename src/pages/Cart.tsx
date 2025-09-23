@@ -101,7 +101,7 @@ const Cart: React.FC = () => {
                               {item.name}
                             </h3>
                             <p className="text-sm text-gray-500 mt-1">
-                              {item.category_name} • {item.unit}
+                              {item.categoryName || ''} • {item.unitName || ''}
                             </p>
                           </div>
                         </div>

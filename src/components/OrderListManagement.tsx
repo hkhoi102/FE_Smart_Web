@@ -98,7 +98,7 @@ const OrderListManagement: React.FC = () => {
       const unitMap: Record<number, { productName?: string; unitName?: string }> = { ...unitInfoCache }
       unitResults.forEach((info, idx) => {
         const key = uniqueUnitIds[idx]
-        if (info) unitMap[key] = { productName: info.name, unitName: info.unitName }
+        if (info) unitMap[key] = { productName: info.productName, unitName: info.unitName }
       })
       // Attach names into details
       Object.keys(detailMap).forEach((orderId) => {
