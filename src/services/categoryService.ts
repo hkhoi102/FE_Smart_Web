@@ -7,6 +7,7 @@ export interface Category {
   description: string
   createdAt?: string
   active?: boolean
+  imageUrl?: string
 }
 
 export interface CreateCategoryRequest {
@@ -77,6 +78,31 @@ export class CategoryService {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       throw new Error(errorData.message || `Failed to create category: ${response.statusText}`)
+    }
+
+    const result = await response.json()
+    return result.data
+  }
+
+  // Tạo category mới với ảnh
+  static async createCategoryWithImage(name: string, description: string, imageFile: File): Promise<Category> {
+    const formData = new FormData()
+    formData.append('name', name)
+    formData.append('description', description)
+    formData.append('image', imageFile)
+
+    const response = await fetch(`${API_BASE_URL}/categories/with-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        // Don't set Content-Type for FormData, let browser set it with boundary
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || `Failed to create category with image: ${response.statusText}`)
     }
 
     const result = await response.json()

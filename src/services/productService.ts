@@ -256,4 +256,142 @@ export const fetchProducts = async (
     hasNextPage: page < totalPages,
     hasPrevPage: page > 1
   }
+
+  static async deleteProduct(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to delete product: ${res.status} ${res.statusText}`)
+  }
+
+  // Import products via Excel file (multipart/form-data)
+  static async importProductsExcel(
+    file: File,
+    options?: { warehouseId?: number; stockLocationId?: number }
+  ): Promise<{ totalRows: number; successCount: number; errorCount: number; errors?: any[]; createdProducts?: any[] }> {
+    const form = new FormData()
+    form.append('file', file)
+    if (options?.warehouseId !== undefined) {
+      form.append('warehouseId', String(options.warehouseId))
+    }
+    if (options?.stockLocationId !== undefined) {
+      form.append('stockLocationId', String(options.stockLocationId))
+    }
+    const res = await fetch(`${API_BASE_URL}/products/import/excel`, {
+      method: 'POST',
+      headers: (() => {
+        const headers: Record<string, string> = {}
+        const token = localStorage.getItem('access_token')
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        return headers
+      })(),
+      body: form,
+    })
+    if (!res.ok) throw new Error(`Failed to import products: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    const data = result.data ?? result
+    return {
+      totalRows: data.totalRows ?? 0,
+      successCount: data.successCount ?? 0,
+      errorCount: data.errorCount ?? 0,
+      errors: data.errors ?? [],
+      createdProducts: data.createdProducts ?? [],
+    }
+  }
+
+  // Update product image by ID (multipart PUT)
+  static async updateProductImage(productId: number, imageFile: File): Promise<Product> {
+    const form = new FormData()
+    form.append('image', imageFile)
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/image`, {
+      method: 'PUT',
+      headers: (() => {
+        const headers: Record<string, string> = {}
+        const token = localStorage.getItem('access_token')
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        return headers
+      })(),
+      body: form,
+    })
+    if (!res.ok) throw new Error(`Failed to update product image: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    return result.data ?? result
+  }
+
+  // Thêm đơn vị tính cho sản phẩm
+  static async addProductUnit(
+    productId: number,
+    payload: { unitId: number; conversionFactor: number; isDefault: boolean }
+  ): Promise<Product> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/units`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`Failed to add product unit: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  static async makeDefaultProductUnit(productId: number, unitId: number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/units/${unitId}/make-default`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to make default unit: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  // PRICE APIs
+  static async getProductPrices(productId: number): Promise<Array<{ id: number; unitId: number; unitName?: string; price: number; isDefault?: boolean; validFrom?: string; validTo?: string }>> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/prices`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to fetch prices: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return (Array.isArray(result?.data) ? result.data : result) || []
+  }
+
+  static async addProductPrice(productId: number, payload: { unitId: number; price: number; validFrom: string; validTo?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/prices`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        productUnitId: payload.unitId,
+        price: payload.price,
+        timeStart: payload.validFrom,
+        timeEnd: payload.validTo,
+      }),
+    })
+    if (!res.ok) throw new Error(`Failed to add price: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  static async updateProductPrice(productId: number, priceId: number, payload: { unitId: number; price: number; validFrom: string; validTo?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/prices/${priceId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        productUnitId: payload.unitId,
+        price: payload.price,
+        timeStart: payload.validFrom,
+        timeEnd: payload.validTo,
+      }),
+    })
+    if (!res.ok) throw new Error(`Failed to update price: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  static async deleteProductPrice(productId: number, priceId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/prices/${priceId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to delete price: ${res.status} ${res.statusText}`)
+  }
 }
