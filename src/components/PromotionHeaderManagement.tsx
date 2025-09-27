@@ -10,7 +10,7 @@ const PromotionHeaderManagement: React.FC = () => {
   const [filterEnd, setFilterEnd] = useState('')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingHeader, setEditingHeader] = useState<any | null>(null)
+  // const [editingHeader, setEditingHeader] = useState<any | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     start_date: '',
@@ -38,26 +38,15 @@ const PromotionHeaderManagement: React.FC = () => {
 
   useEffect(() => { loadHeaders() }, [])
 
-  const handleAddNew = () => {
-    setEditingHeader(null)
-    setFormData({
-      name: '',
-      start_date: '',
-      end_date: '',
-      active: 1
-    })
-    setIsModalOpen(true)
-  }
+  // Ẩn chức năng thêm header mới theo yêu cầu
 
-  const handleEdit = (header: any) => {
-    setEditingHeader(header)
-    setFormData({
-      name: header.name,
-      start_date: header.start_date,
-      end_date: header.end_date,
-      active: header.active
-    })
-    setIsModalOpen(true)
+  const [inlineEditOpen, setInlineEditOpen] = useState(false)
+  const [inlineHeader, setInlineHeader] = useState<any | null>(null)
+
+  const handleEdit = async (header: any) => {
+    // Mở modal chỉnh sửa Heder + Lines + Details trong một nơi
+    setInlineHeader(header)
+    setInlineEditOpen(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,11 +57,8 @@ const PromotionHeaderManagement: React.FC = () => {
       endDate: formData.end_date,
       active: formData.active === 1,
     }
-    if (editingHeader) {
-      await PromotionMutations.updateHeader(editingHeader.id, payload)
-    } else {
-      await PromotionMutations.createHeader(payload)
-    }
+    // Form thêm/sửa header đã ẩn; giữ nguyên để tương thích nếu tái dùng
+    await PromotionMutations.createHeader(payload)
     await loadHeaders()
     setIsModalOpen(false)
   }
@@ -150,6 +136,24 @@ const PromotionHeaderManagement: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN')
+  }
+
+  const viType = (t?: string) => {
+    switch ((t || '').toUpperCase()) {
+      case 'DISCOUNT_PERCENT': return 'Giảm theo %'
+      case 'DISCOUNT_AMOUNT': return 'Giảm tiền'
+      case 'BUY_X_GET_Y': return 'Mua X tặng Y'
+      default: return t || '-'
+    }
+  }
+
+  const viTarget = (t?: string) => {
+    switch ((t || '').toUpperCase()) {
+      case 'PRODUCT': return 'Sản phẩm'
+      case 'CATEGORY': return 'Danh mục'
+      case 'CUSTOMER': return 'Khách hàng'
+      default: return t || '-'
+    }
   }
 
   const getStatusColor = (active: number) => {
@@ -322,13 +326,6 @@ const PromotionHeaderManagement: React.FC = () => {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg leading-6 font-medium text-gray-900">Danh sách Header Khuyến mãi</h3>
-            <button
-              onClick={handleAddNew}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <span className="mr-2">+</span>
-              Thêm Header mới
-            </button>
           </div>
 
           <div className="overflow-x-auto">
@@ -421,7 +418,7 @@ const PromotionHeaderManagement: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingHeader ? 'Sửa Header Khuyến mãi' : 'Thêm Header Khuyến mãi mới'}
+        title={'Thêm Header Khuyến mãi mới'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -500,18 +497,30 @@ const PromotionHeaderManagement: React.FC = () => {
               type="submit"
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              {editingHeader ? 'Cập nhật' : 'Thêm mới'}
+              Thêm mới
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Inline Edit All-in-one (Header + Lines + Details) */}
+      {inlineEditOpen && (
+        <InlinePromotionEditor
+          header={inlineHeader}
+          onClose={async (changed) => {
+            setInlineEditOpen(false)
+            setInlineHeader(null)
+            if (changed) await loadHeaders()
+          }}
+        />
+      )}
 
       {/* View Detail Modal */}
       <Modal
         isOpen={viewModalOpen}
         onClose={() => setViewModalOpen(false)}
         title={viewHeader ? `Chi tiết: ${viewHeader.name}` : 'Chi tiết khuyến mãi'}
-        size="md"
+        size="full"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -547,11 +556,18 @@ const PromotionHeaderManagement: React.FC = () => {
               <div className="text-sm text-gray-500">Đang tải...</div>
             ) : (
               <div className="space-y-4">
-                {viewLines.map((ln) => (
+                  {viewLines.map((ln, idx) => (
                   <div key={ln.id} className="border rounded-md">
                     <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
                       <div className="text-sm font-medium text-gray-900">
-                        Line #{ln.id} • {ln.type} • {ln.target_type} #{ln.target_id}
+                        Khuyến mãi {idx + 1} • {viType(ln.type)} • {viTarget(ln.target_type)} #{ln.target_id}
+                        {ln.start_date || ln.end_date ? (
+                          <span className="ml-2 text-xs text-gray-600">(
+                            {ln.start_date ? formatDate(ln.start_date) : '-'}
+                            {' '}–{' '}
+                            {ln.end_date ? formatDate(ln.end_date) : '-'}
+                          )</span>
+                        ) : null}
                       </div>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ln.active === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                         {ln.active === 1 ? 'Kích hoạt' : 'Tạm dừng'}
@@ -620,3 +636,181 @@ const PromotionHeaderManagement: React.FC = () => {
 }
 
 export default PromotionHeaderManagement
+
+// Editor component to update header + lines + details together
+const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean) => void }> = ({ header, onClose }) => {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [hdr, setHdr] = useState<any>({ id: header.id, name: header.name, startDate: header.start_date, endDate: header.end_date, active: header.active === 1 })
+  const [lines, setLines] = useState<any[]>([])
+  const [detailsByLine, setDetailsByLine] = useState<Record<number, any[]>>({})
+
+  React.useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const lns = await PromotionServiceApi.getLinesAll(header.id)
+        if (cancelled) return
+        setLines(lns)
+        const ents = await Promise.all(lns.map(async (ln: any) => {
+          try { const ds = await PromotionServiceApi.getDetailsAll(ln.id); return [ln.id, ds] as [number, any[]] } catch { return [ln.id, []] as [number, any[]] }
+        }))
+        const rec: Record<number, any[]> = {}
+        ents.forEach(([k, v]) => rec[k] = v)
+        if (!cancelled) {
+          setDetailsByLine(rec)
+          // Prefill line fields from first detail (nếu có)
+          const merged = lns.map((ln: any) => {
+            const d0 = (rec[ln.id] || [])[0]
+            if (!d0) return ln
+            return {
+              ...ln,
+              discountPercent: d0.discountPercent ?? d0.discount_percent ?? ln.discountPercent,
+              discountAmount: d0.discountAmount ?? d0.discount_amount ?? ln.discountAmount,
+              minAmount: d0.minAmount ?? d0.min_amount ?? ln.minAmount,
+              maxDiscount: d0.maxDiscount ?? d0.max_discount ?? ln.maxDiscount,
+              conditionQuantity: d0.conditionQuantity ?? d0.condition_quantity ?? ln.conditionQuantity,
+              freeQuantity: d0.freeQuantity ?? d0.free_quantity ?? ln.freeQuantity,
+            }
+          })
+          setLines(merged)
+        }
+      } finally { if (!cancelled) setLoading(false) }
+    })()
+    return () => { cancelled = true }
+  }, [header?.id])
+
+  const addLine = () => setLines(prev => [...prev, { id: 0, promotionHeaderId: header.id, targetType: 'PRODUCT', targetId: 0, type: 'DISCOUNT_PERCENT', active: true }])
+
+  const saveAll = async () => {
+    setSaving(true)
+    try {
+      await PromotionMutations.updateHeader(hdr.id, { name: hdr.name, startDate: hdr.startDate, endDate: hdr.endDate, active: !!hdr.active })
+      // Upsert lines
+      for (const ln of lines) {
+        if (ln.id && ln.id !== 0) {
+          await PromotionMutations.updateLine(ln.id, { targetType: ln.targetType, targetId: Number(ln.targetId), startDate: ln.startDate, endDate: ln.endDate, active: !!ln.active, type: ln.type })
+        } else {
+          const created = await PromotionMutations.createLine(header.id, { targetType: ln.targetType, targetId: Number(ln.targetId), startDate: ln.startDate, endDate: ln.endDate, active: !!ln.active, type: ln.type })
+          ln.id = created.id
+        }
+        // Upsert first detail: nếu có id → update; nếu chưa có → create
+        const arr = detailsByLine[ln.id] || []
+        const d0 = arr[0]
+        if (d0 && d0.id) {
+          await PromotionServiceApi.updateDetail(d0.id, {
+            promotionLineId: ln.id,
+            discountPercent: ln.discountPercent,
+            discountAmount: ln.discountAmount,
+            minAmount: ln.minAmount,
+            maxDiscount: ln.maxDiscount,
+            conditionQuantity: ln.conditionQuantity,
+            freeQuantity: ln.freeQuantity,
+            active: true,
+          } as any)
+        } else {
+          await PromotionServiceApi.createDetail({
+            promotionLineId: ln.id,
+            discountPercent: ln.discountPercent,
+            discountAmount: ln.discountAmount,
+            minAmount: ln.minAmount,
+            maxDiscount: ln.maxDiscount,
+            conditionQuantity: ln.conditionQuantity,
+            freeQuantity: ln.freeQuantity,
+            active: true,
+          })
+        }
+      }
+      onClose(true)
+    } catch { onClose(false) } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] p-6 max-h-[100vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Sửa khuyến mãi (Header + Dòng + Chi tiết)</h3>
+          <button onClick={() => onClose(false)} className="text-gray-500 hover:text-gray-700">✖</button>
+        </div>
+        {loading ? (
+          <div className="text-sm text-gray-500">Đang tải...</div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded border p-4">
+              <div className="font-medium mb-3">Header</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input className="px-3 py-2 border rounded" value={hdr.name} onChange={e=>setHdr({...hdr, name:e.target.value})} />
+                <input type="date" className="px-3 py-2 border rounded" value={hdr.startDate || ''} onChange={e=>setHdr({...hdr, startDate:e.target.value})} />
+                <input type="date" className="px-3 py-2 border rounded" value={hdr.endDate || ''} onChange={e=>setHdr({...hdr, endDate:e.target.value})} />
+              </div>
+            </div>
+            <div className="rounded border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-medium">Dòng khuyến mãi</div>
+                <button className="px-3 py-1 rounded text-white bg-blue-600 hover:bg-blue-700" onClick={addLine}>+ Thêm dòng</button>
+              </div>
+              <div className="space-y-3">
+                {lines.map((ln, idx) => (
+                  <div key={idx} className="border rounded p-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <select className="px-2 py-2 border rounded" value={ln.targetType} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetType:e.target.value}:l))}>
+                        <option value="PRODUCT">Sản phẩm</option>
+                        <option value="CATEGORY">Danh mục</option>
+                        <option value="CUSTOMER">Khách hàng</option>
+                      </select>
+                      <input className="px-2 py-2 border rounded" type="number" value={ln.targetId || 0} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:Number(e.target.value)}:l))} />
+                      <select className="px-2 py-2 border rounded" value={ln.type || 'DISCOUNT_PERCENT'} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value}:l))}>
+                        <option value="DISCOUNT_PERCENT">Giảm theo %</option>
+                        <option value="DISCOUNT_AMOUNT">Giảm tiền</option>
+                        <option value="BUY_X_GET_Y">Mua X tặng Y</option>
+                      </select>
+                      <div className="flex items-center gap-2">
+                        <input type="date" className="px-2 py-2 border rounded" value={ln.startDate || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, startDate:e.target.value}:l))} />
+                        <input type="date" className="px-2 py-2 border rounded" value={ln.endDate || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, endDate:e.target.value}:l))} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-2 mt-3">
+                      <input placeholder="% giảm" className="px-2 py-2 border rounded" value={ln.discountPercent || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, discountPercent:e.target.value}:l))} />
+                      <input placeholder="Giảm tiền" className="px-2 py-2 border rounded" value={ln.discountAmount || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, discountAmount:e.target.value}:l))} />
+                      <input placeholder="Tối thiểu" className="px-2 py-2 border rounded" value={ln.minAmount || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, minAmount:e.target.value}:l))} />
+                      <input placeholder="Giảm tối đa" className="px-2 py-2 border rounded" value={ln.maxDiscount || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, maxDiscount:e.target.value}:l))} />
+                      <input placeholder="SL X" className="px-2 py-2 border rounded" value={ln.conditionQuantity || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, conditionQuantity:e.target.value}:l))} />
+                      <input placeholder="SL Y" className="px-2 py-2 border rounded" value={ln.freeQuantity || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, freeQuantity:e.target.value}:l))} />
+                    </div>
+                    <div className="mt-2 flex items-center gap-3">
+                      <span className="text-xs text-gray-600">Trạng thái:</span>
+                      <button
+                        type="button"
+                        className={`px-2 py-1 text-xs rounded ${ln.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}
+                        onClick={async () => {
+                          try {
+                            if (ln.id) { await PromotionServiceApi.activateLine(ln.id) }
+                            setLines(prev => prev.map((l,i)=> i===idx?{...l, active: true}:l))
+                          } catch {}
+                        }}
+                      >Kích hoạt</button>
+                      <button
+                        type="button"
+                        className={`px-2 py-1 text-xs rounded ${!ln.active ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}
+                        onClick={async () => {
+                          try {
+                            if (ln.id) { await PromotionServiceApi.deactivateLine(ln.id) }
+                            setLines(prev => prev.map((l,i)=> i===idx?{...l, active: false}:l))
+                          } catch {}
+                        }}
+                      >Tạm ngưng</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button className="px-4 py-2 rounded border" onClick={()=>onClose(false)}>Hủy</button>
+              <button disabled={saving} className="px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50" onClick={saveAll}>Lưu</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

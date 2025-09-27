@@ -5,9 +5,11 @@ interface ProductTableProps {
   categories: ProductCategory[]
   onEdit: (product: Product) => void
   onDelete: (id: number) => void
+  // Đã ẩn nút thêm đơn vị và tạo/xem giá theo yêu cầu
+  onViewDetail?: (product: Product) => void
 }
 
-const ProductTable = ({ products, categories, onEdit, onDelete }: ProductTableProps) => {
+const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: ProductTableProps) => {
 
   const formatPrice = (price?: number) => {
     if (price === undefined || price === null) return '—'
@@ -105,16 +107,28 @@ const ProductTable = ({ products, categories, onEdit, onDelete }: ProductTablePr
                   {product.expirationDate ? formatDate(product.expirationDate) : 'Không có'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    {onViewDetail && (
+                      <button
+                        onClick={() => onViewDetail(product)}
+                        className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                        title="Xem chi tiết sản phẩm"
+                      >
+                        Chi tiết
+                      </button>
+                    )}
+                    {/* Ẩn các nút: "+ Đơn vị" và "Tạo giá/Xem giá" theo yêu cầu */}
                     <button
                       onClick={() => onEdit(product)}
-                      className="text-green-600 hover:text-green-900"
+                      className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                      title="Chỉnh sửa sản phẩm"
                     >
                       Sửa
                     </button>
                     <button
                       onClick={() => onDelete(product.id)}
-                      className="text-red-600 hover:text-red-900"
+                      className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                      title="Xóa sản phẩm"
                     >
                       Xóa
                     </button>

@@ -202,6 +202,66 @@ export const InventoryService = {
     return await res.json().catch(() => ({}))
   },
 
+  // Stock Documents (Inbound/Outbound documents)
+  async createDocument(body: { type: 'INBOUND' | 'OUTBOUND'; warehouseId: number; stockLocationId: number; referenceNumber?: string; note?: string }): Promise<{ id: number }> {
+    const res = await fetch(`${API_BASE_URL}/inventory/documents`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) })
+    if (!res.ok) throw new Error('Failed to create document')
+    const data = await res.json().catch(() => ({}))
+    return data?.data ?? data
+  },
+
+  async addDocumentLinesBulk(documentId: number, lines: Array<{ productUnitId: number; quantity: number }>): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/inventory/documents/${documentId}/lines/bulk`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ lines }) })
+    if (!res.ok) throw new Error('Failed to add document lines (bulk)')
+    return await res.json().catch(() => ({}))
+  },
+
+  async addDocumentLine(documentId: number, line: { productUnitId: number; quantity: number }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/inventory/documents/${documentId}/lines`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(line) })
+    if (!res.ok) throw new Error('Failed to add document line')
+    return await res.json().catch(() => ({}))
+  },
+
+  async getDocumentLines(documentId: number): Promise<Array<{ id: number; productUnitId: number; quantity: number }>> {
+    const res = await fetch(`${API_BASE_URL}/inventory/documents/${documentId}/lines`, { headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to fetch document lines')
+    const data = await res.json().catch(() => ({}))
+    return Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : [])
+  },
+
+  async approveDocument(documentId: number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/inventory/documents/${documentId}/approve`, { method: 'POST', headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to approve document')
+    return await res.json().catch(() => ({}))
+  },
+
+  async rejectDocument(documentId: number, reason?: string): Promise<any> {
+    const body = reason ? { reason } : undefined as any
+    const res = await fetch(`${API_BASE_URL}/inventory/documents/${documentId}/reject`, { method: 'POST', headers: authHeaders(), body: body ? JSON.stringify(body) : undefined })
+    if (!res.ok) throw new Error('Failed to reject document')
+    return await res.json().catch(() => ({}))
+  },
+
+  async listDocuments(params?: { warehouseId?: number }): Promise<Array<{ id: number; type: 'INBOUND' | 'OUTBOUND'; status: string }>> {
+    const qs = params?.warehouseId ? `?warehouseId=${params.warehouseId}` : ''
+    const res = await fetch(`${API_BASE_URL}/inventory/documents${qs}`, { headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to fetch documents')
+    const data = await res.json().catch(() => ({}))
+    return Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : [])
+  },
+
+  async getDocument(documentId: number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/inventory/documents/${documentId}`, { headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to fetch document')
+    const data = await res.json().catch(() => ({}))
+    return data?.data ?? data
+  },
+
+  async deleteDocumentLine(lineId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/inventory/documents/lines/${lineId}`, { method: 'DELETE', headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to delete document line')
+  },
+
   async outbound(payload: Omit<TransactionPayload, 'transactionType'>): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/inventory/outbound`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) })
     if (!res.ok) throw new Error('Failed to create outbound')

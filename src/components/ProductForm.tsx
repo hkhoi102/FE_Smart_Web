@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ProductService } from '@/services/productService'
+// Removed inline barcode handling; handled via row actions in product table
 import type { Product, ProductCategory } from '@/services/productService'
 
 interface ProductFormProps {
@@ -22,6 +23,11 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, isLoading = fals
   })
 
   const [units, setUnits] = useState<Array<{ id: number; name: string }>>([])
+  const [allUnits, setAllUnits] = useState<Array<{ id: number; name: string; isDefault?: boolean }>>([])
+  const [productUnitsView, setProductUnitsView] = useState<Array<{ id: number; unitId: number; unitName: string; conversionFactor: number; isDefault: boolean }>>([])
+  const [newUnitId, setNewUnitId] = useState<number | ''>('')
+  const [newUnitCF, setNewUnitCF] = useState<number>(1)
+
   const [imagePreview, setImagePreview] = useState<string>('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -39,6 +45,7 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, isLoading = fals
         unit_id: (product as any).defaultUnitId || 0
       })
       setImagePreview((product as any).imageUrl || (product as any).image_url || '')
+      setProductUnitsView((product.productUnits || []).map(u => ({ id: u.id, unitId: u.unitId, unitName: u.unitName, conversionFactor: u.conversionFactor, isDefault: !!u.isDefault })))
     } else {
       // Reset form for new product
       setFormData({
@@ -51,17 +58,20 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, isLoading = fals
         unit_id: 0
       })
       setImagePreview('')
+      setProductUnitsView([])
     }
   }, [product])
 
   useEffect(() => {
-    // Load only default units from backend (is_default = true)
+    // Load all units for selection and default units list
     ProductService.getUnits()
       .then((res: any[]) => {
-        const filtered = (res || []).filter((u: any) => u && (u.isDefault === true))
+        const arr = (res || [])
+        setAllUnits(arr)
+        const filtered = arr.filter((u: any) => u && (u.isDefault === true))
         setUnits(filtered.map((u: any) => ({ id: u.id, name: u.name })))
       })
-      .catch(() => setUnits([]))
+      .catch(() => { setUnits([]); setAllUnits([]) })
   }, [])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -88,14 +98,18 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, isLoading = fals
       defaultUnitId: formData.unit_id || null,
     }
 
-    // Nếu có ảnh file và API hỗ trợ tạo cùng ảnh: gửi luôn
+    // Ảnh
     if (imageFile) {
       try {
-        const created = await ProductService.createProductWithImage(productData as any, imageFile)
-        onSubmit(created)
-        return
+        if (product && product.id) {
+          await ProductService.updateProductImage(product.id, imageFile)
+        } else {
+          const created = await ProductService.createProductWithImage(productData as any, imageFile)
+          onSubmit(created)
+          return
+        }
       } catch (err) {
-        // fallback
+        // fallback tạo thường nếu thất bại
       }
     }
 
@@ -206,22 +220,10 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, isLoading = fals
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Đơn vị tính (mặc định)
-          </label>
-          <select
-            value={formData.unit_id}
-            onChange={(e) => setFormData(prev => ({ ...prev, unit_id: Number(e.target.value) }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          >
-            <option value={0}>Chưa chọn</option>
-            {units.map(u => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
-        </div>
+        {/* Bỏ Đơn vị tính (mặc định) theo yêu cầu */}
       </div>
+
+      {/* Đơn vị tính & Barcode (ẩn trong chế độ sửa theo yêu cầu) */}
 
       {/* Buttons */}
       <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">

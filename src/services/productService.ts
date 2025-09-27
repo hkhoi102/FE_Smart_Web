@@ -41,6 +41,8 @@ export interface Product {
   defaultUnitId?: number | null
   productUnits?: ProductUnit[]
   barcodes?: Barcode[] | null
+  // Some BE returns a flat list of barcodes for the product
+  barcodeList?: Array<{ id: number; productUnitId: number; code: string; type?: string }>
 }
 
 export interface ProductResponse {
@@ -192,22 +194,32 @@ export class ProductService {
     return arr.map((u: any) => ({ id: u.id, name: u.name ?? u.unitName ?? u.code ?? String(u.id), description: u.description, isDefault: (u.isDefault ?? u.is_default) ? true : false }))
   }
 
-  static async createUnit(payload: { name: string; description?: string }): Promise<{ id: number; name: string; description?: string; createdAt?: string }> {
+  static async createUnit(payload: { name: string; description?: string; isDefault?: boolean }): Promise<{ id: number; name: string; description?: string; createdAt?: string; isDefault?: boolean }> {
     const res = await fetch(`${API_BASE_URL}/uoms`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.description,
+        // Gửi cả hai key để tương thích các BE khác nhau
+        isDefault: payload.isDefault ? true : false,
+        is_default: payload.isDefault ? 1 : 0,
+      }),
     })
     if (!res.ok) throw new Error(`Failed to create unit: ${res.status} ${res.statusText}`)
     const result = await res.json()
     return result.data ?? result
   }
 
-  static async updateUnit(id: number, payload: { name: string; description?: string }): Promise<{ id: number; name: string; description?: string; createdAt?: string }> {
+  static async updateUnit(id: number, payload: { name: string; description?: string; isDefault?: boolean }): Promise<{ id: number; name: string; description?: string; createdAt?: string; isDefault?: boolean }> {
     const res = await fetch(`${API_BASE_URL}/uoms/${id}`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.description,
+        ...(payload.isDefault === undefined ? {} : { isDefault: !!payload.isDefault, is_default: payload.isDefault ? 1 : 0 }),
+      }),
     })
     if (!res.ok) throw new Error(`Failed to update unit: ${res.status} ${res.statusText}`)
     const result = await res.json()
@@ -331,6 +343,34 @@ export class ProductService {
     return result.data ?? result
   }
 
+  // Update product (fields + optional image) via multipart PUT /products/{id}/with-image
+  static async updateProductWithImage(id: number, fields: UpdateProductRequest, imageFile?: File | null): Promise<Product> {
+    const form = new FormData()
+    if (imageFile) {
+      form.append('image', imageFile, imageFile.name)
+      form.append('file', imageFile, imageFile.name)
+    }
+    form.append('name', fields.name)
+    form.append('description', fields.description ?? '')
+    if (fields.expirationDate) form.append('expirationDate', fields.expirationDate)
+    form.append('categoryId', String(fields.categoryId))
+    // Theo spec: chỉ name, description, categoryId; expirationDate optional; image optional
+
+    const res = await fetch(`${API_BASE_URL}/products/${id}/with-image`, {
+      method: 'PUT',
+      headers: (() => {
+        const headers: Record<string, string> = {}
+        const token = localStorage.getItem('access_token')
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        return headers
+      })(),
+      body: form,
+    })
+    if (!res.ok) throw new Error(`Failed to update product with image: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    return result.data ?? result
+  }
+
   static async deleteProduct(id: number): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/products/${id}`, {
       method: 'DELETE',
@@ -401,7 +441,12 @@ export class ProductService {
     const res = await fetch(`${API_BASE_URL}/products/${productId}/units`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        unitId: payload.unitId,
+        conversionFactor: payload.conversionFactor,
+        conversionRate: payload.conversionFactor, // BE may expect conversionRate
+        isDefault: payload.isDefault,
+      }),
     })
     if (!res.ok) throw new Error(`Failed to add product unit: ${res.status} ${res.statusText}`)
     const result = await res.json()
@@ -418,6 +463,65 @@ export class ProductService {
     return result.data ?? result
   }
 
+  // Some BE versions expect productUnitId path for make-default
+  static async makeDefaultByProductUnitId(productUnitId: number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/units/${productUnitId}/make-default`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to make default unit: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    return result.data ?? result
+  }
+
+  // Update product unit properties (e.g., conversionFactor)
+  static async updateProductUnit(productId: number, unitId: number, payload: { conversionFactor?: number; isDefault?: boolean }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/units/${unitId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        ...payload,
+        conversionRate: payload.conversionFactor ?? undefined,
+      }),
+    })
+    if (!res.ok) throw new Error(`Failed to update product unit: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    return result.data ?? result
+  }
+
+  // Update by productUnitId path (some BE uses this route)
+  static async updateProductUnitByProductUnitId(productUnitId: number, payload: { conversionFactor?: number; isDefault?: boolean }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/units/${productUnitId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        ...payload,
+        conversionRate: payload.conversionFactor ?? undefined,
+      }),
+    })
+    if (!res.ok) throw new Error(`Failed to update product unit: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    return result.data ?? result
+  }
+
+  // Delete product unit by productUnitId (cleanup auto-created base unit)
+  static async deleteProductUnitById(productUnitId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/products/units/${productUnitId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to delete product unit: ${res.status} ${res.statusText}`)
+  }
+
+  // Delete product unit using backend-supported route with productId
+  static async deleteProductUnit(productId: number, productUnitId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/units/${productUnitId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to delete product unit: ${res.status} ${res.statusText}`)
+  }
+
   // PRICE APIs
   static async getProductPrices(productId: number): Promise<Array<{ id: number; unitId: number; unitName?: string; price: number; isDefault?: boolean; validFrom?: string; validTo?: string }>> {
     const res = await fetch(`${API_BASE_URL}/products/${productId}/prices`, {
@@ -427,6 +531,18 @@ export class ProductService {
     if (!res.ok) throw new Error(`Failed to fetch prices: ${res.status} ${res.statusText}`)
     const result = await res.json()
     return (Array.isArray(result?.data) ? result.data : result) || []
+  }
+
+  // Unit-specific price history
+  static async getUnitPriceHistory(productId: number, productUnitId: number): Promise<Array<{ id: number; productUnitId: number; unitId?: number; unitName?: string; price: number; priceHeaderId?: number; timeStart?: string; timeEnd?: string; createdAt?: string }>> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/prices/units/${productUnitId}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to fetch unit price history: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    const arr = Array.isArray(result?.data) ? result.data : (Array.isArray(result) ? result : [])
+    return arr
   }
 
   static async addProductPrice(productId: number, payload: { unitId: number; price: number; validFrom: string; validTo?: string }): Promise<any> {
@@ -441,6 +557,34 @@ export class ProductService {
       }),
     })
     if (!res.ok) throw new Error(`Failed to add price: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  // Add price for a unit with header (preferred)
+  static async addUnitPriceWithHeader(productId: number, productUnitId: number, payload: { priceHeaderId: number; price: number; timeStart: string; timeEnd?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/prices/units/${productUnitId}`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`Failed to add unit price: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  // Fallback: add price under price header path if BE requires it
+  static async addPriceUnderHeader(productId: number, priceHeaderId: number, payload: { price: number; timeStart?: string; timeEnd?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/price-headers/${priceHeaderId}/prices`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        price: payload.price,
+        timeStart: payload.timeStart,
+        timeEnd: payload.timeEnd,
+      }),
+    })
+    if (!res.ok) throw new Error(`Failed to add price (header path): ${res.status} ${res.statusText}`)
     const result = await res.json()
     return result.data ?? result
   }
@@ -467,5 +611,39 @@ export class ProductService {
       headers: this.getAuthHeaders(),
     })
     if (!res.ok) throw new Error(`Failed to delete price: ${res.status} ${res.statusText}`)
+  }
+
+  // Price headers by product unit
+  static async getPriceHeaders(productId: number, productUnitId: number): Promise<Array<{ id: number; name: string; description?: string; timeStart?: string; timeEnd?: string; active?: boolean }>> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/price-headers/units/${productUnitId}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to fetch price headers: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return (Array.isArray(result?.data) ? result.data : result) || []
+  }
+
+  static async createPriceHeader(productId: number, productUnitId: number, payload: { name: string; description?: string; timeStart?: string; timeEnd?: string; active?: boolean }): Promise<{ id: number; name: string }> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/price-headers/units/${productUnitId}`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`Failed to create price header: ${res.status} ${res.statusText}`)
+    const result = await res.json()
+    return result.data ?? result
+  }
+
+  // Get current price for a product unit
+  static async getCurrentPrice(productId: number, productUnitId: number): Promise<number | null> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/prices/current?productUnitId=${productUnitId}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) return null
+    const result = await res.json().catch(() => null)
+    const value = (result?.data ?? result)
+    return typeof value === 'number' ? value : null
   }
 }

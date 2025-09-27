@@ -38,7 +38,8 @@ const InventoryManagement = () => {
   const [notify, setNotify] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [selectedWarehouse, setSelectedWarehouse] = useState<number | 'all'>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
+  const [activeTab, setActiveTab] = useState<'HISTORY' | 'CREATE'>('HISTORY')
+  // removed unused editingItem
   const [txnType, setTxnType] = useState<'INBOUND' | 'OUTBOUND'>('INBOUND')
   const [formData, setFormData] = useState({
     productUnitId: '',
@@ -48,9 +49,53 @@ const InventoryManagement = () => {
     referenceNumber: '',
     note: ''
   })
+  // Document-based flow
+  const [documentId, setDocumentId] = useState<number | null>(null)
+  const [lineInputs, setLineInputs] = useState<Array<{ productUnitId: string; quantity: string; productText?: string; productId?: number; unitOptions?: Array<{ id: number; name: string }>; }>>([{ productUnitId: '', quantity: '', productText: '' }])
+  const [documentLines, setDocumentLines] = useState<Array<{ id: number; productUnitId: number; quantity: number }>>([])
+  const [docList, setDocList] = useState<Array<{ id: number; type: 'INBOUND' | 'OUTBOUND'; status?: string; createdAt?: string }>>([])
+  // removed old searchResults (replaced by dropdown products)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailDoc, setDetailDoc] = useState<any | null>(null)
+  const [detailLines, setDetailLines] = useState<Array<{ id: number; productUnitId: number; quantity: number; productName?: string; unitName?: string }>>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [productOptions, setProductOptions] = useState<Array<{ id: number; name: string }>>([])
+
+  const getDocumentStatusLabel = (status?: string) => {
+    switch ((status || '').toUpperCase()) {
+      case 'DRAFT':
+        return 'Chờ duyệt'
+      case 'APPROVED':
+        return 'Đã duyệt'
+      case 'REJECTED':
+        return 'Đã từ chối'
+      case 'PENDING':
+        return 'Đang xử lý'
+      case 'CANCELLED':
+        return 'Đã hủy'
+      default:
+        return status || '-'
+    }
+  }
+
+  const getDocumentStatusClass = (status?: string) => {
+    switch ((status || '').toUpperCase()) {
+      case 'DRAFT':
+        return 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200'
+      case 'PENDING':
+        return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
+      case 'APPROVED':
+        return 'bg-green-50 text-green-700 ring-1 ring-green-200'
+      case 'REJECTED':
+        return 'bg-red-50 text-red-700 ring-1 ring-red-200'
+      case 'CANCELLED':
+        return 'bg-gray-100 text-gray-600 ring-1 ring-gray-200'
+      default:
+        return 'bg-gray-50 text-gray-600 ring-1 ring-gray-200'
+    }
+  }
 
 
   useEffect(() => {
@@ -124,7 +169,6 @@ const InventoryManagement = () => {
   })
 
   const handleAddItem = () => {
-    setEditingItem(null)
     setFormData({
       productUnitId: '',
       warehouseId: '',
@@ -135,26 +179,19 @@ const InventoryManagement = () => {
     })
     setTxnType('INBOUND')
     setIsModalOpen(true)
+    // Load first-page products for dropdown
+    ;(async ()=>{
+      try {
+        const res = await ProductService.getProducts(1, 50)
+        setProductOptions(res.products.map(p => ({ id: p.id, name: p.name })))
+      } catch {}
+    })()
   }
 
-  const handleEditItem = (item: InventoryItem) => {
-    // repurpose edit to open outbound by default for quick deduction
-    setEditingItem(item)
-    setTxnType('OUTBOUND')
-    setFormData({
-      productUnitId: String(item.productId),
-      warehouseId: String(item.warehouseId),
-      stockLocationId: '',
-      quantity: '',
-      referenceNumber: '',
-      note: ''
-    })
-    setIsModalOpen(true)
-  }
+  // removed unused handleEditItem
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
-    setEditingItem(null)
     setFormData({
       productUnitId: '',
       warehouseId: '',
@@ -163,69 +200,24 @@ const InventoryManagement = () => {
       referenceNumber: '',
       note: ''
     })
+    setDocumentId(null)
+    setLineInputs([{ productUnitId: '', quantity: '' }])
+    setDocumentLines([])
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const required = [formData.productUnitId, formData.warehouseId, formData.stockLocationId, formData.quantity]
-    if (required.some(v => !v)) {
-      setNotify({ type: 'error', message: 'Vui lòng điền đầy đủ thông tin bắt buộc' })
-      return
-    }
+  // Load documents when switching to CREATE tab
+  useEffect(() => {
+    (async () => {
+      if (activeTab === 'CREATE') {
+        try {
+          const list = await InventoryService.listDocuments({})
+          setDocList(list as any)
+        } catch { setDocList([]) }
+      }
+    })()
+  }, [activeTab])
 
-    setIsSubmitting(true)
-    try {
-      const payload = {
-        productUnitId: Number(formData.productUnitId),
-        warehouseId: Number(formData.warehouseId),
-        stockLocationId: Number(formData.stockLocationId),
-        quantity: Number(formData.quantity),
-        transactionDate: new Date().toISOString(),
-        referenceNumber: formData.referenceNumber || undefined,
-        note: formData.note || undefined,
-      }
-      if (txnType === 'INBOUND') {
-        await InventoryService.inboundProcess(payload)
-        setNotify({ type: 'success', message: 'Nhập kho thành công' })
-      } else {
-        await InventoryService.outbound(payload)
-        setNotify({ type: 'success', message: 'Xuất kho thành công' })
-      }
-      // refresh stock
-      const stocks = await InventoryService.getStock()
-      const mapped: InventoryItem[] = await Promise.all((stocks as StockBalanceDto[]).map(async (s, idx) => {
-        let productName = s.productName as string | undefined
-        let unitName = s.unitName as string | undefined
-        if (!productName || !unitName) {
-          const detail = await ProductService.getProductUnitById(s.productUnitId)
-          productName = productName || detail?.productName || `PU#${s.productUnitId}`
-          unitName = unitName || detail?.unitName || '-'
-        }
-        return {
-          id: s.id ?? idx + 1,
-          productId: s.productUnitId,
-          productName,
-          category: '-',
-          unit: unitName,
-          warehouseId: s.warehouseId,
-          warehouseName: s.warehouseName || `Kho #${s.warehouseId}`,
-          currentStock: s.quantity,
-          minStock: 0,
-          maxStock: 0,
-          unitPrice: 0,
-          totalValue: 0,
-          lastUpdated: s.updatedAt || '',
-          status: s.quantity === 0 ? 'out_of_stock' : 'in_stock',
-        }
-      }))
-      setInventory(mapped)
-      handleCloseModal()
-    } catch (err: any) {
-      setNotify({ type: 'error', message: err?.message || 'Thao tác thất bại' })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  // removed old handleSubmit (flow replaced by document create + bulk lines)
 
   const handleDeleteItem = (id: number) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa mục này khỏi kho?')) {
@@ -319,13 +311,33 @@ const InventoryManagement = () => {
           >
             Làm mới
           </button>
-          <button
-            onClick={handleAddItem}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-          >
-            Thêm mục kho
-          </button>
+          {activeTab==='CREATE' && (
+            <button
+              onClick={() => { setActiveTab('CREATE'); handleAddItem() }}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+            >
+              Tạo phiếu nhập/xuất
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('HISTORY')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab==='HISTORY' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          >
+            Lịch sử nhập xuất
+          </button>
+          <button
+            onClick={() => { setActiveTab('CREATE') }}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab==='CREATE' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          >
+            Tạo phiếu
+          </button>
+        </nav>
       </div>
 
       {/* Stats Cards */}
@@ -424,7 +436,8 @@ const InventoryManagement = () => {
         </div>
       </div>
 
-      {/* Inventory Table */}
+      {/* Inventory Table (History tab) */}
+      {activeTab==='HISTORY' && (
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -471,12 +484,6 @@ const InventoryManagement = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => handleEditItem(item)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Sửa
-                      </button>
-                      <button
                         onClick={() => handleDeleteItem(item.id)}
                         className="text-red-600 hover:text-red-900"
                       >
@@ -490,13 +497,82 @@ const InventoryManagement = () => {
           </table>
         </div>
       </div>
+      )}
+
+      {/* Documents list under Create tab */}
+      {activeTab==='CREATE' && (
+        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 className="text-lg font-medium text-gray-900">Danh sách phiếu gần đây</h3>
+            <button className="text-sm text-gray-600 hover:text-gray-900" onClick={async ()=>{ try{ const list = await InventoryService.listDocuments({}); setDocList(list as any) } catch{} }}>Làm mới</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50"><tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loại</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày tạo</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Duyệt/Từ chối</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
+              </tr></thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {docList.map(d => (
+                  <tr key={d.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-3 text-sm text-gray-900">#{d.id}</td>
+                    <td className="px-6 py-3 text-sm text-gray-900">{d.type === 'INBOUND' ? 'Nhập kho' : 'Xuất kho'}</td>
+                    <td className="px-6 py-3 text-sm">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDocumentStatusClass(d.status)}`}>
+                        {getDocumentStatusLabel(d.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-700">{d.createdAt ? new Date(d.createdAt).toLocaleString('vi-VN') : '-'}</td>
+                    <td className="px-6 py-3 text-sm text-center">
+                      {(['DRAFT','PENDING'].includes((d.status || '').toUpperCase())) ? (
+                        <div className="inline-flex gap-2">
+                          <button className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700" onClick={async ()=>{ try{ await InventoryService.approveDocument(d.id); setNotify({ type: 'success', message: `Đã duyệt phiếu #${d.id}` }); const list = await InventoryService.listDocuments({}); setDocList(list as any) } catch(e:any){ setNotify({ type: 'error', message: e?.message || 'Duyệt phiếu thất bại' }) } }}>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                            Duyệt
+                          </button>
+                          <button className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700" onClick={async ()=>{
+                            const reason = prompt('Lý do từ chối (optional):') || undefined
+                            try {
+                              await InventoryService.rejectDocument(d.id, reason)
+                              setNotify({ type: 'success', message: `Đã từ chối phiếu #${d.id}` })
+                              const list = await InventoryService.listDocuments({})
+                              setDocList(list as any)
+                            } catch (e:any) {
+                              setNotify({ type: 'error', message: e?.message || 'Từ chối phiếu thất bại' })
+                            }
+                          }}>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            Từ chối
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-right">
+                      <div className="inline-flex gap-2">
+                        <button className="px-3 py-1 text-xs bg-gray-100 rounded" onClick={async ()=>{ try{ const doc = await InventoryService.getDocument(d.id); let lines = await InventoryService.getDocumentLines(d.id); try { lines = await Promise.all(lines.map(async (ln:any)=>{ const unit = await ProductService.getProductUnitById(ln.productUnitId); return { ...ln, productName: unit?.productName, unitName: unit?.unitName } })) } catch{} setDetailDoc(doc); setDetailLines(lines); setDetailOpen(true) } catch{} }}>Chi tiết</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {docList.length === 0 && (<tr><td colSpan={4} className="px-6 py-4 text-sm text-gray-500">Chưa có phiếu</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Notification Modal */}
       {notify && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setNotify(null)} />
-            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-xl w-full">
               <div className="p-6">
                 <div className={`flex items-center ${notify.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>
                   <div className="flex-shrink-0">
@@ -528,16 +604,16 @@ const InventoryManagement = () => {
         </div>
       )}
 
-      {/* Modal */}
-      {isModalOpen && (
+      {/* Create transaction modal */}
+      {isModalOpen && activeTab==='CREATE' && (
+        <>
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleCloseModal}></div>
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleCloseModal} />
-
-            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className={`relative bg-white rounded-lg shadow-xl w-full ${documentId ? 'max-w-5xl' : 'max-w-md'}`}>
               <div className="flex items-center justify-between p-6 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {editingItem ? 'Chỉnh sửa mục kho' : 'Thêm mục kho mới'}
+                  {txnType === 'INBOUND' ? 'Tạo phiếu nhập' : 'Tạo phiếu xuất'}
                 </h3>
                 <button
                   onClick={handleCloseModal}
@@ -549,8 +625,7 @@ const InventoryManagement = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6">
-                <div className="space-y-4">
+              <div className="p-6 space-y-6">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -567,20 +642,6 @@ const InventoryManagement = () => {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        ProductUnitId *
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.productUnitId}
-                        onChange={(e) => setFormData(prev => ({ ...prev, productUnitId: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        placeholder="Nhập ProductUnitId"
-                        required
-                      />
-                    </div>
-
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Kho *
@@ -629,20 +690,7 @@ const InventoryManagement = () => {
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Số lượng *
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.quantity}
-                        onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        placeholder="0"
-                        min="0"
-                        required
-                      />
-                    </div>
+
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -671,7 +719,117 @@ const InventoryManagement = () => {
                       />
                     </div>
                   </div>
+                  {/* Actions for document step */}
+                  <div className="flex justify-end space-x-3 mt-2">
+                    {!documentId && (
+                      <button
+                        type="button"
+                        disabled={isSubmitting || !formData.warehouseId || !formData.stockLocationId}
+                        className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50"
+                        onClick={async () => {
+                          try {
+                            setIsSubmitting(true)
+                            const created = await InventoryService.createDocument({
+                              type: txnType,
+                              warehouseId: Number(formData.warehouseId),
+                              stockLocationId: Number(formData.stockLocationId),
+                              referenceNumber: formData.referenceNumber || undefined,
+                              note: formData.note || undefined,
+                            })
+                            setDocumentId(created?.id)
+                            setNotify({ type: 'success', message: `Đã tạo phiếu #${created?.id}` })
+                          } catch (e:any) {
+                            setNotify({ type: 'error', message: e?.message || 'Tạo phiếu thất bại' })
+                          } finally { setIsSubmitting(false) }
+                        }}
+                      >Tạo phiếu</button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Step 2: Add lines */}
+                {documentId && (
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-gray-900">Thêm sản phẩm cho phiếu #{documentId}</div>
+                    {lineInputs.map((ln, i) => (
+                      <div key={i} className="grid grid-cols-5 gap-2 items-start">
+                        <div className="col-span-2">
+                          <select
+                            value={String(ln.productId || '')}
+                            onChange={async (e)=> {
+                              const pid = Number(e.target.value)
+                              setLineInputs(prev => prev.map((x,idx)=> idx===i? { ...x, productId: pid }: x))
+                              if (pid) {
+                                try {
+                                  const detail = await ProductService.getProductById(pid)
+                                  const units = (detail.productUnits || []).map((u:any)=> ({ id: u.id, name: u.unitName }))
+                                  const firstUnit = units[0]?.id ? String(units[0].id) : ''
+                                  setLineInputs(prev => prev.map((x,idx)=> idx===i? { ...x, unitOptions: units, productUnitId: firstUnit }: x))
+                                } catch {}
+                              } else {
+                                setLineInputs(prev => prev.map((x,idx)=> idx===i? { ...x, unitOptions: [], productUnitId: '' }: x))
+                              }
+                            }}
+                            className="w-full px-2 py-2 border rounded"
+                          >
+                            <option value="">-- Chọn sản phẩm --</option>
+                            {productOptions.map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <select
+                            value={ln.productUnitId}
+                            onChange={(e)=> setLineInputs(prev=> prev.map((x,idx)=> idx===i? { ...x, productUnitId: e.target.value }: x))}
+                            className="w-full px-2 py-2 border rounded"
+                          >
+                            <option value="">-- Chọn đơn vị --</option>
+                            {(ln.unitOptions || []).map(u => (
+                              <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <input type="number" placeholder="Số lượng" value={ln.quantity} onChange={(e)=> setLineInputs(prev=> prev.map((x,idx)=> idx===i? { ...x, quantity: e.target.value }: x))} className="px-2 py-2 border rounded" />
+                        <div className="flex gap-2">
+                          <button type="button" className="px-3 py-2 text-xs bg-gray-100 rounded" onClick={()=> setLineInputs(prev=> [...prev, { productUnitId: '', quantity: '' }])}>+ Dòng</button>
+                          {lineInputs.length > 1 && (
+                            <button type="button" className="px-3 py-2 text-xs bg-red-100 text-red-700 rounded" onClick={()=> setLineInputs(prev=> prev.filter((_,idx)=> idx!==i))}>Xóa</button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-end gap-2">
+                      <button type="button" className="px-4 py-2 text-sm border rounded" onClick={async ()=>{
+                        try {
+                          const payload = lineInputs
+                            .map(l => ({ productUnitId: Number(l.productUnitId), quantity: Number(l.quantity) }))
+                            .filter(l => l.productUnitId>0 && l.quantity>0)
+                          if (payload.length === 0) return
+                          await InventoryService.addDocumentLinesBulk(documentId, payload)
+                          setNotify({ type: 'success', message: `Đã thêm ${payload.length} dòng vào phiếu #${documentId}` })
+                          // refresh list and close modal
+                          try { const list = await InventoryService.listDocuments({}); setDocList(list as any) } catch {}
+                          handleCloseModal()
+                        } catch (e:any) {
+                          setNotify({ type: 'error', message: e?.message || 'Thêm dòng thất bại' })
+                        }
+                      }}>Xác nhận</button>
+                    </div>
+
+                    <div className="border rounded">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left text-xs font-medium text-gray-500">PU ID</th><th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Số lượng</th><th></th></tr></thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {documentLines.map(l => (
+                            <tr key={l.id}><td className="px-3 py-2 text-sm">{l.productUnitId}</td><td className="px-3 py-2 text-sm">{l.quantity}</td><td className="px-3 py-2 text-sm text-right"><button className="text-red-600" onClick={async ()=>{ try{ await InventoryService.deleteDocumentLine(l.id); setDocumentLines(prev=> prev.filter(x=> x.id!==l.id)) } catch{} }}>Xóa</button></td></tr>
+                          ))}
+                          {documentLines.length === 0 && (<tr><td colSpan={3} className="px-3 py-3 text-sm text-gray-500">Chưa có dòng</td></tr>)}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
@@ -679,17 +837,47 @@ const InventoryManagement = () => {
                     onClick={handleCloseModal}
                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                   >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {isSubmitting ? 'Đang lưu...' : (editingItem ? 'Cập nhật' : 'Thêm')}
+                    Đóng
                   </button>
                 </div>
-              </form>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Detail document modal */}
+      {detailOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={()=> setDetailOpen(false)} />
+            <div className="relative bg-white rounded-lg shadow-xl max-w-3xl w-full">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h3 className="text-lg font-semibold text-gray-900">Chi tiết phiếu #{detailDoc?.id}</h3>
+                <button onClick={()=> setDetailOpen(false)} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
+                  <div><span className="text-gray-500">Loại:</span> <span className="font-medium">{detailDoc?.type === 'INBOUND' ? 'Nhập kho' : 'Xuất kho'}</span></div>
+                  <div><span className="text-gray-500">Trạng thái:</span> <span className="font-medium">{getDocumentStatusLabel(detailDoc?.status)}</span></div>
+                  <div><span className="text-gray-500">Kho:</span> <span className="font-medium">{detailDoc?.warehouseId}</span></div>
+                  <div><span className="text-gray-500">Vị trí:</span> <span className="font-medium">{detailDoc?.stockLocationId}</span></div>
+                </div>
+                <div className="border rounded">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Sản phẩm</th><th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Đơn vị</th><th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Số lượng</th></tr></thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {detailLines.map(l => (<tr key={l.id}><td className="px-3 py-2 text-sm">{l.productName || `PU#${l.productUnitId}`}</td><td className="px-3 py-2 text-sm">{l.unitName || '-'}</td><td className="px-3 py-2 text-sm">{l.quantity}</td></tr>))}
+                      {detailLines.length===0 && (<tr><td colSpan={3} className="px-3 py-3 text-sm text-gray-500">Chưa có dòng</td></tr>)}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-end">
+                  <button onClick={()=> setDetailOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Đóng</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

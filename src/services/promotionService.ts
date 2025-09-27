@@ -1,15 +1,57 @@
-// Promotion Service - API calls
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
-
-const BASE = `${API_BASE_URL}/promotions`
 
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem('access_token')
-  return {
-    'Authorization': token ? `Bearer ${token}` : '',
-    'Content-Type': 'application/json',
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  return headers
+}
+
+export type PromotionType = 'DISCOUNT_PERCENT' | 'DISCOUNT_AMOUNT' | 'BUY_X_GET_Y'
+export type TargetType = 'PRODUCT' | 'CATEGORY' | 'CUSTOMER'
+
+export const PromotionService = {
+  async createHeader(payload: { name: string; startDate: string; endDate?: string; active?: boolean; type?: PromotionType }): Promise<{ id: number }> {
+    const res = await fetch(`${API_BASE_URL}/promotions/headers`, {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error('Failed to create promotion header')
+    const data = await res.json()
+    return data.data ?? data
+  },
+
+  async createLine(payload: { promotionHeaderId: number; targetType: TargetType; targetId: number; startDate?: string; endDate?: string; active?: boolean; type?: PromotionType }): Promise<{ id: number }> {
+    const res = await fetch(`${API_BASE_URL}/promotions/lines`, {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...payload, promotionType: payload.type, type: payload.type })
+    })
+    if (!res.ok) throw new Error('Failed to create promotion line')
+    const data = await res.json()
+    return data.data ?? data
+  },
+
+  async createDetail(payload: { promotionLineId: number; discountPercent?: number; discountAmount?: number; minAmount?: number; maxDiscount?: number; conditionQuantity?: number; freeQuantity?: number; active?: boolean }): Promise<{ id: number }> {
+    const res = await fetch(`${API_BASE_URL}/promotions/details`, {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error('Failed to create promotion detail')
+    const data = await res.json()
+    return data.data ?? data
+  },
+
+  async createFullPromotion(input: {
+    header: { name: string; startDate: string; endDate?: string; active?: boolean; type?: PromotionType }
+    line: { targetType: TargetType; targetId: number; startDate?: string; endDate?: string; active?: boolean; type?: PromotionType }
+    detail: { discountPercent?: number; discountAmount?: number; minAmount?: number; maxDiscount?: number; conditionQuantity?: number; freeQuantity?: number; active?: boolean }
+  }): Promise<{ headerId: number; lineId: number; detailId: number }> {
+    const header = await this.createHeader(input.header)
+    const line = await this.createLine({ ...input.line, promotionHeaderId: header.id })
+    const detail = await this.createDetail({ ...input.detail, promotionLineId: line.id })
+    return { headerId: header.id, lineId: line.id, detailId: detail.id }
   }
 }
+
+// Extra APIs
+const BASE = `${API_BASE_URL}/promotions`
 
 export interface PromotionHeaderDto {
   id: number
@@ -72,9 +114,26 @@ export const PromotionServiceApi = {
     return Array.isArray(data?.data) ? data.data : data
   },
 
+  async activateLine(id: number): Promise<void> {
+    const res = await fetch(`${BASE}/lines/${id}/activate`, { method: 'PUT', headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to activate line')
+  },
+
+  async deactivateLine(id: number): Promise<void> {
+    const res = await fetch(`${BASE}/lines/${id}/deactivate`, { method: 'PUT', headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to deactivate line')
+  },
+
   async createDetail(body: PromotionDetailDto): Promise<PromotionDetailDto> {
     const res = await fetch(`${BASE}/details`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) })
     if (!res.ok) throw new Error('Failed to create detail')
+    const data = await res.json()
+    return data?.data ?? data
+  },
+
+  async updateDetail(id: number, body: Partial<PromotionDetailDto>): Promise<PromotionDetailDto> {
+    const res = await fetch(`${BASE}/details/${id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) })
+    if (!res.ok) throw new Error('Failed to update detail')
     const data = await res.json()
     return data?.data ?? data
   },
@@ -137,6 +196,7 @@ export const PromotionMutations = {
       startDate: body.startDate ? body.startDate + (body.startDate.includes('T') ? '' : 'T00:00:00') : undefined,
       endDate: body.endDate ? body.endDate + (body.endDate.includes('T') ? '' : 'T23:59:59') : undefined,
       promotionType: body.type,
+      type: body.type,
     }
     const res = await fetch(`${BASE}/lines/${lineId}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(normalized) })
     if (!res.ok) throw new Error('Failed to update line')
