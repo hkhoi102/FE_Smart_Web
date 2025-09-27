@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { InventoryManagement, WarehouseManagement, ImportExportManagement, InventoryCheckManagement } from './index'
+import { InventoryManagement, WarehouseManagement, ImportExportManagement } from './index'
 
 const WarehouseTab = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'warehouses' | 'import-export' | 'inventory-check'>('inventory')
+  const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'warehouses' | 'import-export'>('inventory')
 
   return (
     <div className="space-y-6">
@@ -37,17 +37,7 @@ const WarehouseTab = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Nhập/Xuất Kho
-          </button>
-          <button
-            onClick={() => setActiveSubTab('inventory-check')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeSubTab === 'inventory-check'
-                ? 'border-green-500 text-green-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Kiểm kê
+           Lịch Sử Giao Dịch Kho
           </button>
         </nav>
       </div>
@@ -56,7 +46,6 @@ const WarehouseTab = () => {
       {activeSubTab === 'inventory' && <InventoryManagement />}
       {activeSubTab === 'warehouses' && <WarehouseManagement />}
       {activeSubTab === 'import-export' && <ImportExportManagement />}
-      {activeSubTab === 'inventory-check' && <InventoryCheckManagement />}
     </div>
   )
 }

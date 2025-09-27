@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { InventoryService, type WarehouseDto, type StockLocationDto, type StockBalanceDto } from '@/services/inventoryService'
 import { ProductService } from '@/services/productService'
+import InventoryCheckManagement from './InventoryCheckManagement'
 
 interface Warehouse {
   id: number
@@ -38,7 +39,10 @@ const InventoryManagement = () => {
   const [notify, setNotify] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [selectedWarehouse, setSelectedWarehouse] = useState<number | 'all'>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'HISTORY' | 'CREATE'>('HISTORY')
+  const [activeTab, setActiveTab] = useState<'HISTORY' | 'CREATE' | 'CHECK'>('HISTORY')
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectingDocId, setRejectingDocId] = useState<number | null>(null)
   // removed unused editingItem
   const [txnType, setTxnType] = useState<'INBOUND' | 'OUTBOUND'>('INBOUND')
   const [formData, setFormData] = useState({
@@ -97,6 +101,27 @@ const InventoryManagement = () => {
     }
   }
 
+  const handleRejectClick = (docId: number) => {
+    setRejectingDocId(docId)
+    setRejectReason('')
+    setRejectModalOpen(true)
+  }
+
+  const handleRejectConfirm = async () => {
+    if (!rejectingDocId) return
+
+    try {
+      await InventoryService.rejectDocument(rejectingDocId, rejectReason || undefined)
+      setNotify({ type: 'success', message: `Đã từ chối phiếu #${rejectingDocId}` })
+      const list = await InventoryService.listDocuments({})
+      setDocList(list as any)
+      setRejectModalOpen(false)
+      setRejectingDocId(null)
+      setRejectReason('')
+    } catch (e: any) {
+      setNotify({ type: 'error', message: e?.message || 'Từ chối phiếu thất bại' })
+    }
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -219,12 +244,6 @@ const InventoryManagement = () => {
 
   // removed old handleSubmit (flow replaced by document create + bulk lines)
 
-  const handleDeleteItem = (id: number) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa mục này khỏi kho?')) {
-      setInventory(prev => prev.filter(item => item.id !== id))
-    }
-  }
-
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'in_stock': return 'Còn hàng'
@@ -329,13 +348,19 @@ const InventoryManagement = () => {
             onClick={() => setActiveTab('HISTORY')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab==='HISTORY' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
           >
-            Lịch sử nhập xuất
+            Số lượng sản phẩm
           </button>
           <button
             onClick={() => { setActiveTab('CREATE') }}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab==='CREATE' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
           >
-            Tạo phiếu
+            Tạo phiếu nhập xuất hàng
+          </button>
+          <button
+            onClick={() => { setActiveTab('CHECK') }}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab==='CHECK' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          >
+            Kiểm kê
           </button>
         </nav>
       </div>
@@ -455,9 +480,6 @@ const InventoryManagement = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Trạng thái
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thao tác
-                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -480,16 +502,6 @@ const InventoryManagement = () => {
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
                       {getStatusLabel(item.status)}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Xóa
-                      </button>
-                    </div>
                   </td>
                 </tr>
               ))}
@@ -534,17 +546,7 @@ const InventoryManagement = () => {
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
                             Duyệt
                           </button>
-                          <button className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700" onClick={async ()=>{
-                            const reason = prompt('Lý do từ chối (optional):') || undefined
-                            try {
-                              await InventoryService.rejectDocument(d.id, reason)
-                              setNotify({ type: 'success', message: `Đã từ chối phiếu #${d.id}` })
-                              const list = await InventoryService.listDocuments({})
-                              setDocList(list as any)
-                            } catch (e:any) {
-                              setNotify({ type: 'error', message: e?.message || 'Từ chối phiếu thất bại' })
-                            }
-                          }}>
+                          <button className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700" onClick={() => handleRejectClick(d.id)}>
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             Từ chối
                           </button>
@@ -877,6 +879,52 @@ const InventoryManagement = () => {
                 <div className="flex justify-end">
                   <button onClick={()=> setDetailOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Đóng</button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHECK Tab Content */}
+      {activeTab === 'CHECK' && (
+        <InventoryCheckManagement />
+      )}
+
+      {/* Reject Modal */}
+      {rejectModalOpen && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Từ chối phiếu</h3>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lý do từ chối (tùy chọn)
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  rows={3}
+                  placeholder="Nhập lý do từ chối..."
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setRejectModalOpen(false)
+                    setRejectingDocId(null)
+                    setRejectReason('')
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleRejectConfirm}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                >
+                  Từ chối
+                </button>
               </div>
             </div>
           </div>

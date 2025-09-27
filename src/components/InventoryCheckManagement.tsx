@@ -8,7 +8,7 @@ interface InventoryCheck {
   check_date: string
   warehouse_id: number
   warehouse_name: string
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'CONFIRMED'
   created_by: string
   created_at: string
   updated_at: string
@@ -59,7 +59,6 @@ const InventoryCheckManagement = () => {
     note: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [notify, setNotify] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const showNotify = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotify({ type, message })
@@ -67,41 +66,53 @@ const InventoryCheckManagement = () => {
     ;(showNotify as any)._t = window.setTimeout(() => setNotify(null), 2500)
   }
 
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancellingCheckId, setCancellingCheckId] = useState<number | null>(null)
+
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [warehouseFilter, setWarehouseFilter] = useState<number | 'all'>('all')
 
-  const mapCheck = (dto: any): InventoryCheck => ({
-    id: dto.id,
-    check_date: (dto.stocktakingDate ?? dto.checkDate ?? dto.check_date ?? '').replace('T', ' ').substring(0, 19),
-    warehouse_id: dto.warehouseId ?? dto.warehouse_id,
-    warehouse_name: dto.warehouseName ?? dto.warehouse_name ?? '',
-    status: dto.status,
-    created_by: dto.createdBy ?? dto.created_by ?? '',
-    created_at: dto.createdAt ?? dto.created_at ?? '',
-    updated_at: dto.updatedAt ?? dto.updated_at ?? '',
-    note: dto.note ?? '',
-    total_items: dto.totalItems ?? dto.total_items ?? 0,
-    checked_items: dto.checkedItems ?? dto.checked_items ?? 0,
-    discrepancy_items: dto.discrepancyItems ?? dto.discrepancy_items ?? 0,
-  })
+  const mapCheck = (dto: any): InventoryCheck => {
+    console.log('🔍 Mapping check dto:', dto)
+    console.log('🔍 Created by fields:', {
+      createdBy: dto.createdBy,
+      created_by: dto.created_by,
+      created_by_username: dto.created_by_username,
+      createdByUsername: dto.createdByUsername
+    })
+    return {
+      id: dto.id,
+      check_date: (dto.stocktakingDate ?? dto.checkDate ?? dto.check_date ?? '').replace('T', ' ').substring(0, 19),
+      warehouse_id: dto.warehouseId ?? dto.warehouse_id,
+      warehouse_name: dto.warehouseName ?? dto.warehouse_name ?? '',
+      status: dto.status,
+      created_by: dto.createdByUsername ?? dto.createdBy ?? dto.created_by ?? dto.created_by_username ?? 'Chưa xác định',
+      created_at: dto.createdAt ?? dto.created_at ?? '',
+      updated_at: dto.updatedAt ?? dto.updated_at ?? '',
+      note: dto.note ?? '',
+      total_items: dto.totalItems ?? dto.total_items ?? 0,
+      checked_items: dto.checkedItems ?? dto.checked_items ?? 0,
+      discrepancy_items: dto.discrepancyItems ?? dto.discrepancy_items ?? 0,
+    }
+  }
 
   // If BE returns items later we can map with this util
-  const mapItem = (dto: any): CheckItem => ({
-    id: dto.id,
-    check_id: dto.checkId ?? dto.check_id,
-    product_id: dto.productUnitId ?? dto.product_id,
-    product_name: dto.productName ?? dto.product_name ?? 'Sản phẩm',
-    unit: dto.unitName ?? dto.unit ?? '',
-    system_quantity: dto.systemQuantity ?? dto.system_quantity ?? 0,
-    actual_quantity: dto.actualQuantity ?? dto.actual_quantity ?? 0,
-    difference: dto.difference ?? 0,
-    note: dto.note ?? '',
-    status: dto.status ?? 'PENDING',
-  })
+  // const mapItem = (dto: any): CheckItem => ({
+  //   id: dto.id,
+  //   check_id: dto.checkId ?? dto.check_id,
+  //   product_id: dto.productUnitId ?? dto.product_id,
+  //   product_name: dto.productName ?? dto.product_name ?? 'Sản phẩm',
+  //   unit: dto.unitName ?? dto.unit ?? '',
+  //   system_quantity: dto.systemQuantity ?? dto.system_quantity ?? 0,
+  //   actual_quantity: dto.actualQuantity ?? dto.actual_quantity ?? 0,
+  //   difference: dto.difference ?? 0,
+  //   note: dto.note ?? '',
+  //   status: dto.status ?? 'PENDING',
+  // })
 
   const loadInitial = async () => {
-    setLoading(true)
     try {
       const [whs, checksDto] = await Promise.all([
         InventoryService.getWarehouses(),
@@ -111,8 +122,6 @@ const InventoryCheckManagement = () => {
       setChecks(Array.isArray(checksDto) ? checksDto.map(mapCheck) : [])
     } catch (e) {
       console.error(e)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -290,14 +299,28 @@ const InventoryCheckManagement = () => {
     }
   }
 
-  const handleDeleteCheck = async (id: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa phiếu kiểm kê này?')) return
+  const handleCancelCheck = (id: number) => {
+    setCancellingCheckId(id)
+    setCancelReason('')
+    setCancelModalOpen(true)
+  }
+
+  const handleCancelConfirm = async () => {
+    if (!cancellingCheckId) return
+
     try {
-      await InventoryService.deleteInventoryCheck(id)
-      setChecks(prev => prev.filter(check => check.id !== id))
-      setCheckItems(prev => prev.filter(item => item.check_id !== id))
+      const reasonText = cancelReason ? `Lý do hủy: ${cancelReason}` : 'Đã hủy phiếu kiểm kê'
+      await InventoryService.cancelInventoryCheck(cancellingCheckId, reasonText)
+      setChecks(prev => prev.map(check =>
+        check.id === cancellingCheckId ? { ...check, status: 'CANCELLED', note: reasonText } : check
+      ))
+      showNotify('Đã hủy phiếu kiểm kê thành công', 'success')
+      setCancelModalOpen(false)
+      setCancellingCheckId(null)
+      setCancelReason('')
     } catch (e) {
       console.error(e)
+      showNotify('Hủy phiếu kiểm kê thất bại', 'error')
     }
   }
 
@@ -428,6 +451,7 @@ const InventoryCheckManagement = () => {
       case 'IN_PROGRESS': return 'Đang kiểm'
       case 'COMPLETED': return 'Hoàn thành'
       case 'CANCELLED': return 'Đã hủy'
+      case 'CONFIRMED': return 'Hoàn thành'
       default: return status
     }
   }
@@ -438,6 +462,7 @@ const InventoryCheckManagement = () => {
       case 'IN_PROGRESS': return 'bg-blue-100 text-blue-800'
       case 'COMPLETED': return 'bg-green-100 text-green-800'
       case 'CANCELLED': return 'bg-red-100 text-red-800'
+      case 'CONFIRMED': return 'bg-green-100 text-green-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
@@ -566,6 +591,7 @@ const InventoryCheckManagement = () => {
             <option value="all">Tất cả trạng thái</option>
             <option value="PENDING">Chờ kiểm</option>
             <option value="IN_PROGRESS">Đang kiểm</option>
+            <option value="CONFIRMED">Hoàn thành</option>
             <option value="COMPLETED">Hoàn thành</option>
             <option value="CANCELLED">Đã hủy</option>
           </select>
@@ -599,6 +625,9 @@ const InventoryCheckManagement = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Thao tác
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Hành động
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -630,8 +659,26 @@ const InventoryCheckManagement = () => {
                         onClick={() => handleViewItems(check)}
                         className="text-blue-600 hover:text-blue-900"
                       >
-                        Chi tiết
+                        {(check.status === 'COMPLETED' || check.status === 'CONFIRMED') ? 'Chi tiết' : 'Kiểm kê'}
                       </button>
+                      <button
+                        onClick={() => handleEditCheck(check)}
+                        className="text-yellow-600 hover:text-yellow-900"
+                      >
+                        Sửa
+                      </button>
+                      {(check.status !== 'COMPLETED' && check.status !== 'CONFIRMED' && check.status !== 'CANCELLED') && (
+                        <button
+                          onClick={() => handleCancelCheck(check.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Hủy phiếu
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
                       {check.status === 'PENDING' && (
                         <button
                           onClick={() => handleStartCheck(check.id)}
@@ -643,29 +690,19 @@ const InventoryCheckManagement = () => {
                       {check.status === 'IN_PROGRESS' && (
                         <button
                           onClick={() => handleCompleteCheck(check.id)}
-                          className="text-purple-600 hover:text-purple-900"
+                          className="text-gray-800 hover:text-gray-900"
                         >
                           Hoàn thành
                         </button>
                       )}
-                      <button
-                        onClick={() => handleEditCheck(check)}
-                        className="text-yellow-600 hover:text-yellow-900"
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        onClick={() => handleExportReport(check)}
-                        className="text-purple-600 hover:text-purple-900"
-                      >
-                        Xuất báo cáo
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCheck(check.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Xóa
-                      </button>
+                      {(check.status === 'CONFIRMED' || check.status === 'COMPLETED') && (
+                        <button
+                          onClick={() => handleExportReport(check)}
+                          className="text-purple-600 hover:text-purple-900"
+                        >
+                          Xuất Excel
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -872,12 +909,6 @@ const InventoryCheckManagement = () => {
                     <div className="text-sm font-medium text-red-600">Chênh lệch</div>
                     <div className="text-2xl font-bold text-red-900">{selectedCheck.discrepancy_items}</div>
                   </div>
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <div className="text-sm font-medium text-purple-600">Tiến độ</div>
-                    <div className="text-2xl font-bold text-purple-900">
-                      {Math.round((selectedCheck.checked_items / selectedCheck.total_items) * 100)}%
-                    </div>
-                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -965,6 +996,47 @@ const InventoryCheckManagement = () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Modal */}
+      {cancelModalOpen && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Hủy phiếu kiểm kê</h3>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lý do hủy (tùy chọn)
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  rows={3}
+                  placeholder="Nhập lý do hủy phiếu kiểm kê..."
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setCancelModalOpen(false)
+                    setCancellingCheckId(null)
+                    setCancelReason('')
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleCancelConfirm}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                >
+                  Xác nhận hủy
+                </button>
               </div>
             </div>
           </div>

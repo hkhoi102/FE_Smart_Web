@@ -381,6 +381,18 @@ export const InventoryService = {
     if (!res.ok) throw new Error('Failed to delete inventory check')
   },
 
+  async cancelInventoryCheck(id: number, reason?: string): Promise<void> {
+    console.log('🔄 Cancelling inventory check:', id, reason)
+    const body = reason ? { reason } : {}
+    const res = await fetch(`${API_BASE_URL}/inventory/stocktaking/${id}/cancel`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(body)
+    })
+    console.log('📡 Cancel inventory check response:', res.status)
+    if (!res.ok) throw new Error('Failed to cancel inventory check')
+  },
+
   // Check Items
   // This API confirms and persists items; FE composes the items array and submits
   async confirmInventoryCheck(checkId: number, items: Array<{ productUnitId: number; systemQuantity: number; actualQuantity: number; note?: string }>): Promise<any> {
