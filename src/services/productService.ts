@@ -624,14 +624,47 @@ export class ProductService {
     return (Array.isArray(result?.data) ? result.data : result) || []
   }
 
-  static async createPriceHeader(productId: number, productUnitId: number, payload: { name: string; description?: string; timeStart?: string; timeEnd?: string; active?: boolean }): Promise<{ id: number; name: string }> {
-    const res = await fetch(`${API_BASE_URL}/products/${productId}/price-headers/units/${productUnitId}`, {
+  static async createPriceHeader(productId: number, productUnitId: number, payload: { name: string; description?: string | null; timeStart?: string | null; timeEnd?: string | null; active?: boolean }): Promise<{ id: number; name: string }> {
+    const url = `${API_BASE_URL}/products/${productId}/price-headers/units/${productUnitId}`
+
+    // Loại bỏ các trường null/undefined trước khi gửi
+    const cleanPayload = { ...payload }
+    if (cleanPayload.description === null || cleanPayload.description === undefined) {
+      delete cleanPayload.description
+    }
+    if (cleanPayload.timeStart === null || cleanPayload.timeStart === undefined) {
+      delete cleanPayload.timeStart
+    }
+    if (cleanPayload.timeEnd === null || cleanPayload.timeEnd === undefined) {
+      delete cleanPayload.timeEnd
+    }
+
+    console.log('🌐 API Call - Create Price Header:', {
+      url,
+      payload: cleanPayload,
+      headers: this.getAuthHeaders()
+    })
+
+    const res = await fetch(url, {
       method: 'POST',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify(cleanPayload),
     })
-    if (!res.ok) throw new Error(`Failed to create price header: ${res.status} ${res.statusText}`)
+
+    console.log('📡 Price Header API Response:', {
+      status: res.status,
+      statusText: res.statusText,
+      ok: res.ok
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      console.error('❌ Price Header API Error Response:', errorText)
+      throw new Error(`Failed to create price header: ${res.status} ${res.statusText} - ${errorText}`)
+    }
+
     const result = await res.json()
+    console.log('✅ Price Header API Success Response:', result)
     return result.data ?? result
   }
 
@@ -645,5 +678,62 @@ export class ProductService {
     const result = await res.json().catch(() => null)
     const value = (result?.data ?? result)
     return typeof value === 'number' ? value : null
+  }
+
+  // Add price for product unit using the correct API endpoint
+  static async addPriceForProductUnit(
+    productId: number,
+    productUnitId: number,
+    payload: {
+      productUnitId: number;
+      price: number;
+      timeStart?: string | null;
+      timeEnd?: string | null;
+      priceHeaderId?: number;
+      active?: boolean
+    }
+  ): Promise<any> {
+    const url = `${API_BASE_URL}/products/${productId}/prices/units/${productUnitId}`
+
+    // Loại bỏ các trường null/undefined trước khi gửi
+    const cleanPayload = { ...payload }
+
+    // timeStart là bắt buộc, không được xóa
+    if (cleanPayload.timeStart === null || cleanPayload.timeStart === undefined || cleanPayload.timeStart === '') {
+      throw new Error('timeStart is required for adding price')
+    }
+
+    // Chỉ xóa timeEnd nếu null/undefined
+    if (cleanPayload.timeEnd === null || cleanPayload.timeEnd === undefined || cleanPayload.timeEnd === '') {
+      delete cleanPayload.timeEnd
+    }
+
+    console.log('🌐 API Call - Add Price:', {
+      url,
+      payload: cleanPayload,
+      headers: this.getAuthHeaders()
+    })
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(cleanPayload),
+    })
+
+    console.log('📡 API Response:', {
+      status: res.status,
+      statusText: res.statusText,
+      ok: res.ok
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      console.error('❌ API Error Response:', errorText)
+      throw new Error(`Failed to add price for product unit: ${res.status} ${res.statusText} - ${errorText}`)
+    }
+
+    const result = await res.json()
+    console.log('✅ API Success Response:', result)
+    return result.data ?? result
   }
 }

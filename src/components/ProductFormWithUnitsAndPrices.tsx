@@ -39,6 +39,8 @@ const ProductFormWithUnitsAndPrices = ({
       price: number;
       validFrom: string;
       validTo: string;
+      priceHeaderId?: number;
+      isNew?: boolean;
     }>;
   }>>([])
 
@@ -48,12 +50,8 @@ const ProductFormWithUnitsAndPrices = ({
   const [newUnitBarcodeType, setNewUnitBarcodeType] = useState<string>('EAN13')
   const [newUnitIsDefault, setNewUnitIsDefault] = useState<boolean>(false)
 
-  // Price form for new units
-  const [newUnitPrice, setNewUnitPrice] = useState<string>('')
-  const [newUnitPriceValidFrom, setNewUnitPriceValidFrom] = useState<string>('')
-  const [newUnitPriceValidTo, setNewUnitPriceValidTo] = useState<string>('')
 
-  // Price modal states
+  // Price modal states (only when editing)
   const [showPriceModal, setShowPriceModal] = useState(false)
   const [selectedUnitForPriceModal, setSelectedUnitForPriceModal] = useState<number | null>(null)
   const [priceModalData, setPriceModalData] = useState({
@@ -61,6 +59,22 @@ const ProductFormWithUnitsAndPrices = ({
     validFrom: '',
     validTo: ''
   })
+
+  // Price header states (only when editing)
+  const [unitPriceHeaders, setUnitPriceHeaders] = useState<Map<number, Array<{ id: number; name: string; description?: string; timeStart?: string; timeEnd?: string }>>>(new Map())
+  const [showCreateHeaderModal, setShowCreateHeaderModal] = useState(false)
+  const [newHeaderData, setNewHeaderData] = useState({
+    name: '',
+    description: '',
+    timeStart: '',
+    timeEnd: ''
+  })
+  const [selectedHeaderIds, setSelectedHeaderIds] = useState<Map<number, number | ''>>(new Map())
+  const [selectedHeaderInfos, setSelectedHeaderInfos] = useState<Map<number, { name: string; timeStart?: string; timeEnd?: string }>>(new Map())
+
+  // Error handling states
+  const [errorMessage, setErrorMessage] = useState<string>('')
+  const [showError, setShowError] = useState<boolean>(false)
 
   const [imagePreview, setImagePreview] = useState<string>('')
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -81,12 +95,9 @@ const ProductFormWithUnitsAndPrices = ({
       setImagePreview((product as any).imageUrl || (product as any).image_url || '')
 
       // Load product units
-      // Filter out backend auto-created base unit (commonly unitId=1, conversionFactor=1, isDefault=1)
+      // Show all units including "Lon" (id=1) when editing
       const rawUnits = product.productUnits || []
-      const hasMultipleUnits = rawUnits.length > 1
-      const filteredUnits = (hasMultipleUnits ? rawUnits.filter((u: any) => !(u.unitId === 1 && (u.isDefault === true || u.isDefault === 1) && (u.conversionFactor === 1 || u.conversion_rate === 1))) : rawUnits)
-        // Hide backend auto unit named "Lon" if present
-        .filter((u: any) => String(u.unitName || '').toLowerCase() !== 'lon')
+      const filteredUnits = rawUnits
 
       const baseUnits = filteredUnits.map(u => ({
         id: u.id,
@@ -122,7 +133,7 @@ const ProductFormWithUnitsAndPrices = ({
               }
             } catch {}
 
-            let prices: Array<{ price: number; validFrom: string; validTo: string }> = []
+            let prices: Array<{ price: number; validFrom: string; validTo: string; priceHeaderId?: number; isNew?: boolean }> = []
             try {
               const history = await ProductService.getUnitPriceHistory(product.id!, u.id)
               if (Array.isArray(history)) {
@@ -130,6 +141,7 @@ const ProductFormWithUnitsAndPrices = ({
                   price: Number(p.price),
                   validFrom: p.timeStart || p.validFrom || '',
                   validTo: p.timeEnd || p.validTo || '',
+                  priceHeaderId: p.priceHeaderId,
                   isNew: false
                 }))
               }
@@ -164,6 +176,29 @@ const ProductFormWithUnitsAndPrices = ({
       .catch(() => { setAllUnits([]) })
   }, [])
 
+  // Load price headers for each product unit when editing
+  useEffect(() => {
+    if (product && product.id && productUnits.length > 0) {
+      const loadHeadersForUnits = async () => {
+        const newUnitPriceHeaders = new Map<number, Array<{ id: number; name: string; description?: string; timeStart?: string; timeEnd?: string }>>()
+
+        for (const unit of productUnits) {
+          try {
+            const headers = await ProductService.getPriceHeaders(product.id, unit.id)
+            newUnitPriceHeaders.set(unit.id, headers || [])
+          } catch (error) {
+            console.warn(`Failed to load headers for unit ${unit.id}:`, error)
+            newUnitPriceHeaders.set(unit.id, [])
+          }
+        }
+
+        setUnitPriceHeaders(newUnitPriceHeaders)
+      }
+
+      loadHeadersForUnits()
+    }
+  }, [product, productUnits])
+
   // (Removed) Bottom price management effects
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -184,16 +219,6 @@ const ProductFormWithUnitsAndPrices = ({
     const isFirstUnit = productUnits.length === 0
     const shouldBeDefault = newUnitIsDefault || (isFirstUnit && !productUnits.some(u => u.isDefault))
 
-    // Tạo danh sách giá nếu có
-    const prices = []
-    if (newUnitPrice && newUnitPriceValidFrom) {
-      prices.push({
-        price: Number(newUnitPrice),
-        validFrom: newUnitPriceValidFrom,
-        validTo: newUnitPriceValidTo || ''
-      })
-    }
-
     const newUnit = {
       id: Date.now(), // temporary ID
       unitId: Number(newUnitId),
@@ -202,7 +227,7 @@ const ProductFormWithUnitsAndPrices = ({
       isDefault: shouldBeDefault,
       barcodeCode: newUnitBarcode,
       barcodeType: newUnitBarcodeType,
-      prices: prices
+      prices: [] // Không thêm giá khi tạo đơn vị mới
     }
 
     setProductUnits(prev => [...prev, newUnit])
@@ -213,9 +238,6 @@ const ProductFormWithUnitsAndPrices = ({
     setNewUnitBarcode('')
     setNewUnitBarcodeType('EAN13')
     setNewUnitIsDefault(false)
-    setNewUnitPrice('')
-    setNewUnitPriceValidFrom('')
-    setNewUnitPriceValidTo('')
   }
 
   const removeUnit = (unitId: number) => {
@@ -241,10 +263,51 @@ const ProductFormWithUnitsAndPrices = ({
     })))
   }
 
+  const handleHeaderSelection = (unitId: number, headerId: number) => {
+    // Cập nhật selectedHeaderId cho unit cụ thể
+    setSelectedHeaderIds(prev => {
+      const newMap = new Map(prev)
+      newMap.set(unitId, headerId)
+      return newMap
+    })
+
+    // Tìm thông tin bảng giá được chọn
+    const unitHeaders = unitPriceHeaders.get(unitId) || []
+    const selectedHeader = unitHeaders.find(h => h.id === headerId)
+
+    if (selectedHeader) {
+      setSelectedHeaderInfos(prev => {
+        const newMap = new Map(prev)
+        newMap.set(unitId, {
+          name: selectedHeader.name,
+          timeStart: selectedHeader.timeStart,
+          timeEnd: selectedHeader.timeEnd
+        })
+        return newMap
+      })
+    } else {
+      setSelectedHeaderInfos(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(unitId)
+        return newMap
+      })
+    }
+  }
+
   const addPriceToUnit = (unitId: number, price: number, validFrom: string, validTo: string = '') => {
+    const unitSelectedHeaderId = selectedHeaderIds.get(unitId)
     setProductUnits(prev => prev.map(u =>
       u.id === unitId
-        ? { ...u, prices: [...u.prices, { price, validFrom, validTo, isNew: true }] }
+        ? {
+            ...u,
+            prices: [...u.prices, {
+              price,
+              validFrom,
+              validTo,
+              isNew: true,
+              priceHeaderId: unitSelectedHeaderId || undefined
+            }]
+          }
         : u
     ))
   }
@@ -270,18 +333,214 @@ const ProductFormWithUnitsAndPrices = ({
   }
 
   const handleAddPrice = () => {
-    if (!selectedUnitForPriceModal || !priceModalData.price || !priceModalData.validFrom) {
-      // Validation sẽ được hiển thị qua UI, không dùng alert
+    // Validation: Kiểm tra đơn vị được chọn
+    if (!selectedUnitForPriceModal) {
+      showErrorToUser('Vui lòng chọn đơn vị để thêm giá')
       return
     }
 
+    // Validation: Kiểm tra giá
+    if (!priceModalData.price || priceModalData.price.trim() === '') {
+      showErrorToUser('Vui lòng nhập giá sản phẩm')
+      return
+    }
+
+    // Validation: Kiểm tra giá phải là số dương
+    const priceValue = Number(priceModalData.price)
+    if (isNaN(priceValue) || priceValue <= 0) {
+      showErrorToUser('Giá sản phẩm phải là số dương')
+      return
+    }
+
+    // Validation: Kiểm tra thời gian hiệu lực từ
+    if (!priceModalData.validFrom || priceModalData.validFrom.trim() === '') {
+      showErrorToUser('Vui lòng chọn thời gian hiệu lực từ')
+      return
+    }
+
+    // Validation: Kiểm tra thời gian hiệu lực đến (nếu có)
+    if (priceModalData.validTo && priceModalData.validTo.trim() !== '') {
+      const fromDate = new Date(priceModalData.validFrom)
+      const toDate = new Date(priceModalData.validTo)
+
+      if (toDate <= fromDate) {
+        showErrorToUser('Thời gian hiệu lực đến phải sau thời gian hiệu lực từ')
+        return
+      }
+    }
+
+    // Validation: Kiểm tra bảng giá được chọn cho unit này
+    const unitSelectedHeaderId = selectedHeaderIds.get(selectedUnitForPriceModal)
+    if (!unitSelectedHeaderId) {
+      showErrorToUser('Vui lòng chọn bảng giá trước khi thêm giá')
+      return
+    }
+
+    // Nếu tất cả validation đều pass, thêm giá
     addPriceToUnit(
       selectedUnitForPriceModal,
-      Number(priceModalData.price),
+      priceValue,
       priceModalData.validFrom,
       priceModalData.validTo
     )
     closePriceModal()
+  }
+
+  const openCreateHeaderModal = (unitId?: number) => {
+    setNewHeaderData({ name: '', description: '', timeStart: '', timeEnd: '' })
+    setShowCreateHeaderModal(true)
+    // Lưu unitId để tạo header cho đúng unit
+    if (unitId) {
+      setSelectedUnitForPriceModal(unitId)
+    }
+  }
+
+  const closeCreateHeaderModal = () => {
+    setShowCreateHeaderModal(false)
+    setNewHeaderData({ name: '', description: '', timeStart: '', timeEnd: '' })
+  }
+
+  const showErrorToUser = (message: string) => {
+    setErrorMessage(message)
+    setShowError(true)
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+      setShowError(false)
+      setErrorMessage('')
+    }, 5000)
+  }
+
+  const handleCreateHeader = async () => {
+    // Validation: Kiểm tra sản phẩm
+    if (!product) {
+      showErrorToUser('Không tìm thấy sản phẩm')
+      return
+    }
+
+    // Validation: Kiểm tra tên bảng giá
+    if (!newHeaderData.name || newHeaderData.name.trim() === '') {
+      showErrorToUser('Vui lòng nhập tên bảng giá')
+      return
+    }
+
+    // Validation: Kiểm tra thời gian hiệu lực (nếu có)
+    if (newHeaderData.timeStart && newHeaderData.timeEnd) {
+      const startDate = new Date(newHeaderData.timeStart)
+      const endDate = new Date(newHeaderData.timeEnd)
+
+      if (endDate <= startDate) {
+        showErrorToUser('Thời gian hiệu lực đến phải sau thời gian hiệu lực từ')
+        return
+      }
+    }
+
+    try {
+      // Tạo header cho unit được chọn hoặc unit đầu tiên
+      const targetUnit = selectedUnitForPriceModal
+        ? productUnits.find(u => u.id === selectedUnitForPriceModal)
+        : productUnits[0]
+
+      if (targetUnit) {
+        const normalize = (dt?: string) => {
+          if (!dt || dt.trim() === '') return null
+
+          // Đảm bảo format datetime đúng cho backend
+          let normalized = dt.trim()
+
+          console.log('🔍 Normalizing header datetime:', { original: dt, normalized })
+
+          // Nếu chỉ có date (YYYY-MM-DD), thêm time mặc định
+          if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+            normalized = `${normalized}T00:00:00.000Z`
+          }
+          // Nếu có date và time từ datetime-local (YYYY-MM-DDTHH:mm)
+          else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized)) {
+            normalized = `${normalized}:00.000Z`
+          }
+          // Nếu có date và time với seconds (YYYY-MM-DDTHH:mm:ss)
+          else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(normalized)) {
+            normalized = `${normalized}.000Z`
+          }
+          // Nếu đã có timezone, giữ nguyên
+          else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(normalized)) {
+            // Đã đúng format, giữ nguyên
+          }
+          // Nếu có timezone khác, chuyển về UTC
+          else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(normalized)) {
+            try {
+              const date = new Date(normalized)
+              normalized = date.toISOString()
+            } catch (e) {
+              console.error('❌ Error parsing header datetime:', e)
+              return null
+            }
+          }
+
+          console.log('✅ Normalized header datetime:', normalized)
+          return normalized
+        }
+
+        const headerPayload: any = {
+          name: newHeaderData.name,
+          description: newHeaderData.description || null,
+          active: true
+        }
+
+        // Chỉ thêm timeStart nếu có giá trị
+        if (newHeaderData.timeStart) {
+          headerPayload.timeStart = normalize(newHeaderData.timeStart)
+        }
+
+        // Chỉ thêm timeEnd nếu có giá trị
+        if (newHeaderData.timeEnd) {
+          headerPayload.timeEnd = normalize(newHeaderData.timeEnd)
+        }
+
+        const createdHeader = await ProductService.createPriceHeader(product.id, targetUnit.id, headerPayload)
+
+        // Add to headers list for the specific unit
+        const newHeader = {
+          id: createdHeader.id,
+          name: createdHeader.name,
+          description: newHeaderData.description,
+          timeStart: (createdHeader as any).timeStart,
+          timeEnd: (createdHeader as any).timeEnd
+        }
+
+        setUnitPriceHeaders(prev => {
+          const newMap = new Map(prev)
+          const unitHeaders = newMap.get(targetUnit.id) || []
+          newMap.set(targetUnit.id, [...unitHeaders, newHeader])
+          return newMap
+        })
+
+        // Cập nhật selectedHeaderId cho unit cụ thể
+        setSelectedHeaderIds(prev => {
+          const newMap = new Map(prev)
+          newMap.set(targetUnit.id, createdHeader.id)
+          return newMap
+        })
+
+        // Update selected header info cho unit cụ thể
+        setSelectedHeaderInfos(prev => {
+          const newMap = new Map(prev)
+          newMap.set(targetUnit.id, {
+            name: createdHeader.name,
+            timeStart: (createdHeader as any).timeStart,
+            timeEnd: (createdHeader as any).timeEnd
+          })
+          return newMap
+        })
+
+        closeCreateHeaderModal()
+      }
+    } catch (error: any) {
+      console.error('Failed to create price header:', error)
+      const errorMsg = error?.message?.includes('Đã có giá hiệu lực')
+        ? 'Đã có bảng giá hiệu lực trong khoảng thời gian này. Vui lòng chọn thời gian khác.'
+        : 'Không thể tạo bảng giá mới'
+      showErrorToUser(errorMsg)
+    }
   }
 
   // (Removed) Bottom price management helpers
@@ -294,6 +553,19 @@ const ProductFormWithUnitsAndPrices = ({
       return
     }
 
+    // Validation for price header when editing and has prices
+    if (product && productUnits.some(unit => unit.prices.length > 0)) {
+      // Kiểm tra tất cả units có giá đều phải có selectedHeaderId
+      const unitsWithPrices = productUnits.filter(unit => unit.prices.length > 0)
+      for (const unit of unitsWithPrices) {
+        const unitSelectedHeaderId = selectedHeaderIds.get(unit.id)
+        if (!unitSelectedHeaderId) {
+          alert(`Vui lòng chọn bảng giá cho đơn vị: ${unit.unitName}`)
+          return
+        }
+      }
+    }
+
     const productData = {
       name: formData.name,
       description: formData.description,
@@ -301,6 +573,10 @@ const ProductFormWithUnitsAndPrices = ({
       categoryId: formData.category_id,
       active: formData.active === 1,
     }
+
+    // Biến theo dõi trạng thái xử lý
+    let hasErrors = false
+    let totalPricesAdded = 0
 
     try {
       let createdProduct
@@ -329,22 +605,7 @@ const ProductFormWithUnitsAndPrices = ({
 
       // Add product units if any
       if (productUnits.length > 0 && createdProduct?.id) {
-        // Before adding our units, ensure backend auto-created unit is removed if present
-        try {
-          const updatedProduct = await ProductService.getProductById(createdProduct.id)
-          const autoUnit = (updatedProduct.productUnits || []).find((u: any) =>
-            u && (u.unitId === 1) && (u.conversionFactor === 1 || u.conversion_rate === 1)
-          )
-          if (autoUnit?.id) {
-            try {
-              await ProductService.deleteProductUnitById(autoUnit.id)
-            } catch {
-              // ignore if delete fails; we'll still add ours
-            }
-          }
-        } catch {
-          // ignore
-        }
+        // Note: Keep all existing units including "Lon" (id=1) when editing
         // Decide add vs update when editing
         const serverUnits = product?.id ? ((await ProductService.getProductById(createdProduct.id)).productUnits || []) : []
         const serverUnitIdByUomId = new Map<number, number>()
@@ -397,73 +658,154 @@ const ProductFormWithUnitsAndPrices = ({
                 console.warn('Failed to upsert barcode:', barcodeErr)
               }
 
-              // Add prices if any (only the newly added in edit mode)
-              if (unit.prices.length > 0) {
+              // Add prices if any (only when editing and user selected header)
+              const unitSelectedHeaderId = selectedHeaderIds.get(unit.id)
+              console.log('🔍 Debug price processing:', {
+                isEditing: !!product,
+                unitPrices: unit.prices.length,
+                unitSelectedHeaderId,
+                productUnitId
+              })
+              if (product && unit.prices.length > 0 && unitSelectedHeaderId) {
                 try {
-                  // Find or create price header once per unit
                   const normalize = (dt?: string) => {
-                    if (!dt) return undefined as unknown as string
-                    return /:\d{2}$/.test(dt) ? `${dt}:00` : dt
+                    if (!dt || dt.trim() === '') return null
+
+                    // Đảm bảo format datetime đúng cho backend
+                    let normalized = dt.trim()
+
+                    console.log('🔍 Normalizing datetime:', { original: dt, normalized })
+
+                    // Nếu chỉ có date (YYYY-MM-DD), thêm time mặc định
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+                      normalized = `${normalized}T00:00:00.000Z`
+                    }
+                    // Nếu có date và time từ datetime-local (YYYY-MM-DDTHH:mm)
+                    else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized)) {
+                      normalized = `${normalized}:00.000Z`
+                    }
+                    // Nếu có date và time với seconds (YYYY-MM-DDTHH:mm:ss)
+                    else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(normalized)) {
+                      normalized = `${normalized}.000Z`
+                    }
+                    // Nếu đã có timezone, giữ nguyên
+                    else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(normalized)) {
+                      // Đã đúng format, giữ nguyên
+                    }
+                    // Nếu có timezone khác, chuyển về UTC
+                    else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(normalized)) {
+                      try {
+                        const date = new Date(normalized)
+                        normalized = date.toISOString()
+                      } catch (e) {
+                        console.error('❌ Error parsing datetime:', e)
+                        return null
+                      }
+                    }
+
+                    console.log('✅ Normalized datetime:', normalized)
+                    return normalized
                   }
 
-                  // Try reuse existing header
-                  let headerId: number | undefined
-                  try {
-                    const existingHeaders = await ProductService.getPriceHeaders(createdProduct.id, productUnitId)
-                    if (Array.isArray(existingHeaders) && existingHeaders.length > 0) {
-                      // Prefer an active header; fallback to the first
-                      const activeHeader = existingHeaders.find(h => (h as any).active === true)
-                      headerId = (activeHeader ?? existingHeaders[0]).id
-                    }
-                  } catch {}
+                  console.log('💰 Adding prices for header ID:', unitSelectedHeaderId)
 
-                  // If none, create new header
-                  if (!headerId) {
-                    try {
-                      const createdHeader = await ProductService.createPriceHeader(createdProduct.id, productUnitId, {
-                        name: `Bảng giá ${unit.unitName}`,
-                        description: `Bảng giá cho đơn vị ${unit.unitName}`,
-                        timeStart: undefined,
-                        timeEnd: undefined,
-                        active: true
-                      })
-                      headerId = createdHeader?.id
-                    } catch (createHeaderErr) {
-                      // As a fallback, try fetch again (header may already exist with same name)
-                      try {
-                        const existingHeaders = await ProductService.getPriceHeaders(createdProduct.id, productUnitId)
-                        if (Array.isArray(existingHeaders) && existingHeaders.length > 0) {
-                          const activeHeader = existingHeaders.find(h => (h as any).active === true)
-                          headerId = (activeHeader ?? existingHeaders[0]).id
-                        }
-                      } catch {}
-                      if (!headerId) throw createHeaderErr
-                    }
-                  }
+                  // Validate tất cả giá trước khi gửi API
+                  const pricesToAdd = unit.prices.filter((p: any) => p.isNew !== false)
 
-                  if (headerId) {
-                    for (const price of unit.prices.filter((p: any) => p.isNew !== false)) {
-                      const timeStart = normalize(price.validFrom)
-                      const timeEnd = price.validTo ? normalize(price.validTo) : undefined
-                      try {
-                        await ProductService.addUnitPriceWithHeader(createdProduct.id, productUnitId, {
-                          priceHeaderId: headerId,
-                          price: price.price,
-                          timeStart,
-                          timeEnd
-                        })
-                      } catch {
-                        await ProductService.addPriceUnderHeader(createdProduct.id, headerId, {
-                          price: price.price,
-                          timeStart,
-                          timeEnd
-                        })
+                  // Kiểm tra validation trước
+                  for (const price of pricesToAdd) {
+                    const timeStart = normalize(price.validFrom)
+                    const timeEnd = price.validTo ? normalize(price.validTo) : null
+
+                    // Validation: timeStart là bắt buộc
+                    if (!timeStart) {
+                      console.error('❌ timeStart is required but was null/empty:', price.validFrom)
+                      showErrorToUser('Thời gian hiệu lực từ là bắt buộc cho tất cả giá. Vui lòng kiểm tra lại.')
+                      hasErrors = true
+                      return // Dừng toàn bộ quá trình
+                    }
+
+                    // Validation: timeEnd phải sau timeStart nếu có
+                    if (timeEnd && timeStart) {
+                      const startDate = new Date(timeStart)
+                      const endDate = new Date(timeEnd)
+                      if (endDate <= startDate) {
+                        console.error('❌ timeEnd must be after timeStart:', { timeStart, timeEnd })
+                        showErrorToUser('Thời gian hiệu lực đến phải sau thời gian hiệu lực từ')
+                        hasErrors = true
+                        return // Dừng toàn bộ quá trình
                       }
                     }
                   }
+
+                  // Nếu validation fail, dừng xử lý
+                  if (hasErrors) {
+                    return
+                  }
+
+                  // Nếu validation pass, gửi tất cả giá
+                  let successCount = 0
+                  let errorCount = 0
+
+                  for (const price of pricesToAdd) {
+                    const timeStart = normalize(price.validFrom)
+                    const timeEnd = price.validTo ? normalize(price.validTo) : null
+
+                    // Tạo payload với timeStart bắt buộc
+                    const pricePayload: any = {
+                      productUnitId: productUnitId,
+                      price: price.price,
+                      priceHeaderId: unitSelectedHeaderId,
+                      active: true,
+                      timeStart: timeStart  // Luôn gửi timeStart
+                    }
+
+                    // Chỉ thêm timeEnd nếu có giá trị
+                    if (timeEnd) {
+                      pricePayload.timeEnd = timeEnd
+                    }
+
+                    console.log('📊 Adding price:', {
+                      pricePayload,
+                      originalPrice: price,
+                      timeStart: timeStart,
+                      timeEnd: timeEnd
+                    })
+
+                    try {
+                      // Sử dụng API đúng: POST /api/products/{productId}/prices/units/{productUnitId}
+                      const result = await ProductService.addPriceForProductUnit(createdProduct.id, productUnitId, pricePayload)
+                      console.log('✅ Price added successfully:', result)
+                      successCount++
+                      totalPricesAdded++
+                    } catch (priceErr: any) {
+                      console.error('❌ Failed to add price:', priceErr)
+                      errorCount++
+                      hasErrors = true
+                      const errorMsg = priceErr?.message?.includes('Đã có giá hiệu lực')
+                        ? 'Đã có giá hiệu lực trong khoảng thời gian này. Vui lòng chọn thời gian khác hoặc cập nhật giá hiện tại.'
+                        : 'Không thể thêm giá cho đơn vị này'
+                      showErrorToUser(errorMsg)
+
+                      // Nếu có lỗi, dừng quá trình
+                      return
+                    }
+                  }
+
+                  // Chỉ hiển thị thành công nếu tất cả giá đều được thêm thành công
+                  if (successCount > 0 && errorCount === 0) {
+                    console.log(`✅ Successfully added ${successCount} prices`)
+                  }
                 } catch (priceErr) {
-                  console.error('Failed to add prices:', priceErr)
+                  console.error('❌ Failed to add prices:', priceErr)
+                  showErrorToUser('Có lỗi xảy ra khi thêm giá. Vui lòng thử lại.')
+                  hasErrors = true
+                  return // Dừng quá trình
                 }
+              } else {
+                console.log('⏭️ Skipping price processing:', {
+                  reason: !product ? 'Not editing' : !unit.prices.length ? 'No prices' : 'No header name'
+                })
               }
             }
           } catch (unitErr) {
@@ -471,43 +813,28 @@ const ProductFormWithUnitsAndPrices = ({
           }
         }
 
-        // Cleanup: remove any product units on server that user didn't submit (covers BE auto-created unit)
-        try {
-          const refreshed = await ProductService.getProductById(createdProduct.id)
-          const submittedUnitIds = new Set(productUnits.map(u => u.unitId))
-          const serverUnits = (refreshed.productUnits || [])
-          for (const srv of serverUnits) {
-            const srvUnitId = (srv as any).unitId
-            if (!submittedUnitIds.has(srvUnitId)) {
-              try { await ProductService.deleteProductUnit(createdProduct.id, srv.id) } catch {}
-            }
-          }
-        } catch {}
+        // Note: Keep all existing units when editing, don't auto-delete any units
 
-        // Ensure correct default unit on server (some backends ignore isDefault during creation)
-        try {
-          const defaultLocal = productUnits.find(u => u.isDefault) || productUnits[0]
-          if (defaultLocal) {
-            try {
-              await ProductService.makeDefaultProductUnit(createdProduct.id, defaultLocal.unitId)
-            } catch {}
-          }
-        } catch {}
+        // Note: Default unit is handled during unit creation, no need for additional API call
       }
 
       // Return the created product
       onSubmit(createdProduct)
 
-      // Show success message
-      if (productUnits.length > 0) {
-        const totalPrices = productUnits.reduce((sum, unit) => sum + unit.prices.length, 0)
-        if (totalPrices > 0) {
-          alert(`Sản phẩm đã được tạo thành công với ${productUnits.length} đơn vị và ${totalPrices} giá!`)
+      // Chỉ hiển thị thông báo thành công nếu không có lỗi
+      if (!hasErrors) {
+        if (productUnits.length > 0) {
+          if (product && totalPricesAdded > 0) {
+            alert(`Sản phẩm đã được cập nhật thành công với ${productUnits.length} đơn vị và ${totalPricesAdded} giá!`)
+          } else {
+            alert(`Sản phẩm đã được ${product ? 'cập nhật' : 'tạo'} thành công với ${productUnits.length} đơn vị!`)
+          }
         } else {
-          alert(`Sản phẩm đã được tạo thành công với ${productUnits.length} đơn vị!`)
+          alert(`Sản phẩm đã được ${product ? 'cập nhật' : 'tạo'} thành công!`)
         }
       } else {
-        alert('Sản phẩm đã được tạo thành công!')
+        // Nếu có lỗi, không hiển thị thông báo thành công
+        console.log('❌ Có lỗi xảy ra, không hiển thị thông báo thành công')
       }
     } catch (error) {
       console.error('Error creating/updating product:', error)
@@ -517,6 +844,33 @@ const ProductFormWithUnitsAndPrices = ({
 
   return (
     <div className="space-y-6">
+      {/* Error notification */}
+      {showError && (
+        <div className="fixed top-4 right-4 z-50 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded shadow-lg">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium">{errorMessage}</p>
+            </div>
+            <div className="ml-auto pl-3">
+              <button
+                type="button"
+                onClick={() => setShowError(false)}
+                className="text-red-400 hover:text-red-600"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Tên sản phẩm */}
@@ -697,41 +1051,6 @@ const ProductFormWithUnitsAndPrices = ({
               </div>
             </div>
 
-            {/* Giá cho đơn vị mới */}
-            <div className="mt-3 p-3 bg-white rounded border">
-              <h5 className="text-xs font-medium text-gray-700 mb-2">💰 Giá cho đơn vị này (tùy chọn)</h5>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Giá (VNĐ)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={newUnitPrice}
-                    onChange={(e) => setNewUnitPrice(e.target.value)}
-                    placeholder="Nhập giá"
-                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Hiệu lực từ</label>
-                  <input
-                    type="datetime-local"
-                    value={newUnitPriceValidFrom}
-                    onChange={(e) => setNewUnitPriceValidFrom(e.target.value)}
-                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Đến (tùy chọn)</label>
-                  <input
-                    type="datetime-local"
-                    value={newUnitPriceValidTo}
-                    onChange={(e) => setNewUnitPriceValidTo(e.target.value)}
-                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                </div>
-              </div>
-            </div>
 
             <div className="mt-2 flex items-center gap-4">
               <div>
@@ -823,53 +1142,124 @@ const ProductFormWithUnitsAndPrices = ({
                     />
                   </div>
 
-                  {/* Giá cho đơn vị này */}
-                  <div className="bg-gray-50 p-3 rounded">
-                    <div className="flex items-center justify-between mb-2">
-                      <h6 className="text-xs font-medium text-gray-700">💰 Giá cho đơn vị này</h6>
-                      <button
-                        type="button"
-                        onClick={() => openPriceModal(unit.id)}
-                        className="text-xs text-blue-600 hover:text-blue-800"
-                      >
-                        + Thêm giá
-                      </button>
-                    </div>
-
-                    {unit.prices.length > 0 ? (
-                      <div className="space-y-1">
-                        {unit.prices.map((price, index) => (
-                          <div key={index} className="flex items-center justify-between bg-white p-2 rounded border">
-                            <div className="text-xs">
-                              <span className="font-medium">
-                                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price.price)}
-                              </span>
-                              <span className="text-gray-500 ml-2">
-                                từ {new Date(price.validFrom).toLocaleString('vi-VN')}
-                                {price.validTo && ` đến ${new Date(price.validTo).toLocaleString('vi-VN')}`}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removePriceFromUnit(unit.id, index)}
-                              className="text-xs text-red-600 hover:text-red-800"
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        ))}
+                  {/* Giá cho đơn vị này - chỉ hiển thị khi sửa sản phẩm */}
+                  {product && (
+                    <div className="bg-gray-50 p-3 rounded">
+                      <div className="flex items-center justify-between mb-3">
+                        <h6 className="text-xs font-medium text-gray-700">💰 Giá cho đơn vị này</h6>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openCreateHeaderModal(unit.id)}
+                            className="text-xs text-green-600 hover:text-green-800"
+                          >
+                            + Tạo bảng giá mới
+                          </button>
+                          {(() => {
+                            const unitHeaders = unitPriceHeaders.get(unit.id) || []
+                            const unitSelectedHeaderId = selectedHeaderIds.get(unit.id) || ''
+                            return unitHeaders.length > 0 && unitSelectedHeaderId && (
+                              <button
+                                type="button"
+                                onClick={() => openPriceModal(unit.id)}
+                                className="text-xs text-blue-600 hover:text-blue-800"
+                              >
+                                + Thêm giá
+                              </button>
+                            )
+                          })()}
+                        </div>
                       </div>
-                    ) : (
-                      <p className="text-xs text-gray-500">Chưa có giá cho đơn vị này</p>
-                    )}
-                  </div>
+
+                      {/* Header selection */}
+                      {(() => {
+                        const unitHeaders = unitPriceHeaders.get(unit.id) || []
+                        const unitSelectedHeaderId = selectedHeaderIds.get(unit.id) || ''
+                        const unitSelectedHeaderInfo = selectedHeaderInfos.get(unit.id)
+
+                        return unitHeaders.length > 0 && (
+                          <div className="mb-3">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Chọn bảng giá</label>
+                            <select
+                              value={unitSelectedHeaderId}
+                              onChange={(e) => handleHeaderSelection(unit.id, Number(e.target.value))}
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                            >
+                              <option value="">-- Chọn bảng giá --</option>
+                              {unitHeaders.map(header => (
+                                <option key={header.id} value={header.id}>
+                                  {header.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* Hiển thị thông tin bảng giá được chọn */}
+                            {unitSelectedHeaderInfo && unitSelectedHeaderId && (
+                              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                                <div className="font-medium text-blue-800">{unitSelectedHeaderInfo.name}</div>
+                                {unitSelectedHeaderInfo.timeStart && (
+                                  <div className="text-blue-600">
+                                    Từ: {new Date(unitSelectedHeaderInfo.timeStart).toLocaleString('vi-VN')}
+                                  </div>
+                                )}
+                                {unitSelectedHeaderInfo.timeEnd && (
+                                  <div className="text-blue-600">
+                                    Đến: {new Date(unitSelectedHeaderInfo.timeEnd).toLocaleString('vi-VN')}
+                                  </div>
+                                )}
+                                {!unitSelectedHeaderInfo.timeEnd && (
+                                  <div className="text-blue-600">Vô thời hạn</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+
+                      {(() => {
+                        // Lọc giá theo header được chọn cho unit này
+                        const unitSelectedHeaderId = selectedHeaderIds.get(unit.id) || ''
+                        const filteredPrices = unitSelectedHeaderId
+                          ? unit.prices.filter((price: any) => price.priceHeaderId === unitSelectedHeaderId)
+                          : unit.prices
+
+                        return filteredPrices.length > 0 ? (
+                          <div className="space-y-1">
+                            {filteredPrices.map((price, index) => (
+                              <div key={index} className="flex items-center justify-between bg-white p-2 rounded border">
+                                <div className="text-xs">
+                                  <span className="font-medium">
+                                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price.price)}
+                                  </span>
+                                  <span className="text-gray-500 ml-2">
+                                    từ {new Date(price.validFrom).toLocaleString('vi-VN')}
+                                    {price.validTo && ` đến ${new Date(price.validTo).toLocaleString('vi-VN')}`}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removePriceFromUnit(unit.id, index)}
+                                  className="text-xs text-red-600 hover:text-red-800"
+                                >
+                                  Xóa
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500">
+                            {unitSelectedHeaderId ? 'Chưa có giá cho bảng giá này' : 'Chưa có giá cho đơn vị này'}
+                          </p>
+                        )
+                      })()}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* (Removed) Bottom price management */}
 
         {/* Buttons */}
         <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
@@ -890,8 +1280,80 @@ const ProductFormWithUnitsAndPrices = ({
         </div>
       </form>
 
-      {/* Price Modal */}
-      {showPriceModal && (
+      {/* Create Header Modal - chỉ hiển thị khi sửa sản phẩm */}
+      {product && showCreateHeaderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Tạo bảng giá mới</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tên bảng giá *</label>
+                <input
+                  type="text"
+                  value={newHeaderData.name}
+                  onChange={(e) => setNewHeaderData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="VD: Bảng giá tháng 12/2024"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Mô tả</label>
+                <input
+                  type="text"
+                  value={newHeaderData.description}
+                  onChange={(e) => setNewHeaderData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Mô tả bảng giá"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Hiệu lực từ</label>
+                <input
+                  type="datetime-local"
+                  value={newHeaderData.timeStart}
+                  onChange={(e) => setNewHeaderData(prev => ({ ...prev, timeStart: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Hiệu lực đến</label>
+                <input
+                  type="datetime-local"
+                  value={newHeaderData.timeEnd}
+                  onChange={(e) => setNewHeaderData(prev => ({ ...prev, timeEnd: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={closeCreateHeaderModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateHeader}
+                disabled={!newHeaderData.name.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Tạo bảng giá
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Price Modal - chỉ hiển thị khi sửa sản phẩm */}
+      {product && showPriceModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-medium text-gray-900 mb-4">
