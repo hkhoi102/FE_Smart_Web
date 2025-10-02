@@ -1,7 +1,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 function authHeaders(): HeadersInit {
-  const token = localStorage.getItem('access_token')
+  // Prefer end-user token, fallback to admin token for admin views
+  const userToken = localStorage.getItem('user_access_token')
+  const adminToken = localStorage.getItem('access_token')
+  const token = userToken || adminToken
   return {
     'Authorization': token ? `Bearer ${token}` : '',
     'Content-Type': 'application/json',
@@ -24,6 +27,17 @@ export const CustomerService = {
   async getById(id: number): Promise<CustomerInfoDto | null> {
     try {
       const res = await fetch(`${API_BASE_URL}/customers/${id}`, { headers: authHeaders() })
+      if (!res.ok) return null
+      const data = await res.json().catch(() => null)
+      return data
+    } catch {
+      return null
+    }
+  },
+
+  async getByUserId(userId: number): Promise<CustomerInfoDto | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/by-user/${userId}`, { headers: authHeaders() })
       if (!res.ok) return null
       const data = await res.json().catch(() => null)
       return data

@@ -95,11 +95,11 @@ const Cart: React.FC = () => {
                       {/* Product Info */}
                       <div className="md:col-span-6">
                         <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0">
+                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
                             <img
-                              src="/images/fresh_fruit.png"
+                              src={item.imageUrl || '/images/fresh_fruit.png'}
                               alt={item.name}
-                              className="w-full h-full object-cover rounded-lg"
+                              className="w-full h-full object-cover"
                             />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -173,23 +173,6 @@ const Cart: React.FC = () => {
                 >
                   ← Trở về Shop
                 </Link>
-                <button
-                  onClick={handleRefreshCart}
-                  disabled={cartState.loading}
-                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {cartState.loading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Đang cập nhật...
-                    </>
-                  ) : (
-                    'Cập nhật giỏ'
-                  )}
-                </button>
               </div>
             </div>
           </div>

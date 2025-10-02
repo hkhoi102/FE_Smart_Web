@@ -47,7 +47,8 @@ const ProductCard = ({
   // Derive display unit and price from productUnits
   const defaultUnit = (product.productUnits && product.productUnits.find(u => u.isDefault)) || product.productUnits?.[0]
   const displayUnitName = defaultUnit?.unitName || ''
-  const displayPrice = defaultUnit?.currentPrice ?? defaultUnit?.convertedPrice ?? 0
+  const displayPrice = defaultUnit?.currentPrice ?? defaultUnit?.convertedPrice
+  const hasPrice = typeof displayPrice === 'number' && (displayPrice as number) > 0
   const hasDiscount = false
 
   // Show unit count if multiple units (should be 1 now since we expanded)
@@ -114,7 +115,7 @@ const ProductCard = ({
 
         <div className="flex items-center gap-2">
           <span className="text-primary-600 font-semibold text-lg">
-            {formatCurrency(displayPrice)}
+            {typeof displayPrice === 'number' && displayPrice > 0 ? formatCurrency(displayPrice) : 'Liên hệ'}
           </span>
           {hasDiscount && (
             <span className="text-gray-400 line-through text-sm">{/* no original price for now */}</span>
@@ -122,10 +123,14 @@ const ProductCard = ({
         </div>
 
         <button
-          onClick={() => addToCart(product)}
-          className="mt-2 w-full bg-primary-600 hover:bg-primary-700 text-white text-sm py-2 rounded-lg transition-colors"
+          onClick={() => {
+            if (!hasPrice) return
+            addToCart(product)
+          }}
+          disabled={!hasPrice}
+          className={`mt-2 w-full text-white text-sm py-2 rounded-lg transition-colors ${hasPrice ? 'bg-primary-600 hover:bg-primary-700' : 'bg-gray-300 cursor-not-allowed'}`}
         >
-          Thêm vào giỏ
+          {hasPrice ? 'Thêm vào giỏ' : 'Liên hệ để mua'}
         </button>
       </div>
     </div>

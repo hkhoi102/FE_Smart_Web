@@ -74,7 +74,7 @@ const Layout = ({ children }: LayoutProps) => {
           <p>Chào mừng đến với Siêu Thị Thông Minh — Thực phẩm tươi ngon giao hàng nhanh chóng</p>
           <div className="flex items-center gap-6">
             <span>Trợ giúp</span>
-            <span>Theo dõi đơn hàng</span>
+            <Link to="/my-orders" className="hover:text-white underline-offset-2 hover:underline">Theo dõi đơn hàng</Link>
             <span>Liên hệ: +84 123 456 789</span>
           </div>
         </div>
@@ -223,7 +223,7 @@ const Layout = ({ children }: LayoutProps) => {
             <div className="flex flex-wrap gap-4 text-sm">
               <Link to="/about" className="hover:text-white">Giới thiệu</Link>
               <Link to="/contact" className="hover:text-white">Liên hệ</Link>
-              <Link to="#" className="hover:text-white">Đơn hàng</Link>
+              <Link to="/my-orders" className="hover:text-white">Đơn hàng</Link>
               <Link to="#" className="hover:text-white">Trợ giúp</Link>
             </div>
           </div>

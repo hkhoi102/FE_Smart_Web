@@ -137,6 +137,7 @@ const Home = () => {
                 <CategoryCard
                   key={category.id}
                   name={category.name}
+                  categoryId={category.id as any}
                   imageUrl={getCategoryImage(category)}
                   description={category.description}
                 />

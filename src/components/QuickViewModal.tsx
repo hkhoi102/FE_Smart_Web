@@ -41,6 +41,10 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
 
 
   const handleAddToCart = () => {
+    // Block adding if all units have no price
+    const units = product.productUnits || []
+    const hasAnyPrice = units.some(u => typeof (u.currentPrice ?? u.convertedPrice) === 'number' && (u.currentPrice ?? u.convertedPrice)! > 0)
+    if (!hasAnyPrice) return
     for (let i = 0; i < quantity; i++) {
       addToCart(product)
     }
@@ -53,10 +57,8 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
     }
   }
 
-  const hasDiscount = product.originalPrice && product.originalPrice > product.price
-  const discountPercent = hasDiscount
-    ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100)
-    : 0
+  const hasDiscount = false
+  const discountPercent = 0
 
   if (!isOpen) return null
 
@@ -123,9 +125,7 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
               {product.productUnits && product.productUnits.length > 0 ? (
                 <div className="space-y-3">
                   {product.productUnits.map((unit) => (
-                    <div key={unit.id} className={`flex items-center justify-between p-3 rounded-lg ${
-                      product.currentUnit?.id === unit.id ? 'bg-primary-50 border-2 border-primary-200' : 'bg-gray-50'
-                    }`}>
+                    <div key={unit.id} className={`flex items-center justify-between p-3 rounded-lg bg-gray-50`}>
                       <div className="flex items-center gap-3">
                         <span className="font-medium text-gray-900">{unit.unitName}</span>
                         {unit.isDefault && (
@@ -133,15 +133,13 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
                             Mặc định
                           </span>
                         )}
-                        {product.currentUnit?.id === unit.id && (
-                          <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
-                            Đang xem
-                          </span>
-                        )}
+                        {/* current unit indicator removed */}
                       </div>
                       <div className="text-right">
                         <div className="text-lg font-semibold text-primary-600">
-                          {formatCurrency(unit.currentPrice || unit.convertedPrice || 0)}
+                          {typeof (unit.currentPrice ?? unit.convertedPrice) === 'number' && (unit.currentPrice ?? unit.convertedPrice)! > 0
+                            ? formatCurrency((unit.currentPrice ?? unit.convertedPrice) as number)
+                            : 'Liên hệ'}
                         </div>
                         {unit.conversionFactor && unit.conversionFactor !== 1 && (
                           <div className="text-xs text-gray-500">
@@ -192,9 +190,10 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
 
               <button
                 onClick={handleAddToCart}
-                className="flex-1 bg-primary-600 text-white py-3 px-6 rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center justify-center gap-2"
+                className="flex-1 bg-primary-600 text-white py-3 px-6 rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                disabled={!((product.productUnits||[]).some(u => typeof (u.currentPrice ?? u.convertedPrice) === 'number' && (u.currentPrice ?? u.convertedPrice)! > 0))}
               >
-                Thêm vào Giỏ
+                {((product.productUnits||[]).some(u => typeof (u.currentPrice ?? u.convertedPrice) === 'number' && (u.currentPrice ?? u.convertedPrice)! > 0)) ? 'Thêm vào Giỏ' : 'Liên hệ để mua'}
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l-1 12H6L5 9z"/>
                 </svg>
@@ -211,11 +210,11 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
             <div className="space-y-2 text-sm">
               <div>
                 <span className="text-gray-600">Danh mục: </span>
-                <span className="text-gray-900">{product.category_name}</span>
+                <span className="text-gray-900">{product.categoryName}</span>
               </div>
               <div>
                 <span className="text-gray-600">Tag: </span>
-                <span className="text-gray-900">Vegetables, Healthy, {product.category_name}, {product.name.split(' ')[0]}</span>
+                <span className="text-gray-900">Vegetables, Healthy, {product.categoryName}, {product.name.split(' ')[0]}</span>
               </div>
             </div>
 

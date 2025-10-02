@@ -11,6 +11,7 @@ import ProductDetail from '@/pages/ProductDetail'
 import Cart from '@/pages/Cart'
 import Checkout from '@/pages/Checkout'
 import Payment from '@/pages/Payment'
+import MyOrders from '@/pages/MyOrders'
 import Login from '@/pages/Login'
 import UserLogin from '@/pages/UserLogin'
 import Admin from '@/pages/Admin'
@@ -35,6 +36,7 @@ function App() {
               <Route path="/cart" element={<Layout><Cart /></Layout>} />
               <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
               <Route path="/payment/:orderId" element={<Layout><Payment /></Layout>} />
+              <Route path="/my-orders" element={<Layout><MyOrders /></Layout>} />
 
               {/* Admin routes */}
               <Route

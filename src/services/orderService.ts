@@ -47,6 +47,7 @@ export interface OrderResponseDto {
   status: OrderStatus
   paymentMethod?: 'COD' | 'BANK_TRANSFER'
   paymentStatus?: 'PAID' | 'UNPAID'
+  shippingAddress?: string
   promotionAppliedId?: number
   createdAt: string
   updatedAt: string
@@ -61,6 +62,47 @@ export interface CreateOrderRequest {
   promotionAppliedId?: number
   paymentMethod?: 'COD' | 'BANK_TRANSFER'
   shippingAddress?: string
+}
+
+// ===== Return Order DTOs =====
+export type ReturnStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED'
+
+export interface CreateReturnDetailRequest {
+  orderDetailId: number
+  quantity: number
+}
+
+export interface CreateReturnRequest {
+  orderId: number
+  reason?: string
+  returnDetails: CreateReturnDetailRequest[]
+}
+
+export interface ReturnDetailResponse {
+  id: number
+  returnOrderId: number
+  orderDetailId: number
+  productUnitId: number
+  productName?: string
+  unitName?: string
+  productImageUrl?: string
+  quantity: number
+  unitPrice?: number
+  refundAmount?: number
+  originalQuantity?: number
+  maxReturnQuantity?: number
+}
+
+export interface ReturnOrderResponseDto {
+  id: number
+  orderId: number
+  customerId: number
+  status: ReturnStatus
+  reason?: string
+  totalRefundAmount?: number
+  createdAt: string
+  processedAt?: string
+  returnDetails: ReturnDetailResponse[]
 }
 
 export interface CartReviewRequest {
@@ -256,6 +298,28 @@ export const OrderApi = {
     })
     if (!res.ok) throw new Error(`Failed to create order: ${res.status}`)
     const data = await res.json()
+    return data.data ?? data
+  },
+
+  // ===== Return Orders =====
+  async createReturn(request: CreateReturnRequest): Promise<ReturnOrderResponseDto> {
+    const res = await fetch(`${API_BASE_URL}/returns`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(request)
+    })
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => '')
+      throw new Error(`Failed to create return: ${res.status} ${res.statusText}${errorText ? ` - ${errorText}` : ''}`)
+    }
+    const data = await res.json().catch(() => ({}))
+    return data.data ?? data
+  },
+
+  async getReturnById(id: number): Promise<ReturnOrderResponseDto> {
+    const res = await fetch(`${API_BASE_URL}/returns/${id}`, { headers: authHeaders() })
+    if (!res.ok) throw new Error(`Failed to fetch return ${id}`)
+    const data = await res.json().catch(() => ({}))
     return data.data ?? data
   },
 }
