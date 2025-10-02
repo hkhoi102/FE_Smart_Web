@@ -7,14 +7,22 @@ import { ProductService } from '../services/productService'
 
 const Products: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [selectedCategory, setSelectedCategory] = useState<string>('Đồ uống')
+  const [selectedCategory, setSelectedCategory] = useState<{ id: number; name: string } | null>(null)
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'rating'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(false)
-  const [productsData, setProductsData] = useState({
+  const [error, setError] = useState<string | null>(null)
+  const [productsData, setProductsData] = useState<{
+    products: any[]
+    totalCount: number
+    currentPage: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+  }>({
     products: [],
     totalCount: 0,
     currentPage: 1,
@@ -26,15 +34,16 @@ const Products: React.FC = () => {
   // Handle URL search params
   useEffect(() => {
     const urlSearchTerm = searchParams.get('search')
-    const urlCategory = searchParams.get('category')
-    
+    const urlCategoryId = searchParams.get('categoryId')
+    const urlCategoryName = searchParams.get('category')
+
     if (urlSearchTerm) {
       setSearchTerm(urlSearchTerm)
-      setSelectedCategory('') // Clear category filter when searching from header
+      setSelectedCategory(null) // Clear category filter when searching from header
     }
-    
-    if (urlCategory) {
-      setSelectedCategory(urlCategory)
+
+    if (urlCategoryId && urlCategoryName) {
+      setSelectedCategory({ id: parseInt(urlCategoryId), name: urlCategoryName })
       setSearchTerm('') // Clear search when filtering by category
     }
   }, [searchParams])
@@ -42,16 +51,15 @@ const Products: React.FC = () => {
   // Fetch products from API
   const loadProducts = async () => {
     setLoading(true)
+    setError(null)
     try {
-      const minPrice = priceRange.min ? parseInt(priceRange.min) : undefined
-      const maxPrice = priceRange.max ? parseInt(priceRange.max) : undefined
-      
       const response = await ProductService.getProducts(
         currentPage,
         20,
         searchTerm || undefined,
-        undefined
+        selectedCategory?.id
       )
+
       setProductsData({
         products: response.products,
         totalCount: response.pagination.total_items,
@@ -60,14 +68,25 @@ const Products: React.FC = () => {
         hasNextPage: response.pagination.current_page < response.pagination.total_pages,
         hasPrevPage: response.pagination.current_page > 1
       })
+
       console.log('Products loaded:', {
-        currentPage: response.currentPage,
-        totalPages: response.totalPages,
-        totalCount: response.totalCount,
+        currentPage: response.pagination.current_page,
+        totalPages: response.pagination.total_pages,
+        totalCount: response.pagination.total_items,
         productsCount: response.products.length
       })
     } catch (error) {
       console.error('Error fetching products:', error)
+      setError('Không thể tải danh sách sản phẩm. Vui lòng thử lại.')
+      // Set empty data on error
+      setProductsData({
+        products: [],
+        totalCount: 0,
+        currentPage: 1,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false
+      })
     } finally {
       setLoading(false)
     }
@@ -85,11 +104,11 @@ const Products: React.FC = () => {
   }, [selectedCategory, searchTerm, priceRange.min, priceRange.max])
 
 
-  const handleCategorySelect = (category: string) => {
+  const handleCategorySelect = (category: { id: number; name: string }) => {
     setSelectedCategory(category)
     setCurrentPage(1)
     // Update URL params
-    setSearchParams({ category: category })
+    setSearchParams({ categoryId: category.id.toString(), category: category.name })
   }
 
 
@@ -105,7 +124,7 @@ const Products: React.FC = () => {
     setPriceRange({ min: '', max: '' })
     setSortBy('name')
     setSortOrder('asc')
-    setSelectedCategory('')
+    setSelectedCategory(null)
     setCurrentPage(1)
     // Clear URL search params
     setSearchParams({})
@@ -118,19 +137,19 @@ const Products: React.FC = () => {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar - Category Menu */}
           <div className="lg:w-64 flex-shrink-0">
-            <CategoryMenu 
+            <CategoryMenu
               initialActive={0}
-              activeCategory={selectedCategory}
+              activeCategory={selectedCategory?.name}
               onSelect={handleCategorySelect}
             />
-            
+
             {/* Filters */}
             <div className="mt-6 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">Bộ lọc</h3>
               </div>
               <div className="p-6">
-              
+
               {/* Search */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -195,11 +214,11 @@ const Products: React.FC = () => {
                   )}
                   {selectedCategory && (
                     <span className="text-sm text-gray-500">
-                      trong danh mục "{selectedCategory}"
+                      trong danh mục "{selectedCategory.name}"
                     </span>
                   )}
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-700">Sắp xếp theo:</span>
                   <select
@@ -229,20 +248,56 @@ const Products: React.FC = () => {
               </div>
             )}
 
-            {/* Products Grid */}
-            {!loading && productsData.products.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {productsData.products.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                  />
-                ))}
+            {/* Error State */}
+            {error && !loading && (
+              <div className="text-center py-12">
+                <div className="text-red-500 mb-4">
+                  <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Có lỗi xảy ra</h3>
+                <p className="text-gray-500 mb-4">{error}</p>
+                <button
+                  onClick={loadProducts}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  Thử lại
+                </button>
               </div>
             )}
 
+            {/* Products Grid */}
+            {!loading && !error && productsData.products.length > 0 && (() => {
+              // Create separate products for each unit
+              const expandedProducts = productsData.products.flatMap((product: any) => {
+                if (product.productUnits && product.productUnits.length > 0) {
+                  return product.productUnits.map((unit: any) => ({
+                    ...product,
+                    id: `${product.id}-${unit.id}`, // Unique ID for each unit
+                    productUnits: [unit], // Only this unit
+                    currentUnit: unit
+                  }))
+                }
+                return [product]
+              })
+
+              console.log('🔍 Debug - Expanded products:', expandedProducts)
+
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {expandedProducts.map((product: any) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                    />
+                  ))}
+                </div>
+              )
+            })()}
+
             {/* Empty State */}
-            {!loading && productsData.products.length === 0 && (
+            {!loading && !error && productsData.products.length === 0 && (
               <div className="text-center py-12">
                 <div className="text-gray-400 mb-4">
                   <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -255,10 +310,10 @@ const Products: React.FC = () => {
             )}
 
             {/* Pagination */}
-            {!loading && productsData.totalCount > 0 && (
+            {!loading && !error && productsData.totalCount > 0 && (
               <div className="mt-8 flex flex-col items-center gap-4">
                 <div className="text-sm text-gray-600">
-                  Trang {productsData.currentPage} / {productsData.totalPages} 
+                  Trang {productsData.currentPage} / {productsData.totalPages}
                   (Hiển thị {productsData.products.length} / {productsData.totalCount} sản phẩm)
                 </div>
                 <Pagination

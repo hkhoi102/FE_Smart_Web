@@ -69,7 +69,11 @@ export interface UpdateProductRequest extends CreateProductRequest {}
 
 export class ProductService {
   private static getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('access_token')
+    // Try user token first, fallback to admin token
+    const userToken = localStorage.getItem('user_access_token')
+    const adminToken = localStorage.getItem('access_token')
+    const token = userToken || adminToken
+
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',

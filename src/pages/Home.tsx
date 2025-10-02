@@ -1,42 +1,71 @@
 import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { CategoryCard, ProductCard, SectionHeader, PromoCard, TestimonialCard } from '@/components'
+import { CategoryService, type Category } from '@/services/categoryService'
+import { ProductService, type Product } from '@/services/productService'
 import bannerImg from '@/images/Bannar_Big-removebg-preview.png'
 import freshFruit from '@/images/fresh_fruit.png'
-import freshVegetables from '@/images/fresh_vegetables.png'
-import meatFish from '@/images/meat_fish.jpg'
 import snacksImg from '@/images/snacks.png'
 import beveragesImg from '@/images/beverages.png'
-import beautyHealthImg from '@/images/Beauty_Health.png'
 import breadBakeryImg from '@/images/Bread_Bakery.png'
-import bakingNeedsImg from '@/images/Baking_Needs.png'
-import cookingImg from '@/images/cooking.png'
-import diabeticFoodImg from '@/images/Diabetic_Food.png'
 import dishDetergentsImg from '@/images/Dish_Detergents.png'
-import oilImg from '@/images/oil.png'
 
-const categories = [
-  { name: 'Đồ uống', imageUrl: beveragesImg, description: 'Các loại đồ uống giải khát' },
-  { name: 'Đồ ăn vặt', imageUrl: snacksImg, description: 'Các loại snack, bánh kẹo' },
-  { name: 'Sữa và sản phẩm từ sữa', imageUrl: freshFruit, description: 'Sữa tươi, sữa chua, phô mai' },
-  { name: 'Hàng gia dụng', imageUrl: dishDetergentsImg, description: 'Các sản phẩm gia dụng' },
-  { name: 'Do Uong', imageUrl: beveragesImg, description: 'Các loại đồ uống giải khát' },
-  { name: 'Banh', imageUrl: breadBakeryImg, description: 'Các loại đồ Banh Ngọt' },
-]
-
-const products = [
-  { id: 1, name: 'Green Apple', category_id: 1, category_name: 'Trái cây', unit: 'kg', price: 120000, status: 'ACTIVE', created_at: '2024-01-15', updated_at: '2024-01-15', imageUrl: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?q=80&w=800&auto=format&fit=crop', originalPrice: 240000 },
-  { id: 2, name: 'Spinach Leaves', category_id: 2, category_name: 'Rau xanh', unit: 'bó', price: 85000, status: 'ACTIVE', created_at: '2024-01-15', updated_at: '2024-01-15', imageUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?q=80&w=800&auto=format&fit=crop' },
-  { id: 3, name: 'Fresh Lettuce', category_id: 2, category_name: 'Rau xanh', unit: 'bó', price: 62500, status: 'ACTIVE', created_at: '2024-01-15', updated_at: '2024-01-15', imageUrl: 'https://images.unsplash.com/photo-1615486363623-ccfed2a58c17?q=80&w=800&auto=format&fit=crop' },
-  { id: 4, name: 'Eggplant', category_id: 2, category_name: 'Rau củ', unit: 'kg', price: 71000, status: 'ACTIVE', created_at: '2024-01-15', updated_at: '2024-01-15', imageUrl: 'https://images.unsplash.com/photo-1607301405390-0a1264fad5a7?q=80&w=800&auto=format&fit=crop', originalPrice: 90000 },
-  { id: 5, name: 'Tomatoes', category_id: 2, category_name: 'Rau củ', unit: 'kg', price: 57000, status: 'ACTIVE', created_at: '2024-01-15', updated_at: '2024-01-15', imageUrl: 'https://images.unsplash.com/photo-1546470427-ea3b3f2a5a0c?q=80&w=800&auto=format&fit=crop' },
-  { id: 6, name: 'Cucumber', category_id: 2, category_name: 'Rau củ', unit: 'kg', price: 41500, status: 'ACTIVE', created_at: '2024-01-15', updated_at: '2024-01-15', imageUrl: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?q=80&w=800&auto=format&fit=crop' },
-  { id: 7, name: 'Bell Pepper', category_id: 2, category_name: 'Rau củ', unit: 'kg', price: 38500, status: 'ACTIVE', created_at: '2024-01-15', updated_at: '2024-01-15', imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=800&auto=format&fit=crop' },
-  { id: 8, name: 'Peach', category_id: 1, category_name: 'Trái cây', unit: 'kg', price: 102000, status: 'ACTIVE', created_at: '2024-01-15', updated_at: '2024-01-15', imageUrl: 'https://images.unsplash.com/photo-1626808642875-0aa545482dfb?q=80&w=800&auto=format&fit=crop' },
-  { id: 9, name: 'Orange', category_id: 1, category_name: 'Trái cây', unit: 'kg', price: 69000, status: 'ACTIVE', created_at: '2024-01-15', updated_at: '2024-01-15', imageUrl: 'https://images.unsplash.com/photo-1508747703725-719777637510?q=80&w=800&auto=format&fit=crop' },
-  { id: 10, name: 'Grapes', category_id: 1, category_name: 'Trái cây', unit: 'kg', price: 94000, status: 'ACTIVE', created_at: '2024-01-15', updated_at: '2024-01-15', imageUrl: 'https://images.unsplash.com/photo-1576402187878-974f58d4dc67?q=80&w=800&auto=format&fit=crop' },
-]
+// Mapping ảnh cho danh mục (fallback khi API không có ảnh)
+const categoryImageMap: Record<string, string> = {
+  'Đồ uống': beveragesImg,
+  'Beverages': beveragesImg,
+  'Đồ ăn vặt': snacksImg,
+  'Snacks': snacksImg,
+  'Sữa và sản phẩm từ sữa': freshFruit,
+  'Dairy': freshFruit,
+  'Hàng gia dụng': dishDetergentsImg,
+  'Household': dishDetergentsImg,
+  'Bánh': breadBakeryImg,
+  'Bread': breadBakeryImg,
+}
 
 const Home = () => {
+  const [categories, setCategories] = useState<Category[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Load categories and products in parallel
+        const [categoriesData, productsResponse] = await Promise.all([
+          CategoryService.getCategories(),
+          ProductService.getProducts(1, 10) // Get first 10 products
+        ])
+
+        setCategories(categoriesData)
+        setProducts(productsResponse.products)
+      } catch (err) {
+        console.error('Error fetching data:', err)
+        setError('Không thể tải dữ liệu')
+        setCategories([])
+        setProducts([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  // Helper function để lấy ảnh cho danh mục
+  const getCategoryImage = (category: Category) => {
+    // Ưu tiên ảnh từ API
+    if (category.imageUrl) {
+      return category.imageUrl
+    }
+    // Fallback về mapping local
+    return categoryImageMap[category.name] || freshFruit
+  }
   return (
     <div className="space-y-16">
       {/* Hero */}
@@ -80,21 +109,92 @@ const Home = () => {
       {/* Popular Categories */}
       <section>
         <SectionHeader title="Danh mục" action={<Link to="#" className="text-primary-600 flex items-center gap-1">Tất cả <span>→</span></Link>} />
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {categories.map((c) => (
-            <CategoryCard key={c.name} name={c.name} imageUrl={c.imageUrl} description={c.description} />
-          ))}
-        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {[...Array(6)].map((_, index) => (
+              <div key={index} className="bg-gray-200 rounded-lg p-4 animate-pulse">
+                <div className="w-full h-20 bg-gray-300 rounded mb-2"></div>
+                <div className="h-4 bg-gray-300 rounded mb-1"></div>
+                <div className="h-3 bg-gray-300 rounded w-3/4"></div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-500 mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-primary-600 hover:text-primary-700"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {categories.length > 0 ? (
+              categories.map((category) => (
+                <CategoryCard
+                  key={category.id}
+                  name={category.name}
+                  imageUrl={getCategoryImage(category)}
+                  description={category.description}
+                />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-8 text-gray-500">
+                Chưa có danh mục nào
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Popular Products */}
       <section>
         <SectionHeader title="Sản phẩm nổi bật" action={<Link to="#" className="text-primary-600">Xem tất cả →</Link>} />
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
-          {products.slice(0,10).map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
+            {[...Array(10)].map((_, index) => (
+              <div key={index} className="bg-gray-200 rounded-lg p-4 animate-pulse">
+                <div className="w-full h-48 bg-gray-300 rounded mb-3"></div>
+                <div className="h-4 bg-gray-300 rounded mb-2"></div>
+                <div className="h-3 bg-gray-300 rounded w-3/4 mb-2"></div>
+                <div className="h-6 bg-gray-300 rounded w-1/2"></div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-500 mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-primary-600 hover:text-primary-700"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
+            {products.length > 0 ? (
+              products.slice(0, 10).map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={{
+                    ...product,
+                    imageUrl: product.imageUrl || undefined,
+                    originalPrice: undefined
+                  }}
+                />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-8 text-gray-500">
+                Chưa có sản phẩm nào
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Promo Banners */}
@@ -120,11 +220,48 @@ const Home = () => {
       {/* Featured Products */}
       <section>
         <SectionHeader title="Bán chạy nhất" action={<Link to="#" className="text-primary-600">Xem tất cả →</Link>} />
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-          {products.slice(0,5).map((p) => (
-            <ProductCard key={`featured-${p.id}`} product={p} />
-          ))}
-        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+            {[...Array(5)].map((_, index) => (
+              <div key={index} className="bg-gray-200 rounded-lg p-4 animate-pulse">
+                <div className="w-full h-48 bg-gray-300 rounded mb-3"></div>
+                <div className="h-4 bg-gray-300 rounded mb-2"></div>
+                <div className="h-3 bg-gray-300 rounded w-3/4 mb-2"></div>
+                <div className="h-6 bg-gray-300 rounded w-1/2"></div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-500 mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-primary-600 hover:text-primary-700"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+            {products.length > 0 ? (
+              products.slice(0, 5).map((product) => (
+                <ProductCard
+                  key={`featured-${product.id}`}
+                  product={{
+                    ...product,
+                    imageUrl: product.imageUrl || undefined,
+                    originalPrice: undefined
+                  }}
+                />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-8 text-gray-500">
+                Chưa có sản phẩm nào
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Client Testimonials */}

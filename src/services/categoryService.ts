@@ -22,7 +22,11 @@ export interface UpdateCategoryRequest {
 
 export class CategoryService {
   private static getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('access_token')
+    // Try user token first, fallback to admin token
+    const userToken = localStorage.getItem('user_access_token')
+    const adminToken = localStorage.getItem('access_token')
+    const token = userToken || adminToken
+
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -94,7 +98,7 @@ export class CategoryService {
     const response = await fetch(`${API_BASE_URL}/categories/with-image`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('user_access_token') || localStorage.getItem('access_token')}`,
         // Don't set Content-Type for FormData, let browser set it with boundary
       },
       body: formData,

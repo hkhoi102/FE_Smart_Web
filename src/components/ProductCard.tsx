@@ -26,7 +26,7 @@ const ProductCard = ({
   // Get image URL - prioritize imageUrl prop, fallback to mapped images
   const getImageUrl = () => {
     if (product.imageUrl) return product.imageUrl
-    
+
     const imageMap: { [key: string]: string } = {
       'Coca Cola 330ml': '/images/beverages.png',
       'Pepsi 330ml': '/images/beverages.png',
@@ -50,21 +50,24 @@ const ProductCard = ({
   const displayPrice = defaultUnit?.currentPrice ?? defaultUnit?.convertedPrice ?? 0
   const hasDiscount = false
 
+  // Show unit count if multiple units (should be 1 now since we expanded)
+  const unitCount = product.productUnits?.length || 0
+
   return (
     <>
-      <div 
-        className={`bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow duration-200 ${className}`} 
+      <div
+        className={`bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow duration-200 ${className}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         {...props}
       >
         <div className="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden relative group">
-          <img 
-            src={getImageUrl()} 
-            alt={product.name} 
-            className="object-cover w-full h-full" 
+          <img
+            src={getImageUrl()}
+            alt={product.name}
+            className="object-cover w-full h-full"
           />
-          
+
           {/* Quick View Button - appears on hover */}
           <div className={`absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
             <button
@@ -88,14 +91,24 @@ const ProductCard = ({
           <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
             {product.categoryName}
           </span>
-          <span className="text-xs text-gray-500">
-            {displayUnitName}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">
+              {displayUnitName}
+            </span>
+            {unitCount > 1 && (
+              <span className="text-xs text-primary-600 bg-primary-50 px-2 py-1 rounded-full">
+                +{unitCount - 1} đơn vị
+              </span>
+            )}
+          </div>
         </div>
 
         <h3 className="text-gray-900 font-medium line-clamp-2 min-h-[2.5rem]">
           <Link to={`/product/${product.id}`} className="hover:text-primary-600">
             {product.name}
+            {displayUnitName && (
+              <span className="text-sm text-gray-500 font-normal"> - {displayUnitName}</span>
+            )}
           </Link>
         </h3>
 
@@ -108,7 +121,7 @@ const ProductCard = ({
           )}
         </div>
 
-        <button 
+        <button
           onClick={() => addToCart(product)}
           className="mt-2 w-full bg-primary-600 hover:bg-primary-700 text-white text-sm py-2 rounded-lg transition-colors"
         >
