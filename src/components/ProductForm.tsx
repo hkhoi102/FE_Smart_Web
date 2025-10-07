@@ -206,19 +206,7 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, isLoading = fals
           <p className="text-xs text-gray-500 mt-1">{uploading ? 'Đang xử lý ảnh...' : 'Chọn ảnh từ máy tính; nếu có API tạo kèm ảnh sẽ gửi cùng.'}</p>
         </div>
 
-        {/* Hạn sử dụng và Đơn vị tính */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Hạn sử dụng
-          </label>
-          <input
-            type="date"
-            name="expiration_date"
-            value={formData.expiration_date}
-            onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          />
-        </div>
+        {/* Hạn sử dụng - removed per request */}
 
         {/* Bỏ Đơn vị tính (mặc định) theo yêu cầu */}
       </div>

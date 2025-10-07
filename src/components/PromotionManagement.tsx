@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { PromotionService, PromotionType, TargetType } from '@/services/promotionService'
 import PromotionHeaderManagement from './PromotionHeaderManagement'
+import { ProductService } from '@/services/productService'
 
 export interface PromotionHeader {
   id: number
@@ -39,7 +40,7 @@ const PromotionManagement: React.FC = () => {
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [headerForm, setHeaderForm] = useState({
-    name: '', startDate: '', endDate: '', type: 'DISCOUNT_PERCENT' as PromotionType,
+    name: '', startDate: '', endDate: '', type: 'DISCOUNT_PERCENT' as PromotionType, active: true,
   })
   type LineItem = {
     targetType: TargetType
@@ -47,15 +48,27 @@ const PromotionManagement: React.FC = () => {
     type: PromotionType
     lineStartDate?: string
     lineEndDate?: string
-    discountPercent?: string
-    discountAmount?: string
-    minAmount?: string
-    maxDiscount?: string
-    conditionQuantity?: string
-    freeQuantity?: string
+    targetNameQuery?: string
   }
   const newLine = (): LineItem => ({ targetType: 'PRODUCT', targetId: 0, type: 'DISCOUNT_PERCENT' })
   const [lines, setLines] = useState<LineItem[]>([newLine()])
+
+  const [productOptions, setProductOptions] = useState<Array<{ id: number; name: string }>>([])
+  const [categoryOptions, setCategoryOptions] = useState<Array<{ id: number; name: string }>>([])
+
+  useEffect(() => {
+    if (!isWizardOpen) return
+    ;(async () => {
+      try {
+        const prods = await ProductService.getProducts(1, 1000)
+        setProductOptions(prods.products.map(p => ({ id: p.id, name: p.name })))
+      } catch { setProductOptions([]) }
+      try {
+        const cats = await ProductService.getCategories()
+        setCategoryOptions(cats.map((c: any) => ({ id: c.id, name: c.name })))
+      } catch { setCategoryOptions([]) }
+    })()
+  }, [isWizardOpen])
 
   const subTabs: Array<{ id: 'headers'; label: string; icon: string }> = [
     { id: 'headers', label: 'Header Khuyến mãi', icon: '📋' },
@@ -70,7 +83,7 @@ const PromotionManagement: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900">Quản lý Khuyến mãi</h1>
             <p className="text-gray-600 mt-1">Quản lý các chương trình khuyến mãi và giảm giá</p>
           </div>
-          <button onClick={() => setIsWizardOpen(true)} className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700">Tạo khuyến mãi nhanh</button>
+          <button onClick={() => setIsWizardOpen(true)} className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700">Tạo khuyến mãi mới</button>
         </div>
       </div>
 
@@ -101,108 +114,110 @@ const PromotionManagement: React.FC = () => {
       </div>
 
       {isWizardOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Tạo khuyến mãi nhanh</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl p-7 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-semibold text-gray-900">Tạo khuyến mãi mới</h3>
               <button onClick={() => setIsWizardOpen(false)} className="text-gray-500 hover:text-gray-700">✖</button>
             </div>
             <div className="space-y-4">
               {/* Header section */}
-              <div className="rounded border p-4">
-                <div className="font-medium mb-3">Thông tin chương trình</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-gray-200 p-5 bg-white shadow-sm">
+                <div className="text-base font-semibold text-gray-900 mb-4">Thông tin chương trình</div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tên chương trình</label>
-                    <input value={headerForm.name} onChange={e=>setHeaderForm({...headerForm, name:e.target.value})} className="w-full px-3 py-2 border rounded" />
+                    <input value={headerForm.name} onChange={e=>setHeaderForm({...headerForm, name:e.target.value})} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Bắt đầu</label>
-                    <input type="date" value={headerForm.startDate} onChange={e=>setHeaderForm({...headerForm, startDate:e.target.value})} className="w-full px-3 py-2 border rounded" />
+                    <input type="date" value={headerForm.startDate} onChange={e=>setHeaderForm({...headerForm, startDate:e.target.value})} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Kết thúc (tùy chọn)</label>
-                    <input type="date" value={headerForm.endDate} onChange={e=>setHeaderForm({...headerForm, endDate:e.target.value})} className="w-full px-3 py-2 border rounded" />
+                    <input type="date" value={headerForm.endDate} onChange={e=>setHeaderForm({...headerForm, endDate:e.target.value})} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                    <select className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={headerForm.active ? '1' : '0'} onChange={(e)=>setHeaderForm({...headerForm, active: e.target.value==='1'})}>
+                      <option value="1">Kích hoạt</option>
+                      <option value="0">Tạm dừng</option>
+                    </select>
                   </div>
                 </div>
               </div>
 
               {/* Lines section */}
-              <div className="rounded border p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="font-medium">Các loại khuyến mãi áp dụng</div>
-                  <button className="px-3 py-1 rounded text-white bg-blue-600 hover:bg-blue-700" onClick={()=>setLines(prev=>[...prev, newLine()])}>+ Thêm loại</button>
+              <div className="rounded-xl border border-gray-200 p-5 bg-white shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-base font-semibold text-gray-900">Các loại khuyến mãi áp dụng</div>
+                  <button className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700" onClick={()=>setLines(prev=>[...prev, newLine()])}>
+                    <span className="text-lg leading-none">＋</span> Thêm loại
+                  </button>
                 </div>
                 <div className="space-y-4">
                   {lines.map((ln, idx) => (
-                    <div key={idx} className="rounded-md border p-3">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div key={idx} className="rounded-lg border border-gray-200 p-4 bg-gray-50">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                         <div>
                           <label className="block text-sm font-medium mb-1">Áp dụng cho</label>
-                          <select value={ln.targetType} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetType:e.target.value as TargetType}:l))} className="w-full px-3 py-2 border rounded">
+                          <select value={ln.targetType} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetType:e.target.value as TargetType, targetId: 0}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="PRODUCT">Sản phẩm</option>
                             <option value="CATEGORY">Danh mục</option>
-                            <option value="CUSTOMER">Khách hàng</option>
+
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium mb-1">ID mục tiêu</label>
-                          <input type="number" value={ln.targetId} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:Number(e.target.value)}:l))} className="w-full px-3 py-2 border rounded" />
+                          <label className="block text-sm font-medium mb-1">Mục tiêu</label>
+                          {ln.targetType === 'PRODUCT' && (
+                            <div className="relative">
+                              <input className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tìm sản phẩm..." value={ln.targetNameQuery || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetNameQuery:e.target.value, showSuggest:true}:l))} />
+                              {((ln.targetNameQuery || '').trim().length > 0) && (ln as any).showSuggest && (
+                                <div className="absolute z-10 bg-white border rounded shadow w-full mt-1 max-h-48 overflow-auto">
+                                  {productOptions.filter(p=>p.name.toLowerCase().includes(String(ln.targetNameQuery).toLowerCase())).slice(0,8).map(p=> (
+                                    <div key={p.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:p.id, targetNameQuery:p.name, showSuggest:false}:l))}>{p.name}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {ln.targetType === 'CATEGORY' && (
+                            <div className="relative">
+                              <input className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tìm danh mục..." value={ln.targetNameQuery || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetNameQuery:e.target.value, showSuggest:true}:l))} />
+                              {((ln.targetNameQuery || '').trim().length > 0) && (ln as any).showSuggest && (
+                                <div className="absolute z-10 bg-white border rounded shadow w-full mt-1 max-h-48 overflow-auto">
+                                  {categoryOptions.filter(c=>c.name.toLowerCase().includes(String(ln.targetNameQuery).toLowerCase())).slice(0,8).map(c=> (
+                                    <div key={c.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:c.id, targetNameQuery:c.name, showSuggest:false}:l))}>{c.name}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {ln.targetType === 'CUSTOMER' && (
+                            <input type="number" value={ln.targetId} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:Number(e.target.value)}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ID khách hàng" />
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium mb-1">Loại</label>
-                          <select value={ln.type} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value as PromotionType}:l))} className="w-full px-3 py-2 border rounded">
+                          <select value={ln.type} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value as PromotionType}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="DISCOUNT_PERCENT">Giảm theo %</option>
                             <option value="DISCOUNT_AMOUNT">Giảm tiền</option>
                             <option value="BUY_X_GET_Y">Mua X tặng Y</option>
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium mb-1">Bắt đầu (Loại)</label>
-                          <input type="date" value={ln.lineStartDate || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineStartDate:e.target.value}:l))} className="w-full px-3 py-2 border rounded" />
+                          <label className="block text-sm font-medium mb-1">Bắt đầu</label>
+                          <input type="date" value={ln.lineStartDate || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineStartDate:e.target.value}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium mb-1">Kết thúc (Loại)</label>
-                          <input type="date" value={ln.lineEndDate || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineEndDate:e.target.value}:l))} className="w-full px-3 py-2 border rounded" />
+                          <label className="block text-sm font-medium mb-1">Kết thúc</label>
+                          <input type="date" value={ln.lineEndDate || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineEndDate:e.target.value}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                        {ln.type === 'DISCOUNT_PERCENT' && (
-                          <div>
-                            <label className="block text-sm font-medium mb-1">% giảm</label>
-                            <input type="number" value={ln.discountPercent || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, discountPercent:e.target.value}:l))} className="w-full px-3 py-2 border rounded" />
-                          </div>
-                        )}
-                        {ln.type === 'DISCOUNT_AMOUNT' && (
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Số tiền giảm</label>
-                            <input type="number" value={ln.discountAmount || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, discountAmount:e.target.value}:l))} className="w-full px-3 py-2 border rounded" />
-                          </div>
-                        )}
-                        {ln.type === 'BUY_X_GET_Y' && (
-                          <>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Số lượng mua (X)</label>
-                              <input type="number" value={ln.conditionQuantity || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, conditionQuantity:e.target.value}:l))} className="w-full px-3 py-2 border rounded" />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Số lượng tặng (Y)</label>
-                              <input type="number" value={ln.freeQuantity || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, freeQuantity:e.target.value}:l))} className="w-full px-3 py-2 border rounded" />
-                            </div>
-                          </>
-                        )}
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Đơn tối thiểu</label>
-                          <input type="number" value={ln.minAmount || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, minAmount:e.target.value}:l))} className="w-full px-3 py-2 border rounded" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Giảm tối đa</label>
-                          <input type="number" value={ln.maxDiscount || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, maxDiscount:e.target.value}:l))} className="w-full px-3 py-2 border rounded" />
-                        </div>
-                      </div>
+                      {/* Bỏ phần detail cho khuyến mãi */}
                       {lines.length > 1 && (
                         <div className="flex justify-end mt-3">
-                          <button className="text-red-600" onClick={()=>setLines(prev=>prev.filter((_,i)=>i!==idx))}>Xóa loại</button>
+                          <button className="text-red-600 hover:text-red-700" onClick={()=>setLines(prev=>prev.filter((_,i)=>i!==idx))}>Xóa loại</button>
                         </div>
                       )}
                     </div>
@@ -211,24 +226,17 @@ const PromotionManagement: React.FC = () => {
               </div>
 
               <div className="flex justify-end gap-2">
-                <button className="px-4 py-2 rounded border" onClick={()=>setIsWizardOpen(false)}>Hủy</button>
-                <button disabled={creating} className="px-4 py-2 rounded text-white bg-green-600 hover:bg-green-700 disabled:opacity-50" onClick={async ()=>{
+                <button className="px-4 py-2 rounded-md border" onClick={()=>setIsWizardOpen(false)}>Hủy</button>
+                <button disabled={creating} className="px-5 py-2 rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50" onClick={async ()=>{
                   if (!headerForm.name.trim() || !headerForm.startDate) return
                   setCreating(true)
                   try {
-                    const header = { name: headerForm.name.trim(), startDate: headerForm.startDate, endDate: headerForm.endDate || undefined, active: true }
+                    const header = { name: headerForm.name.trim(), startDate: headerForm.startDate, endDate: headerForm.endDate || undefined, active: !!headerForm.active }
                     // Tạo header trước
                     const h = await PromotionService.createHeader(header)
-                    // Tạo tất cả line+detail
+                    // Tạo các line (không tạo detail)
                     for (const ln of lines) {
-                      const createdLine = await PromotionService.createLine({ promotionHeaderId: h.id, targetType: ln.targetType, targetId: Number(ln.targetId), startDate: ln.lineStartDate || undefined, endDate: ln.lineEndDate || undefined, active: true, type: ln.type })
-                      const detail: any = { promotionLineId: createdLine.id, active: true }
-                      if (ln.type === 'DISCOUNT_PERCENT') detail.discountPercent = Number(ln.discountPercent || 0)
-                      if (ln.type === 'DISCOUNT_AMOUNT') detail.discountAmount = Number(ln.discountAmount || 0)
-                      if (ln.type === 'BUY_X_GET_Y') { detail.conditionQuantity = Number(ln.conditionQuantity || 0); detail.freeQuantity = Number(ln.freeQuantity || 0) }
-                      if (ln.minAmount) detail.minAmount = Number(ln.minAmount)
-                      if (ln.maxDiscount) detail.maxDiscount = Number(ln.maxDiscount)
-                      await PromotionService.createDetail(detail)
+                      await PromotionService.createLine({ promotionHeaderId: h.id, targetType: ln.targetType, targetId: Number(ln.targetId), startDate: ln.lineStartDate || undefined, endDate: ln.lineEndDate || undefined, active: true, type: ln.type })
                     }
                     setIsWizardOpen(false)
                     alert('Tạo khuyến mãi thành công')

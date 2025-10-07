@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { InventoryService, WarehouseDto } from '../services/inventoryService'
 import { ProductService } from '../services/productService'
+import Pagination from './Pagination'
 
 interface InventoryCheck {
   id: number
@@ -40,6 +42,7 @@ interface ProductUnit {
 }
 
 const InventoryCheckManagement = () => {
+  const navigate = useNavigate()
   const [checks, setChecks] = useState<InventoryCheck[]>([])
   const [checkItems, setCheckItems] = useState<CheckItem[]>([])
   const [warehouses, setWarehouses] = useState<WarehouseDto[]>([])
@@ -73,6 +76,13 @@ const InventoryCheckManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [warehouseFilter, setWarehouseFilter] = useState<number | 'all'>('all')
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    total_pages: 1,
+    total_items: 0,
+    items_per_page: 10
+  })
+  const [currentPage, setCurrentPage] = useState(1)
 
   const mapCheck = (dto: any): InventoryCheck => {
     console.log('🔍 Mapping check dto:', dto)
@@ -138,15 +148,36 @@ const InventoryCheckManagement = () => {
     return matchesSearch && matchesStatus && matchesWarehouse
   })
 
-  const handleAddCheck = () => {
-    setEditingCheck(null)
-    setFormData({
-      check_date: new Date().toISOString().slice(0, 16),
-      warehouse_id: '',
-      note: '',
+  // Pagination logic
+  const itemsPerPage = 10
+  const totalItems = filteredChecks.length
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedChecks = filteredChecks.slice(startIndex, endIndex)
 
+  // Update pagination state
+  useEffect(() => {
+    setPagination({
+      current_page: currentPage,
+      total_pages: totalPages,
+      total_items: totalItems,
+      items_per_page: itemsPerPage
     })
-    setIsModalOpen(true)
+  }, [currentPage, totalPages, totalItems, itemsPerPage])
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter, warehouseFilter])
+
+  const handleAddCheck = () => {
+    navigate('/admin/inventory-check/create')
   }
 
   const handleEditCheck = (check: InventoryCheck) => {
@@ -574,7 +605,7 @@ const InventoryCheckManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredChecks.map((check) => (
+              {paginatedChecks.map((check) => (
                 <tr key={check.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {check.id}
@@ -654,6 +685,14 @@ const InventoryCheckManagement = () => {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination
+          pagination={pagination}
+          onPageChange={handlePageChange}
+        />
+      )}
 
       {/* Check Modal */}
       {isModalOpen && (

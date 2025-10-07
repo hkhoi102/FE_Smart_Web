@@ -1,14 +1,27 @@
 import { useAuth } from '@/contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { ProductService, Product, ProductCategory, CreateProductRequest, UpdateProductRequest } from '@/services/productService'
 import { InventoryService, WarehouseDto, StockLocationDto } from '@/services/inventoryService'
-import { Pagination, ProductTable, ProductFormWithUnitsAndPrices, Modal, UnitManagement, ManagementDropdown, PriceManagement, AccountManagement, InventoryManagement, WarehouseTab, PromotionManagement, OrderManagement } from '@/components'
+import { Pagination, ProductTable, ProductFormWithUnitsAndPrices, Modal, UnitManagement, PriceManagement, AccountManagement, InventoryManagement, InventoryCheckManagement, WarehouseTab, PromotionManagement, OrderManagement, OrderProcessingManagement, OrderListManagement, AdminSidebar } from '@/components'
+import CreateOrderManagement from '@/components/CreateOrderManagement'
+import InventoryImportExportCreate from '@/components/InventoryImportExportCreate'
+import InventoryImportExportList from '@/components/InventoryImportExportList'
+import PriceHeaderDetail from '@/pages/PriceHeaderDetail'
+import InventoryCheckCreate from '@/pages/InventoryCheckCreate'
 import CategoryManagement from '@/components/CategoryManagement'
 
 const Admin = () => {
   const { user, logout, isAuthenticated } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { headerId } = useParams<{ headerId?: string }>()
+
+  // Detect create inventory check page
+  const isInventoryCheckCreate = location.pathname === '/admin/inventory-check/create'
+
+  // Detect price header detail page
+  const isPriceHeaderDetail = location.pathname.startsWith('/admin/prices/') && headerId
 
   // State for products
   const [products, setProducts] = useState<Product[]>([])
@@ -22,7 +35,28 @@ const Admin = () => {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>()
-  const [currentTab, setCurrentTab] = useState<'overview' | 'products' | 'categories' | 'units' | 'prices' | 'inventory' | 'warehouses' | 'accounts' | 'promotions' | 'orders'>('overview')
+  type TabType = 'overview' | 'management' | 'products' | 'categories' | 'units' | 'prices' | 'inventory' | 'inventory-management' | 'inventory-import-export' | 'inventory-import-export-list' | 'inventory-check-create' | 'inventory-check' | 'warehouses' | 'warehouse-list' | 'warehouse-history' | 'accounts' | 'promotions' | 'orders' | 'order-processing' | 'order-list' | 'return-processing' | 'create-order'
+
+  const [currentTab, setCurrentTab] = useState<TabType>(
+    (new URLSearchParams(location.search).get('tab') as TabType) ||
+    (isInventoryCheckCreate ? 'inventory-check-create' :
+     isPriceHeaderDetail ? 'prices' : 'overview')
+  )
+
+  // Keep tab in sync with URL changes (e.g., when navigating back from create page)
+  useEffect(() => {
+    const tabFromUrl = (new URLSearchParams(location.search).get('tab') as any) || undefined
+    if (isInventoryCheckCreate) {
+      setCurrentTab('inventory-check-create')
+    } else if (isPriceHeaderDetail) {
+      setCurrentTab('prices')
+    } else if (tabFromUrl) {
+      setCurrentTab(tabFromUrl)
+    } else if (!tabFromUrl && currentTab !== 'overview') {
+      setCurrentTab('overview')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.search])
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -270,6 +304,7 @@ const Admin = () => {
       }
       const payload: CreateProductRequest | UpdateProductRequest = {
         name: productData.name,
+        code: productData.code || '',
         description: productData.description,
         imageUrl: productData.image_url || productData.imageUrl,
         expirationDate: productData.expiration_date || productData.expirationDate,
@@ -396,87 +431,81 @@ const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Trang quản trị</h1>
-              <p className="text-gray-600">Chào mừng, {user?.fullName} ({user?.role})</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-            >
-              Đăng xuất
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
+      <AdminSidebar
+        currentTab={currentTab}
+        onTabChange={setCurrentTab}
+      />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          {/* Tabs */}
-          <div className="border-b border-gray-200 mb-6">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setCurrentTab('overview')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentTab === 'overview'
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Tổng quan
-              </button>
-              <ManagementDropdown
-                currentTab={currentTab}
-                onTabChange={setCurrentTab}
-              />
-              <button
-                onClick={() => setCurrentTab('warehouses')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentTab === 'warehouses'
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Kho
-              </button>
-              <button
-                onClick={() => setCurrentTab('accounts')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentTab === 'accounts'
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Tài khoản
-              </button>
-              <button
-                onClick={() => setCurrentTab('promotions')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentTab === 'promotions'
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Khuyến mãi
-              </button>
-              <button
-                onClick={() => setCurrentTab('orders')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentTab === 'orders'
-                    ? 'border-orange-500 text-orange-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Đơn hàng
-              </button>
-            </nav>
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="px-6 py-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Trang quản trị</h1>
+                <p className="text-gray-600">Chào mừng, {user?.fullName} ({user?.role})</p>
+              </div>
+              <div className="flex items-center gap-4">
+                {/* Search */}
+                <div className="hidden md:block">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm..."
+                      className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35m1.1-4.4a6.75 6.75 0 11-13.5 0 6.75 6.75 0 0113.5 0z"/>
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Grid Icon */}
+                <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+                  </svg>
+                </button>
+
+                {/* Bell Icon */}
+                <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg relative">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                  </svg>
+                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
+                </button>
+
+                {/* User Profile */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-gray-700">
+                      {user?.fullName?.charAt(0) || 'U'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
+        </header>
+
+        {/* Content Area */}
+        <main className="flex-1 p-6 overflow-y-auto">
+
+          {currentTab === 'management' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Quản lý</h2>
+              <p className="text-gray-600">Chọn một mục con từ menu bên trái để quản lý.</p>
+            </div>
+          )}
 
           {currentTab === 'overview' && (
             <>
@@ -795,14 +824,38 @@ const Admin = () => {
           )}
 
           {currentTab === 'prices' && (
-            <PriceManagement />
+            headerId ? <PriceHeaderDetail /> : <PriceManagement />
           )}
 
           {currentTab === 'inventory' && (
             <InventoryManagement />
           )}
 
+          {currentTab === 'inventory-management' && (
+            <InventoryManagement />
+          )}
+
+          {currentTab === 'inventory-import-export' && (
+            <InventoryImportExportCreate />
+          )}
+
+          {currentTab === 'inventory-import-export-list' && (
+            <InventoryImportExportList />
+          )}
+
+          {currentTab === 'inventory-check-create' && (
+            <InventoryCheckCreate />
+          )}
+
+          {currentTab === 'inventory-check' && (
+            <InventoryCheckManagement />
+          )}
+
           {currentTab === 'warehouses' && (
+            <WarehouseTab />
+          )}
+
+          {currentTab === 'warehouse-list' && (
             <WarehouseTab />
           )}
 
@@ -817,8 +870,34 @@ const Admin = () => {
           {currentTab === 'orders' && (
             <OrderManagement />
           )}
-        </div>
-      </main>
+
+          {currentTab === 'order-processing' && (
+            <OrderProcessingManagement />
+          )}
+
+          {currentTab === 'order-list' && (
+            <OrderListManagement />
+          )}
+
+          {currentTab === 'return-processing' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Xử lý đơn trả về</h2>
+              <p className="text-gray-600">Chức năng xử lý đơn trả về sẽ được triển khai ở đây.</p>
+            </div>
+          )}
+
+          {currentTab === 'create-order' && (
+            <CreateOrderManagement />
+          )}
+
+          {currentTab === 'warehouse-history' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Lịch sử nhập xuất</h2>
+              <p className="text-gray-600">Chức năng xem lịch sử nhập xuất sẽ được triển khai ở đây.</p>
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* Product Modal */}
       <Modal
@@ -1102,12 +1181,12 @@ const Admin = () => {
                                 const fresh = await ProductService.getProductById(targetProduct!.id)
                                 setDetailedProduct(fresh)
                                 await loadProducts()
-                                openNotify('Thành công', 'Đã đặt đơn vị mặc định', 'success')
+                                openNotify('Thành công', 'Đã đặt đơn vị cơ bản', 'success')
                               } catch (err) {
-                                openNotify('Thất bại', 'Không thể đặt mặc định', 'error')
+                                openNotify('Thất bại', 'Không thể đặt đơn vị cơ bản', 'error')
                               }
                             }}
-                          >Đặt mặc định</button>
+                          >Đặt đơn vị cơ bản</button>
                         )}
                       </div>
                       {/* Barcode inline editor (prefilled if exists) */}

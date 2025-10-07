@@ -30,6 +30,7 @@ export interface ProductCategory {
 export interface Product {
   id: number
   name: string
+  code?: string
   description: string
   imageUrl?: string | null
   expirationDate?: string | null
@@ -57,6 +58,7 @@ export interface ProductResponse {
 
 export interface CreateProductRequest {
   name: string
+  code: string
   description: string
   imageUrl?: string
   expirationDate?: string
@@ -146,6 +148,7 @@ export class ProductService {
     const mapProduct = (p: any): Product => ({
       id: p.id,
       name: p.name,
+      code: p.code,
       description: p.description,
       imageUrl: ProductService.toAbsoluteUrl(p.imageUrl ?? p.image_url) ?? null,
       expirationDate: p.expirationDate ?? null,
@@ -270,6 +273,47 @@ export class ProductService {
     return result.data ?? result
   }
 
+  // Get product by product code (maSP)
+  static async getProductByProductCode(code: string): Promise<Product | null> {
+    const res = await fetch(`${API_BASE_URL}/products/by-product-code/${encodeURIComponent(code)}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) return null
+    const result = await res.json().catch(() => null)
+    const data = (result?.data ?? result)
+    if (!data) return null
+    // Map minimal fields used on FE
+    const mapUnit = (u: any): ProductUnit => ({
+      id: u.id,
+      unitId: u.unitId,
+      unitName: u.unitName,
+      conversionFactor: u.conversionFactor ?? u.conversionRate ?? 1,
+      isDefault: !!u.isDefault,
+      currentPrice: typeof u.currentPrice === 'number' ? u.currentPrice : undefined,
+      convertedPrice: typeof u.convertedPrice === 'number' ? u.convertedPrice : undefined,
+      quantity: typeof u.quantity === 'number' ? u.quantity : undefined,
+      availableQuantity: typeof u.availableQuantity === 'number' ? u.availableQuantity : undefined,
+    })
+    const prod: Product = {
+      id: data.id,
+      name: data.name,
+      code: data.code,
+      description: data.description ?? '',
+      imageUrl: this.toAbsoluteUrl(data.imageUrl ?? data.image_url) ?? null,
+      expirationDate: data.expirationDate ?? null,
+      categoryId: data.categoryId,
+      categoryName: data.categoryName,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+      active: data.active,
+      defaultUnitId: data.defaultUnitId ?? null,
+      productUnits: Array.isArray(data.productUnits) ? data.productUnits.map(mapUnit) : [],
+      barcodes: data.barcodes ?? null,
+    }
+    return prod
+  }
+
   static async createProduct(body: CreateProductRequest): Promise<Product> {
     const res = await fetch(`${API_BASE_URL}/products`, {
       method: 'POST',
@@ -293,6 +337,7 @@ export class ProductService {
     form.append('photo', imageFile, imageFile.name)
     // Provide flat fields for simple parsers
     form.append('name', fields.name)
+    if (fields.code) form.append('code', fields.code)
     form.append('description', fields.description ?? '')
     if (fields.expirationDate) form.append('expirationDate', fields.expirationDate)
     form.append('categoryId', String(fields.categoryId))
@@ -527,6 +572,60 @@ export class ProductService {
   }
 
   // PRICE APIs
+  // Global price headers
+  static async listPriceHeaders(): Promise<Array<{ id: number; name: string; description?: string; timeStart?: string; timeEnd?: string; active?: boolean; createdAt?: string }>> {
+    const res = await fetch(`${API_BASE_URL}/products/price-headers`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to fetch price headers: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => [])
+    return (Array.isArray(result?.data) ? result.data : result) || []
+  }
+
+  static async createGlobalPriceHeader(payload: { name: string; description?: string; timeStart?: string | null; timeEnd?: string | null; active?: boolean }): Promise<{ id: number; name: string }> {
+    // Remove null/undefined fields
+    const clean: Record<string, any> = { name: payload.name }
+    if (payload.description) clean.description = payload.description
+    if (payload.timeStart) clean.timeStart = payload.timeStart
+    if (payload.timeEnd) clean.timeEnd = payload.timeEnd
+    if (payload.active !== undefined) clean.active = payload.active
+
+    const res = await fetch(`${API_BASE_URL}/products/price-headers`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(clean),
+    })
+    if (!res.ok) throw new Error(`Failed to create price header: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    return result.data ?? result
+  }
+
+  static async bulkAddPricesToHeader(priceHeaderId: number, items: Array<{ productUnitId: number; price: number; productCode?: string }>): Promise<any[]> {
+    const url = `${API_BASE_URL}/products/price-headers/${priceHeaderId}/prices/bulk`
+
+    // Attempt 1: array body with { productUnitId, price } (as in your Postman)
+    let res = await fetch(url, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(items.map(it => ({ productUnitId: it.productUnitId, price: it.price }))),
+    })
+    if (res.ok) {
+      const result = await res.json().catch(() => ([]))
+      return result.data ?? result
+    }
+
+    // Attempt 2: wrapped payload with items [{ productCode, unitId, price }] for other BE versions
+    const wrapped = { items: items.map(it => ({ productCode: it.productCode, unitId: it.productUnitId, price: it.price })) }
+    res = await fetch(url, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(wrapped),
+    })
+    if (!res.ok) throw new Error(`Failed to bulk add prices: ${res.status} ${res.statusText}`)
+    const result2 = await res.json().catch(() => ([]))
+    return result2.data ?? result2
+  }
   static async getProductPrices(productId: number): Promise<Array<{ id: number; unitId: number; unitName?: string; price: number; isDefault?: boolean; validFrom?: string; validTo?: string }>> {
     const res = await fetch(`${API_BASE_URL}/products/${productId}/prices`, {
       method: 'GET',
@@ -549,15 +648,15 @@ export class ProductService {
     return arr
   }
 
-  static async addProductPrice(productId: number, payload: { unitId: number; price: number; validFrom: string; validTo?: string }): Promise<any> {
+  static async addProductPrice(productId: number, payload: { unitId: number; price: number; validFrom?: string; validTo?: string }): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/products/${productId}/prices`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({
         productUnitId: payload.unitId,
         price: payload.price,
-        timeStart: payload.validFrom,
-        timeEnd: payload.validTo,
+        ...(payload.validFrom ? { timeStart: payload.validFrom } : {}),
+        ...(payload.validTo ? { timeEnd: payload.validTo } : {}),
       }),
     })
     if (!res.ok) throw new Error(`Failed to add price: ${res.status} ${res.statusText}`)

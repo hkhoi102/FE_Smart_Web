@@ -15,6 +15,9 @@ import MyOrders from '@/pages/MyOrders'
 import Login from '@/pages/Login'
 import UserLogin from '@/pages/UserLogin'
 import Admin from '@/pages/Admin'
+import PriceHeaderDetail from '@/pages/PriceHeaderDetail'
+import InventoryCheckCreate from '@/pages/InventoryCheckCreate'
+import InventoryImportExportDetail from '@/components/InventoryImportExportDetail'
 
 function App() {
   return (
@@ -44,6 +47,30 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Admin />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/prices/:headerId"
+                element={
+                  <ProtectedRoute>
+                    <Admin />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/inventory-check/create"
+                element={
+                  <ProtectedRoute>
+                    <InventoryCheckCreate />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/import-export/:id"
+                element={
+                  <ProtectedRoute>
+                    <InventoryImportExportDetail />
                   </ProtectedRoute>
                 }
               />

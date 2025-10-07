@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import Modal from './Modal'
 import { PromotionServiceApi, PromotionMutations } from '@/services/promotionService'
+import { ProductService } from '@/services/productService'
 
 const PromotionHeaderManagement: React.FC = () => {
   const [headers, setHeaders] = useState<any[]>([])
@@ -177,6 +178,71 @@ const PromotionHeaderManagement: React.FC = () => {
     const matchEnd = filterEnd ? new Date(h.end_date) <= new Date(filterEnd) : true
     return matchText && matchStatus && matchStart && matchEnd
   })
+
+  // Expand lines under a header row
+  const [expandedHeaderId, setExpandedHeaderId] = useState<number | null>(null)
+  const [expandedLinesByHeader, setExpandedLinesByHeader] = useState<Record<number, any[]>>({})
+  const [productNameCache, setProductNameCache] = useState<Record<number, string>>({})
+  const [categoryNameCache, setCategoryNameCache] = useState<Record<number, string>>({})
+  const [lineEditOpen, setLineEditOpen] = useState(false)
+  const [lineEditing, setLineEditing] = useState<any | null>(null)
+  const [lineDetails, setLineDetails] = useState<any[]>([])
+  const openLineEditor = async (line: any) => {
+    setLineEditing(line)
+    try {
+      const ds = await PromotionServiceApi.getDetailsAll(line.id)
+      setLineDetails(Array.isArray(ds) ? ds : [])
+    } catch { setLineDetails([]) }
+    setLineEditOpen(true)
+  }
+  const toggleExpandHeader = async (headerId: number) => {
+    if (expandedHeaderId === headerId) {
+      setExpandedHeaderId(null)
+      return
+    }
+    setExpandedHeaderId(headerId)
+    if (!expandedLinesByHeader[headerId]) {
+      try {
+        const lines = await PromotionServiceApi.getLinesAll(headerId)
+        const mapped = lines.map((l: any) => ({
+          id: l.id,
+          targetType: l.targetType,
+          targetId: l.targetId,
+          type: l.type || l.promotionType,
+          startDate: l.startDate,
+          endDate: l.endDate,
+          active: l.active,
+        }))
+        setExpandedLinesByHeader(prev => ({ ...prev, [headerId]: mapped }))
+        // Load target names for better display
+        // Categories: load once if needed
+        const needsCategory = mapped.some(m => String(m.targetType).toUpperCase() === 'CATEGORY')
+        if (needsCategory && Object.keys(categoryNameCache).length === 0) {
+          try {
+            const cats = await ProductService.getCategories()
+            const rec: Record<number, string> = {}
+            ;(cats || []).forEach((c: any) => { rec[c.id] = c.name })
+            setCategoryNameCache(rec)
+          } catch {}
+        }
+        // Products: targetId is productUnitId → resolve via getProductUnitById
+        const unitIds = mapped.filter(m => String(m.targetType).toUpperCase() === 'PRODUCT').map(m => m.targetId)
+        for (const unitId of unitIds) {
+          if (!productNameCache[unitId]) {
+            try {
+              const info = await ProductService.getProductUnitById(unitId)
+              const title = info?.productName ? `${info.productName}` : `#${unitId}`
+              setProductNameCache(prev => ({ ...prev, [unitId]: title }))
+            } catch {
+              setProductNameCache(prev => ({ ...prev, [unitId]: `#${unitId}` }))
+            }
+          }
+        }
+      } catch {
+        setExpandedLinesByHeader(prev => ({ ...prev, [headerId]: [] }))
+      }
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -357,7 +423,8 @@ const PromotionHeaderManagement: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredHeaders.map((header) => (
-                  <tr key={header.id} className="hover:bg-gray-50">
+                  <>
+                  <tr key={header.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => toggleExpandHeader(header.id)}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {header.id}
                     </td>
@@ -398,15 +465,69 @@ const PromotionHeaderManagement: React.FC = () => {
                         >
                           {header.active === 1 ? 'Tạm dừng' : 'Kích hoạt'}
                         </button>
-                        <button
+                        {/* <button
                           onClick={() => handleDelete(header.id)}
                           className="text-red-600 hover:text-red-900"
                         >
                           Xóa
-                        </button>
+                        </button> */}
                       </div>
                     </td>
                   </tr>
+                  {expandedHeaderId === header.id && (
+                    <tr>
+                      <td className="px-6 py-4 bg-gray-50" colSpan={7}>
+
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loại</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Áp dụng cho</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mục tiêu</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bắt đầu</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kết thúc</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {(expandedLinesByHeader[header.id] || []).map((l: any) => (
+                                <tr key={l.id} className="hover:bg-gray-50">
+                                  <td className="px-3 py-2 text-sm text-gray-700">{l.id}</td>
+                                  <td className="px-3 py-2 text-sm text-gray-700">{viType(l.type)}</td>
+                                  <td className="px-3 py-2 text-sm text-gray-700">{viTarget(l.targetType)}</td>
+                                  <td className="px-3 py-2 text-sm text-gray-700">
+                                    {String(l.targetType).toUpperCase() === 'PRODUCT'
+                                      ? (productNameCache[l.targetId] || `#${l.targetId}`)
+                                      : String(l.targetType).toUpperCase() === 'CATEGORY'
+                                        ? (categoryNameCache[l.targetId] || `#${l.targetId}`)
+                                        : `Khách hàng #${l.targetId}`}
+                                  </td>
+                                  <td className="px-3 py-2 text-sm text-gray-700">{l.startDate ? formatDate(l.startDate) : '-'}</td>
+                                  <td className="px-3 py-2 text-sm text-gray-700">{l.endDate ? formatDate(l.endDate) : '-'}</td>
+                                  <td className="px-3 py-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${l.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        {l.active ? 'Kích hoạt' : 'Tạm dừng'}
+                                      </span>
+                                      <button className="text-xs text-blue-600 hover:text-blue-800" onClick={() => openLineEditor(l)}>Sửa</button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                              {(expandedLinesByHeader[header.id] || []).length === 0 && (
+                                <tr>
+                                  <td className="px-3 py-2 text-sm text-gray-500" colSpan={7}>Chưa có dòng khuyến mãi</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </>
                 ))}
               </tbody>
             </table>
@@ -631,6 +752,15 @@ const PromotionHeaderManagement: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {lineEditOpen && lineEditing && (
+        <LineDetailEditor
+          line={lineEditing}
+          details={lineDetails}
+          onChange={(arr) => setLineDetails(arr)}
+          onClose={() => setLineEditOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -643,7 +773,8 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
   const [saving, setSaving] = useState(false)
   const [hdr, setHdr] = useState<any>({ id: header.id, name: header.name, startDate: header.start_date, endDate: header.end_date, active: header.active === 1 })
   const [lines, setLines] = useState<any[]>([])
-  const [detailsByLine, setDetailsByLine] = useState<Record<number, any[]>>({})
+  const [productOptions, setProductOptions] = useState<Array<{ id: number; name: string }>>([])
+  const [categoryOptions, setCategoryOptions] = useState<Array<{ id: number; name: string }>>([])
 
   React.useEffect(() => {
     let cancelled = false
@@ -652,35 +783,31 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
         const lns = await PromotionServiceApi.getLinesAll(header.id)
         if (cancelled) return
         setLines(lns)
-        const ents = await Promise.all(lns.map(async (ln: any) => {
-          try { const ds = await PromotionServiceApi.getDetailsAll(ln.id); return [ln.id, ds] as [number, any[]] } catch { return [ln.id, []] as [number, any[]] }
-        }))
-        const rec: Record<number, any[]> = {}
-        ents.forEach(([k, v]) => rec[k] = v)
-        if (!cancelled) {
-          setDetailsByLine(rec)
-          // Prefill line fields from first detail (nếu có)
-          const merged = lns.map((ln: any) => {
-            const d0 = (rec[ln.id] || [])[0]
-            if (!d0) return ln
-            return {
-              ...ln,
-              discountPercent: d0.discountPercent ?? d0.discount_percent ?? ln.discountPercent,
-              discountAmount: d0.discountAmount ?? d0.discount_amount ?? ln.discountAmount,
-              minAmount: d0.minAmount ?? d0.min_amount ?? ln.minAmount,
-              maxDiscount: d0.maxDiscount ?? d0.max_discount ?? ln.maxDiscount,
-              conditionQuantity: d0.conditionQuantity ?? d0.condition_quantity ?? ln.conditionQuantity,
-              freeQuantity: d0.freeQuantity ?? d0.free_quantity ?? ln.freeQuantity,
-            }
-          })
-          setLines(merged)
-        }
+        if (!cancelled) setLines(lns)
       } finally { if (!cancelled) setLoading(false) }
     })()
     return () => { cancelled = true }
   }, [header?.id])
 
+  // Load selectable targets (products/categories)
+  React.useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const prods = await ProductService.getProducts(1, 1000)
+        if (!cancelled) setProductOptions(prods.products.map((p: any) => ({ id: p.id, name: p.name })))
+      } catch { if (!cancelled) setProductOptions([]) }
+      try {
+        const cats = await ProductService.getCategories()
+        if (!cancelled) setCategoryOptions(cats.map((c: any) => ({ id: c.id, name: c.name })))
+      } catch { if (!cancelled) setCategoryOptions([]) }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   const addLine = () => setLines(prev => [...prev, { id: 0, promotionHeaderId: header.id, targetType: 'PRODUCT', targetId: 0, type: 'DISCOUNT_PERCENT', active: true }])
+
+  // Detail editing removed in large modal
 
   const saveAll = async () => {
     setSaving(true)
@@ -694,32 +821,7 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
           const created = await PromotionMutations.createLine(header.id, { targetType: ln.targetType, targetId: Number(ln.targetId), startDate: ln.startDate, endDate: ln.endDate, active: !!ln.active, type: ln.type })
           ln.id = created.id
         }
-        // Upsert first detail: nếu có id → update; nếu chưa có → create
-        const arr = detailsByLine[ln.id] || []
-        const d0 = arr[0]
-        if (d0 && d0.id) {
-          await PromotionServiceApi.updateDetail(d0.id, {
-            promotionLineId: ln.id,
-            discountPercent: ln.discountPercent,
-            discountAmount: ln.discountAmount,
-            minAmount: ln.minAmount,
-            maxDiscount: ln.maxDiscount,
-            conditionQuantity: ln.conditionQuantity,
-            freeQuantity: ln.freeQuantity,
-            active: true,
-          } as any)
-        } else {
-          await PromotionServiceApi.createDetail({
-            promotionLineId: ln.id,
-            discountPercent: ln.discountPercent,
-            discountAmount: ln.discountAmount,
-            minAmount: ln.minAmount,
-            maxDiscount: ln.maxDiscount,
-            conditionQuantity: ln.conditionQuantity,
-            freeQuantity: ln.freeQuantity,
-            active: true,
-          })
-        }
+        // Details are managed in line-level editor, skip here
       }
       onClose(true)
     } catch { onClose(false) } finally { setSaving(false) }
@@ -729,7 +831,7 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] p-6 max-h-[100vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Sửa khuyến mãi (Header + Dòng + Chi tiết)</h3>
+          <h3 className="text-lg font-semibold">Sửa khuyến mãi</h3>
           <button onClick={() => onClose(false)} className="text-gray-500 hover:text-gray-700">✖</button>
         </div>
         {loading ? (
@@ -756,9 +858,40 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
                       <select className="px-2 py-2 border rounded" value={ln.targetType} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetType:e.target.value}:l))}>
                         <option value="PRODUCT">Sản phẩm</option>
                         <option value="CATEGORY">Danh mục</option>
-                        <option value="CUSTOMER">Khách hàng</option>
+
                       </select>
-                      <input className="px-2 py-2 border rounded" type="number" value={ln.targetId || 0} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:Number(e.target.value)}:l))} />
+                      {ln.targetType === 'PRODUCT' && (
+                        <div className="relative">
+                          <input
+                            className="px-2 py-2 border rounded w-full"
+                            placeholder="Tìm sản phẩm..."
+                            value={ln.targetNameQuery || ''}
+                            onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetNameQuery:e.target.value, showSuggest:true}:l))}
+                          />
+                          {((ln.targetNameQuery || '').trim().length > 0) && ln.showSuggest && (
+                            <div className="absolute z-10 bg-white border rounded shadow w-full mt-1 max-h-48 overflow-auto">
+                              {productOptions.filter(p=>p.name.toLowerCase().includes(String(ln.targetNameQuery).toLowerCase())).slice(0,8).map(p=> (
+                                <div key={p.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:p.id, targetNameQuery:p.name, showSuggest:false}:l))}>{p.name}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {ln.targetType === 'CATEGORY' && (
+                        <div className="relative">
+                          <input className="px-2 py-2 border rounded w-full" placeholder="Tìm danh mục..." value={ln.targetNameQuery || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetNameQuery:e.target.value, showSuggest:true}:l))} />
+                          {((ln.targetNameQuery || '').trim().length > 0) && ln.showSuggest && (
+                            <div className="absolute z-10 bg-white border rounded shadow w-full mt-1 max-h-48 overflow-auto">
+                              {categoryOptions.filter(c=>c.name.toLowerCase().includes(String(ln.targetNameQuery).toLowerCase())).slice(0,8).map(c=> (
+                                <div key={c.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:c.id, targetNameQuery:c.name, showSuggest:false}:l))}>{c.name}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {ln.targetType === 'CUSTOMER' && (
+                        <input className="px-2 py-2 border rounded" type="number" value={ln.targetId || 0} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:Number(e.target.value)}:l))} />
+                      )}
                       <select className="px-2 py-2 border rounded" value={ln.type || 'DISCOUNT_PERCENT'} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value}:l))}>
                         <option value="DISCOUNT_PERCENT">Giảm theo %</option>
                         <option value="DISCOUNT_AMOUNT">Giảm tiền</option>
@@ -769,14 +902,7 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
                         <input type="date" className="px-2 py-2 border rounded" value={ln.endDate || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, endDate:e.target.value}:l))} />
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-6 gap-2 mt-3">
-                      <input placeholder="% giảm" className="px-2 py-2 border rounded" value={ln.discountPercent || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, discountPercent:e.target.value}:l))} />
-                      <input placeholder="Giảm tiền" className="px-2 py-2 border rounded" value={ln.discountAmount || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, discountAmount:e.target.value}:l))} />
-                      <input placeholder="Tối thiểu" className="px-2 py-2 border rounded" value={ln.minAmount || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, minAmount:e.target.value}:l))} />
-                      <input placeholder="Giảm tối đa" className="px-2 py-2 border rounded" value={ln.maxDiscount || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, maxDiscount:e.target.value}:l))} />
-                      <input placeholder="SL X" className="px-2 py-2 border rounded" value={ln.conditionQuantity || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, conditionQuantity:e.target.value}:l))} />
-                      <input placeholder="SL Y" className="px-2 py-2 border rounded" value={ln.freeQuantity || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, freeQuantity:e.target.value}:l))} />
-                    </div>
+                    {/* Detail editing removed in this modal */}
                     <div className="mt-2 flex items-center gap-3">
                       <span className="text-xs text-gray-600">Trạng thái:</span>
                       <button
@@ -810,6 +936,202 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Modal: Edit details for a single line
+const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: any[]) => void; onClose: () => void }> = ({ line, details, onChange, onClose }) => {
+  const [saving, setSaving] = useState(false)
+  const [giftNameByUnitId, setGiftNameByUnitId] = useState<Record<number, string>>({})
+  const [giftUnitOptions, setGiftUnitOptions] = useState<Array<{ id: number; label: string }>>([])
+
+  const viType = (t?: string) => {
+    switch (String(t || '').toUpperCase()) {
+      case 'DISCOUNT_PERCENT': return 'Giảm theo %'
+      case 'DISCOUNT_AMOUNT': return 'Giảm tiền'
+      case 'BUY_X_GET_Y': return 'Mua X tặng Y'
+      default: return t || '-'
+    }
+  }
+  const viTarget = (t?: string) => {
+    switch (String(t || '').toUpperCase()) {
+      case 'PRODUCT': return 'Sản phẩm'
+      case 'CATEGORY': return 'Danh mục'
+      case 'CUSTOMER': return 'Khách hàng'
+      default: return t || '-'
+    }
+  }
+
+  const addDetail = () => onChange([...(details || []), { id: 0, promotionLineId: line.id, discountPercent: '', discountAmount: '', minAmount: '', maxDiscount: '', conditionQuantity: '', freeQuantity: '', giftProductUnitId: '', active: true }])
+  const removeDetail = (idx: number) => onChange(details.filter((_, i) => i !== idx))
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      for (const d of details) {
+        const t = String(line?.type || '').toUpperCase()
+        const body: any = { promotionLineId: line.id, active: d.active !== false }
+        if (t === 'DISCOUNT_PERCENT') {
+          body.discountPercent = d.discountPercent ? Number(d.discountPercent) : undefined
+          body.minAmount = d.minAmount ? Number(d.minAmount) : undefined
+          body.maxDiscount = d.maxDiscount ? Number(d.maxDiscount) : undefined
+        } else if (t === 'DISCOUNT_AMOUNT') {
+          body.discountAmount = d.discountAmount ? Number(d.discountAmount) : undefined
+          body.minAmount = d.minAmount ? Number(d.minAmount) : undefined
+          body.maxDiscount = d.maxDiscount ? Number(d.maxDiscount) : undefined
+        } else if (t === 'BUY_X_GET_Y') {
+          body.conditionQuantity = d.conditionQuantity ? Number(d.conditionQuantity) : undefined
+          body.freeQuantity = d.freeQuantity ? Number(d.freeQuantity) : undefined
+          body.giftProductUnitId = d.giftProductUnitId ? Number(d.giftProductUnitId) : undefined
+        }
+        if (d.id && d.id !== 0) await PromotionServiceApi.updateDetail(d.id, body)
+        else await PromotionServiceApi.createDetail(body)
+      }
+      onClose()
+    } finally { setSaving(false) }
+  }
+
+  const resolveGiftName = async (unitId?: number | string) => {
+    const idNum = Number(unitId)
+    if (!idNum || isNaN(idNum)) return
+    if (giftNameByUnitId[idNum]) return
+    try {
+      const info = await ProductService.getProductUnitById(idNum)
+      const name = info?.productName || ''
+      setGiftNameByUnitId(prev => ({ ...prev, [idNum]: name }))
+    } catch {}
+  }
+
+  // Load selectable gift product units
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const list = await ProductService.getProducts(1, 1000)
+        if (cancelled) return
+        const opts: Array<{ id: number; label: string }> = []
+        ;(list?.products || []).forEach((p: any) => {
+          (p.productUnits || []).forEach((u: any) => {
+            const label = `${p.name}${u.unitName ? ' • ' + u.unitName : ''}`
+            if (u.id) opts.push({ id: Number(u.id), label })
+          })
+        })
+        setGiftUnitOptions(opts)
+      } catch {
+        setGiftUnitOptions([])
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Resolve names for existing details (when modal opens)
+  useEffect(() => {
+    ;(async () => {
+      for (const d of details) {
+        if (d && d.giftProductUnitId) {
+          await resolveGiftName(d.giftProductUnitId)
+        }
+      }
+    })()
+  }, [details])
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl p-8 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-semibold text-gray-900">Sửa chi tiết khuyến mãi</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✖</button>
+        </div>
+        <div className="flex items-center justify-between mb-6">
+          <div className="text-lg text-gray-800 font-medium">{viType(line?.type)} • {viTarget(line?.targetType)} #{line?.targetId}</div>
+          <button className="px-4 py-2 text-xs rounded-md text-white bg-green-600 hover:bg-green-700" onClick={addDetail}>+ Thêm chi tiết</button>
+        </div>
+        <div className="space-y-4">
+          {(details || []).map((d, idx) => {
+            const t = String(line?.type || '').toUpperCase()
+            return (
+              <div key={idx} className="grid grid-cols-12 gap-3 items-end">
+                {t === 'DISCOUNT_PERCENT' && (
+                  <div className="col-span-12 md:col-span-3">
+                    <div className="text-sm text-gray-700 mb-1">% giảm</div>
+                    <input placeholder="% giảm" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.discountPercent || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, discountPercent:e.target.value}:x))} />
+                  </div>
+                )}
+                {t === 'DISCOUNT_AMOUNT' && (
+                  <div className="col-span-12 md:col-span-4">
+                    <div className="text-sm text-gray-700 mb-1">Giảm tiền</div>
+                    <input placeholder="Giảm tiền" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.discountAmount || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, discountAmount:e.target.value}:x))} />
+                  </div>
+                )}
+                {(t === 'DISCOUNT_PERCENT' || t === 'DISCOUNT_AMOUNT') && (
+                  <>
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="text-sm text-gray-700 mb-1">Đơn tối thiểu</div>
+                      <input placeholder="Nhập giá trị tối thiểu" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.minAmount || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, minAmount:e.target.value}:x))} />
+                    </div>
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="text-sm text-gray-700 mb-1">Giảm tối đa</div>
+                      <input placeholder="Nhập mức giảm tối đa" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.maxDiscount || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, maxDiscount:e.target.value}:x))} />
+                    </div>
+                  </>
+                )}
+                {t === 'BUY_X_GET_Y' && (
+                  <>
+                    <div className="col-span-12 md:col-span-3">
+                      <div className="text-sm text-gray-700 mb-1">Số lượng mua (X)</div>
+                      <input placeholder="SL X" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.conditionQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, conditionQuantity:e.target.value}:x))} />
+                    </div>
+                    <div className="col-span-12 md:col-span-3">
+                      <div className="text-sm text-gray-700 mb-1">Số lượng tặng (Y)</div>
+                      <input placeholder="SL Y" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.freeQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, freeQuantity:e.target.value}:x))} />
+                    </div>
+                    <div className="col-span-12 md:col-span-4 relative">
+                      <div className="text-sm text-gray-700 mb-1">Đơn vị quà tặng</div>
+                      <input
+                        placeholder="Nhập tên sản phẩm để tìm..."
+                        className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={(d.giftQuery ?? (giftNameByUnitId[Number(d.giftProductUnitId)] || ''))}
+                        onChange={(e)=>{
+                          const q = e.target.value
+                          onChange(details.map((x,i)=> i===idx?{...x, giftQuery:q, showSuggest:true}:x))
+                        }}
+                      />
+                      {((d.giftQuery || '').trim().length > 0) && d.showSuggest && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
+                          {giftUnitOptions.filter(o => o.label.toLowerCase().includes(String(d.giftQuery).toLowerCase())).slice(0,8).map(opt => (
+                            <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={async ()=>{
+                              onChange(details.map((x,i)=> i===idx?{...x, giftProductUnitId: opt.id, giftQuery: opt.label, showSuggest:false}:x))
+                              await resolveGiftName(opt.id)
+                            }}>{opt.label}</div>
+                          ))}
+                        </div>
+                      )}
+                      {/* no extra name display below */}
+                    </div>
+                    <div className="col-span-12 md:col-span-2 flex items-end">
+                      <button className="ml-auto px-3 py-2 text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
+                    </div>
+                  </>
+                )}
+                {t !== 'BUY_X_GET_Y' && t !== 'DISCOUNT_PERCENT' && t !== 'DISCOUNT_AMOUNT' && (
+                  <div className="text-xs text-gray-500">Loại khuyến mãi chưa xác định.</div>
+                )}
+                {t !== 'BUY_X_GET_Y' && (
+                  <div className="col-span-12 md:col-span-1">
+                    <button className="text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {(details || []).length === 0 && (<div className="text-sm text-gray-500">Chưa có chi tiết</div>)}
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <button className="px-4 py-2 rounded-md border" onClick={onClose}>Hủy</button>
+          <button disabled={saving} className="px-5 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50" onClick={save}>Lưu</button>
+        </div>
       </div>
     </div>
   )

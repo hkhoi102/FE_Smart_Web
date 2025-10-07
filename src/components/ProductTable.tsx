@@ -16,9 +16,7 @@ const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: 
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN')
-  }
+  // HSD đã bỏ khỏi bảng, giữ lại nếu tái sử dụng ở nơi khác
 
   const getCategoryName = (product: Product) => {
     if (product.categoryName) return product.categoryName
@@ -59,10 +57,8 @@ const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: 
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Giá
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              HSD
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+
+            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
               Thao tác
             </th>
           </tr>
@@ -103,11 +99,9 @@ const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {formatPrice(unit?.currentPrice)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {product.expirationDate ? formatDate(product.expirationDate) : 'Không có'}
-                </td>
+
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex flex-wrap gap-2 justify-end">
+                  <div className="flex flex-wrap gap-2 justify-center">
                     {onViewDetail && (
                       <button
                         onClick={() => onViewDetail(product)}

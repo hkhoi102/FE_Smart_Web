@@ -101,7 +101,7 @@ const OrderStatusTracker: React.FC<OrderStatusTrackerProps> = ({
                 >
                   {isCompleted ? step.icon : step.id}
                 </div>
-                
+
                 {/* Step Title */}
                 <div className="mt-2 text-center">
                   <p
@@ -113,7 +113,7 @@ const OrderStatusTracker: React.FC<OrderStatusTrackerProps> = ({
                   >
                     {step.title}
                   </p>
-                  
+
                   {/* Timestamp */}
                   {isCompleted && (
                     <p className="text-xs text-gray-500 mt-1">

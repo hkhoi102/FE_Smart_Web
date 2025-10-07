@@ -23,8 +23,6 @@ const Checkout: React.FC = () => {
 
   const [paymentMethod, setPaymentMethod] = useState('cod')
   const [orderNotes, setOrderNotes] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | undefined>(undefined)
 
   // Auto-fill user information when user is authenticated
   useEffect(() => {
@@ -64,9 +62,6 @@ const Checkout: React.FC = () => {
     e.preventDefault()
     if (!isAuthenticated) return
 
-    setSubmitting(true)
-    setSubmitError(undefined)
-
     try {
       const orderDetails = cartState.items.map((item) => ({
         productUnitId: item.unitId || (item as any).id,
@@ -96,9 +91,7 @@ const Checkout: React.FC = () => {
       }
     } catch (err: any) {
       console.error('❌ Create order failed:', err)
-      setSubmitError(err?.message || 'Tạo đơn hàng thất bại')
-    } finally {
-      setSubmitting(false)
+      alert('Tạo đơn hàng thất bại: ' + (err?.message || 'Lỗi không xác định'))
     }
   }
 
