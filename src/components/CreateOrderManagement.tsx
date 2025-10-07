@@ -54,15 +54,24 @@ const CreateOrderManagement: React.FC = () => {
   const [orderPreview, setOrderPreview] = useState<any>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [currentOrder, setCurrentOrder] = useState<any>(null)
-  const [orderStatus, setOrderStatus] = useState<'PENDING' | 'DELIVERING' | 'COMPLETED' | null>(null)
+  const [orderStatus, setOrderStatus] = useState<'PENDING' | 'CONFIRMED' | 'DELIVERING' | 'COMPLETED' | null>(null)
   const [paymentInfo, setPaymentInfo] = useState<any>(null)
   const [paymentPolling, setPaymentPolling] = useState<any>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showCompleteConfirmModal, setShowCompleteConfirmModal] = useState(false)
+  const [orderSummaryForConfirm, setOrderSummaryForConfirm] = useState<any>(null)
+  const [pendingCompleteOrderId, setPendingCompleteOrderId] = useState<number | null>(null)
+  const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false)
 
   // Form states for adding products
   const [selectedProduct, setSelectedProduct] = useState<number | ''>('')
   const [quantity, setQuantity] = useState(1)
   const [showAddProduct, setShowAddProduct] = useState(false)
+  const [showCameraScanner, setShowCameraScanner] = useState(false)
+  const videoRef = React.useRef<HTMLVideoElement | null>(null)
+  const streamRef = React.useRef<MediaStream | null>(null)
+  const scanLoopRef = React.useRef<number | null>(null)
+  const zxingReaderRef = React.useRef<any>(null)
 
   // POS specific states
   const [barcodeInput, setBarcodeInput] = useState('')
@@ -346,6 +355,112 @@ const CreateOrderManagement: React.FC = () => {
     handleAddProduct()
   }
 
+  // Camera barcode scanning using native BarcodeDetector (Chromium-based browsers)
+  const startCameraScanner = async () => {
+    try {
+      setError(null)
+      setShowCameraScanner(true)
+      // Request back camera
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      }
+
+      // Prefer native BarcodeDetector when available
+      const isSupported = (window as any).BarcodeDetector && typeof (window as any).BarcodeDetector === 'function'
+      if (!isSupported) {
+        // Fallback to ZXing if not supported
+        await startZxingFallback()
+        return
+      }
+
+      const detector = isSupported ? new (window as any).BarcodeDetector({ formats: ['ean_13', 'code_128', 'ean_8', 'qr_code'] }) : null
+      const startTime = Date.now()
+      const scanFrame = async () => {
+        try {
+          if (!videoRef.current || videoRef.current.readyState !== 4 || !detector) {
+            scanLoopRef.current = requestAnimationFrame(scanFrame)
+            return
+          }
+          const barcodes = await detector.detect(videoRef.current)
+          if (barcodes && barcodes.length > 0) {
+            const value = barcodes[0].rawValue || barcodes[0].rawValue
+            await stopCameraScanner()
+            await handleBarcodeScan(String(value))
+            return
+          }
+          // If no result after 3 seconds, fallback to ZXing (more robust on many devices)
+          if (Date.now() - startTime > 3000) {
+            await startZxingFallback()
+            return
+          }
+        } catch (e) {
+          // continue scanning silently
+        }
+        scanLoopRef.current = requestAnimationFrame(scanFrame)
+      }
+      scanLoopRef.current = requestAnimationFrame(scanFrame)
+    } catch (e: any) {
+      setError('Không thể mở camera: ' + (e?.message || ''))
+      await stopCameraScanner()
+    }
+  }
+
+  const startZxingFallback = async () => {
+    try {
+      // Dynamically load ZXing UMD bundle
+      const ensure = () => new Promise<void>((resolve, reject) => {
+        if ((window as any).ZXing && (window as any).ZXing.BrowserMultiFormatReader) return resolve()
+        const s = document.createElement('script')
+        s.src = 'https://unpkg.com/@zxing/library@latest'
+        s.async = true
+        s.onload = () => resolve()
+        s.onerror = () => reject(new Error('Cannot load ZXing'))
+        document.head.appendChild(s)
+      })
+      await ensure()
+      const ZX = (window as any).ZXing
+      if (!ZX || !ZX.BrowserMultiFormatReader) throw new Error('ZXing not available')
+      const reader = new ZX.BrowserMultiFormatReader()
+      zxingReaderRef.current = reader
+      if (!videoRef.current) return
+      // Use default device (back camera chosen by facingMode in getUserMedia)
+      await reader.decodeFromVideoDevice(null, videoRef.current, async (result: any) => {
+        if (result && result.getText) {
+          const text = result.getText()
+          await stopCameraScanner()
+          await handleBarcodeScan(String(text))
+        }
+        // keep scanning on errors
+      })
+    } catch (e) {
+      setError('Trình duyệt không hỗ trợ quét mã tự động. Vui lòng nhập mã hoặc dùng thiết bị khác.')
+    }
+  }
+
+  const stopCameraScanner = async () => {
+    try {
+      if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current)
+      scanLoopRef.current = null
+      if (zxingReaderRef.current) {
+        try { zxingReaderRef.current.reset() } catch (_) {}
+        zxingReaderRef.current = null
+      }
+      if (videoRef.current) {
+        videoRef.current.pause()
+        videoRef.current.srcObject = null
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+    } finally {
+      setShowCameraScanner(false)
+    }
+  }
+
   // Kiểm tra và refresh token nếu cần
   const checkAndRefreshToken = async () => {
     const token = localStorage.getItem('access_token')
@@ -457,6 +572,7 @@ const CreateOrderManagement: React.FC = () => {
     setOrderStatus(null)
     setPaymentInfo(null)
     setShowPaymentModal(false)
+    setShowPaymentSuccessModal(false)
 
     // Clear payment polling
     if (paymentPolling) {
@@ -465,41 +581,86 @@ const CreateOrderManagement: React.FC = () => {
     }
   }
 
-  // Xử lý thanh toán tiền mặt - tự động workflow
-  const handleCashPaymentWorkflow = async (orderId: number) => {
+  // Xử lý workflow sau tạo đơn (dùng cho COD và sau khi chuyển khoản đã xác nhận)
+  // markPaid=true: sau khi hoàn tất sẽ gọi API cập nhật payment-status = PAID (dành cho COD)
+  const handleCashPaymentWorkflow = async (orderId: number, markPaid: boolean = false) => {
     setTimeout(async () => {
       try {
         console.log('🚀 Starting cash payment workflow...')
 
-        // Chuyển sang DELIVERING (xuất kho)
-        console.log('📦 Step 1: Updating to DELIVERING...')
-        const deliveringResult = await updateOrderStatusAPI(orderId, 'DELIVERING')
-        setOrderStatus('DELIVERING')
-        setCurrentOrder(deliveringResult.data || deliveringResult)
-        setSuccess('Đã xuất kho! Đơn hàng đang được giao.')
+        // Bước 1: PENDING → CONFIRMED
+        console.log('📋 Step 1: Updating to CONFIRMED...')
+        const confirmedResult = await updateOrderStatusAPI(orderId, 'CONFIRMED')
+        setOrderStatus('CONFIRMED')
+        setCurrentOrder(confirmedResult.data || confirmedResult)
+        setSuccess('Đã xác nhận đơn hàng!')
 
-        // Sau 1 giây, chuyển sang COMPLETED
+        // Bước 2: CONFIRMED → DELIVERING (xuất kho)
         setTimeout(async () => {
           try {
-            console.log('✅ Step 2: Updating to COMPLETED...')
-            const completedResult = await updateOrderStatusAPI(orderId, 'COMPLETED')
-            setOrderStatus('COMPLETED')
-            setCurrentOrder(completedResult.data || completedResult)
-            setSuccess('Đơn hàng đã hoàn thành! Giao dịch thành công.')
-            console.log('🎉 Cash payment workflow completed successfully!')
+            console.log('📦 Step 2: Updating to DELIVERING...')
+            const deliveringResult = await updateOrderStatusAPI(orderId, 'DELIVERING')
+            setOrderStatus('DELIVERING')
+            setCurrentOrder(deliveringResult.data || deliveringResult)
+            setSuccess('Đã xuất kho! Đơn hàng đang được giao.')
 
-            // Reset form sau khi hoàn thành
-            setTimeout(() => {
-              handleClearCart()
-            }, 2000)
+            // Bước 3: DELIVERING → COMPLETED
+            setTimeout(async () => {
+              try {
+            // Trước khi chuyển COMPLETED hiển thị xác nhận hóa đơn
+            try {
+              const detail = await OrderApi.getById(orderId).catch(() => null)
+              let summary: any = detail?.data || detail || null
+              if (summary?.orderDetails && Array.isArray(summary.orderDetails)) {
+                const enriched = await Promise.all(summary.orderDetails.map(async (d: any) => {
+                  // Ưu tiên lấy tên từ giỏ hiện tại
+                  const oi = orderItems.find(oi => oi.productUnitId === d.productUnitId)
+                  if (oi) {
+                    return { ...d, productName: oi.productName, unitName: oi.unitName }
+                  }
+                  // Nếu không có trong giỏ, gọi ProductService để lấy tên
+                  try {
+                    const unitInfo = await ProductService.getProductUnitById(d.productUnitId)
+                    return { ...d, productName: unitInfo?.productName || `PU#${d.productUnitId}`, unitName: unitInfo?.unitName || 'Đơn vị' }
+                  } catch {
+                    return { ...d, productName: `PU#${d.productUnitId}`, unitName: 'Đơn vị' }
+                  }
+                }))
+                summary = { ...summary, orderDetails: enriched }
+              }
+              setOrderSummaryForConfirm(summary)
+            } catch {}
+            setShowCompleteConfirmModal(true)
+            // Dừng luồng tại đây; việc chuyển COMPLETED sẽ thực hiện khi người dùng bấm OK
+            return
+
+            // Nếu là COD, sau khi hoàn thành đơn, cập nhật payment-status = PAID
+            try {
+              if (markPaid) {
+                console.log('💳 Mark COD order as PAID...')
+                await updatePaymentStatus(orderId)
+              }
+            } catch (e) {
+              console.error('❌ Failed to update payment status for COD:', e)
+            }
+
+                // Reset form sau khi hoàn thành
+                setTimeout(() => {
+                  handleClearCart()
+                }, 2000)
+              } catch (error: any) {
+                console.error('❌ Error in step 3 (COMPLETED):', error)
+                setError('Lỗi khi hoàn thành đơn hàng: ' + error.message)
+              }
+            }, 1000)
           } catch (error: any) {
-            console.error('❌ Error in step 2 (COMPLETED):', error)
-            setError('Lỗi khi hoàn thành đơn hàng: ' + error.message)
+            console.error('❌ Error in step 2 (DELIVERING):', error)
+            setError('Lỗi khi xuất kho: ' + error.message)
           }
         }, 1000)
       } catch (error: any) {
-        console.error('❌ Error in step 1 (DELIVERING):', error)
-        setError('Lỗi khi xuất kho: ' + error.message)
+        console.error('❌ Error in step 1 (CONFIRMED):', error)
+        setError('Lỗi khi xác nhận đơn hàng: ' + error.message)
       }
     }, 1000)
   }
@@ -514,7 +675,7 @@ const CreateOrderManagement: React.FC = () => {
         orderId: orderId,
         amount: amount,
         description: `Thanh toan don hang #${orderId}`,
-        bankCode: 'VCB' // Vietcombank
+        bankCode: 'ACB' // Asia Commercial Bank
       }
 
       const response = await fetch(`${API_BASE_URL}/payments/sepay/intent`, {
@@ -572,11 +733,15 @@ const CreateOrderManagement: React.FC = () => {
             clearInterval(pollInterval)
             setPaymentPolling(null)
 
+            // Đóng modal thanh toán và hiển thị modal thành công
+            setShowPaymentModal(false)
+            setShowPaymentSuccessModal(true)
+
             // Cập nhật payment status
             await updatePaymentStatus(orderId)
 
-            // Chuyển sang workflow hoàn thành
-            await handleCashPaymentWorkflow(orderId)
+            // Đợi người dùng đóng modal thành công rồi mới hiển thị xác nhận hoàn thành
+            setPendingCompleteOrderId(orderId)
           }
         }
       } catch (error) {
@@ -617,7 +782,7 @@ const CreateOrderManagement: React.FC = () => {
   }
 
   // Chuyển trạng thái đơn hàng cho POS (cho auto workflow)
-  const updateOrderStatusAPI = async (orderId: number, newStatus: 'DELIVERING' | 'COMPLETED') => {
+  const updateOrderStatusAPI = async (orderId: number, newStatus: 'CONFIRMED' | 'DELIVERING' | 'COMPLETED') => {
     console.log(`🔄 API Call: Updating order ${orderId} to ${newStatus}`)
 
     const requestBody = {
@@ -736,7 +901,7 @@ const CreateOrderManagement: React.FC = () => {
         } else {
           // Thanh toán tiền mặt - tự động chuyển trạng thái
           setSuccess(`Đơn hàng #${result.id} đã tạo! Đang tự động xuất kho và hoàn thành...`)
-          await handleCashPaymentWorkflow(result.id)
+          await handleCashPaymentWorkflow(result.id, true)
         }
       } else {
         setSuccess(`Đơn hàng #${result.id} đã được tạo thành công!`)
@@ -766,6 +931,22 @@ const CreateOrderManagement: React.FC = () => {
       style: 'currency',
       currency: 'VND'
     }).format(amount)
+  }
+
+  const getBankName = (bankCode: string) => {
+    const bankNames: { [key: string]: string } = {
+      'ACB': 'Ngân hàng TMCP Á Châu (ACB)',
+      'VCB': 'Ngân hàng TMCP Ngoại thương Việt Nam (Vietcombank)',
+      'TCB': 'Ngân hàng TMCP Kỹ thương Việt Nam (Techcombank)',
+      'BIDV': 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV)',
+      'VIB': 'Ngân hàng TMCP Quốc tế Việt Nam (VIB)',
+      'VPB': 'Ngân hàng TMCP Việt Nam Thịnh Vượng (VPBank)',
+      'MSB': 'Ngân hàng TMCP Hàng Hải (MSB)',
+      'HDB': 'Ngân hàng TMCP Phát triển Thành phố Hồ Chí Minh (HDBank)',
+      'TPB': 'Ngân hàng TMCP Tiên Phong (TPBank)',
+      'STB': 'Ngân hàng TMCP Sài Gòn Thương Tín (Sacombank)'
+    }
+    return bankNames[bankCode] || bankCode
   }
 
   if (loading && customers.length === 0) {
@@ -877,6 +1058,12 @@ const CreateOrderManagement: React.FC = () => {
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >
                     Quét
+                  </button>
+                  <button
+                    onClick={startCameraScanner}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  >
+                    Quét bằng camera
                   </button>
                 </div>
               </div>
@@ -1321,11 +1508,13 @@ const CreateOrderManagement: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <div className={`w-3 h-3 rounded-full ${
                       orderStatus === 'PENDING' ? 'bg-yellow-500' :
+                      orderStatus === 'CONFIRMED' ? 'bg-orange-500' :
                       orderStatus === 'DELIVERING' ? 'bg-blue-500' :
                       orderStatus === 'COMPLETED' ? 'bg-green-500' : 'bg-gray-300'
                     }`}></div>
                     <span className="text-sm font-medium">
                       {orderStatus === 'PENDING' ? 'Đang tạo đơn hàng...' :
+                       orderStatus === 'CONFIRMED' ? 'Đã xác nhận đơn hàng...' :
                        orderStatus === 'DELIVERING' ? 'Đang xuất kho...' :
                        orderStatus === 'COMPLETED' ? 'Hoàn thành!' : 'Không xác định'}
                     </span>
@@ -1339,6 +1528,14 @@ const CreateOrderManagement: React.FC = () => {
                     </div>
                   )}
 
+                  {orderStatus === 'CONFIRMED' && (
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                    </div>
+                  )}
+
                   {orderStatus === 'DELIVERING' && (
                     <div className="flex items-center space-x-1">
                       <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
@@ -1349,7 +1546,8 @@ const CreateOrderManagement: React.FC = () => {
                 </div>
 
                 <div className="text-sm text-green-700 mb-3">
-                  {orderStatus === 'PENDING' && 'Đang tạo đơn hàng và chuẩn bị xuất kho...'}
+                  {orderStatus === 'PENDING' && 'Đang tạo đơn hàng...'}
+                  {orderStatus === 'CONFIRMED' && 'Đã xác nhận đơn hàng, chuẩn bị xuất kho...'}
                   {orderStatus === 'DELIVERING' && 'Đang xuất kho và hoàn thành đơn hàng...'}
                   {orderStatus === 'COMPLETED' && 'Đơn hàng đã hoàn thành! Giao dịch thành công.'}
                 </div>
@@ -1391,7 +1589,32 @@ const CreateOrderManagement: React.FC = () => {
                 💳 Thanh toán chuyển khoản - Đơn hàng #{currentOrder?.id}
               </h3>
               <button
-                onClick={() => setShowPaymentModal(false)}
+                onClick={async () => {
+                  setShowPaymentModal(false)
+                  if (pendingCompleteOrderId) {
+                    try {
+                      const detail = await OrderApi.getById(pendingCompleteOrderId).catch(() => null)
+                      let summary: any = detail?.data || detail || null
+                      if (summary?.orderDetails && Array.isArray(summary.orderDetails)) {
+                        const enriched = await Promise.all((summary.orderDetails || []).map(async (d: any) => {
+                          const oi = orderItems.find(oi => oi.productUnitId === d.productUnitId)
+                          if (oi) return { ...d, productName: oi.productName, unitName: oi.unitName }
+                          try {
+                            const unitInfo = await ProductService.getProductUnitById(d.productUnitId)
+                            return { ...d, productName: unitInfo?.productName || `PU#${d.productUnitId}`, unitName: unitInfo?.unitName || 'Đơn vị' }
+                          } catch {
+                            return { ...d, productName: `PU#${d.productUnitId}`, unitName: 'Đơn vị' }
+                          }
+                        }))
+                        summary = { ...summary, orderDetails: enriched }
+                      }
+                      setCurrentOrder(summary)
+                      setOrderSummaryForConfirm(summary)
+                      setShowCompleteConfirmModal(true)
+                    } catch {}
+                    setPendingCompleteOrderId(null)
+                  }
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1449,7 +1672,7 @@ const CreateOrderManagement: React.FC = () => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600">Ngân hàng:</span>
-                      <span className="font-medium text-gray-900">{paymentInfo.bankCode}</span>
+                      <span className="font-medium text-gray-900">{getBankName(paymentInfo.bankCode)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600">Số tiền:</span>
@@ -1491,7 +1714,7 @@ const CreateOrderManagement: React.FC = () => {
                 <button
                   onClick={() => {
                     // Copy payment info to clipboard
-                    const paymentText = `Số tài khoản: ${paymentInfo.accountNumber}\nTên: ${paymentInfo.accountName}\nNgân hàng: ${paymentInfo.bankCode}\nSố tiền: ${formatCurrency(currentOrder?.totalAmount || 0)}\nNội dung: ${paymentInfo.transferContent}`
+                    const paymentText = `Số tài khoản: ${paymentInfo.accountNumber}\nTên: ${paymentInfo.accountName}\nNgân hàng: ${getBankName(paymentInfo.bankCode)}\nSố tiền: ${formatCurrency(currentOrder?.totalAmount || 0)}\nNội dung: ${paymentInfo.transferContent}`
                     navigator.clipboard.writeText(paymentText)
                     setSuccess('Đã copy thông tin chuyển khoản!')
                   }}
@@ -1500,6 +1723,162 @@ const CreateOrderManagement: React.FC = () => {
                   Copy thông tin
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Success Modal */}
+      {showPaymentSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center">
+            <div className="mb-6">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                🎉 Thanh toán thành công!
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Đơn hàng #{currentOrder?.id} đã được thanh toán thành công
+              </p>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <div className="text-sm text-green-800">
+                <div className="font-medium mb-2">✅ Xác nhận thanh toán:</div>
+                <ul className="space-y-1 text-left">
+                  <li>• Số tiền: <span className="font-bold">{formatCurrency(currentOrder?.totalAmount || 0)}</span></li>
+                  <li>• Ngân hàng: {getBankName(paymentInfo?.bankCode || '')}</li>
+                  <li>• Trạng thái: Đã thanh toán</li>
+                  <li>• Đơn hàng: Đang xử lý...</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 justify-center">
+              <button
+                onClick={() => {
+                  setShowPaymentSuccessModal(false)
+                  handleClearCart()
+                }}
+                className="bg-green-600 text-white py-3 px-6 rounded-md hover:bg-green-700 font-medium text-lg"
+              >
+                Tạo đơn hàng mới
+              </button>
+              <button
+                onClick={() => setShowPaymentSuccessModal(false)}
+                className="bg-gray-500 text-white py-3 px-6 rounded-md hover:bg-gray-600 font-medium text-lg"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera Scanner Modal */}
+      {showCameraScanner && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-xl w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Quét mã bằng camera</h3>
+              <button onClick={stopCameraScanner} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <video ref={videoRef} className="w-full rounded border bg-black" playsInline muted />
+              <div className="text-xs text-gray-500">Hướng camera vào mã vạch/QR. Khi nhận diện được, sản phẩm sẽ được thêm vào giỏ.</div>
+              <div className="flex justify-end">
+                <button onClick={stopCameraScanner} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Đóng</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Complete Modal */}
+      {showCompleteConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Xác nhận hoàn thành đơn hàng</h3>
+              <button onClick={() => setShowCompleteConfirmModal(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {orderSummaryForConfirm ? (
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <div><span className="text-gray-600">Mã đơn:</span> <span className="font-medium">#{orderSummaryForConfirm.id}</span></div>
+                  <div><span className="text-gray-600">Ngày tạo:</span> {new Date(orderSummaryForConfirm.createdAt).toLocaleString('vi-VN')}</div>
+                  <div><span className="text-gray-600">Phương thức:</span> {orderSummaryForConfirm.paymentMethod === 'COD' ? 'Tiền mặt' : 'Chuyển khoản'}</div>
+                  <div><span className="text-gray-600">Tổng tiền:</span> <span className="font-semibold text-blue-600">{formatCurrency(orderSummaryForConfirm.totalAmount || 0)}</span></div>
+                </div>
+                <div className="mt-2">
+                  <div className="font-medium text-gray-800 mb-2">Chi tiết sản phẩm</div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-gray-600">Sản phẩm</th>
+                          <th className="px-3 py-2 text-left text-gray-600">Đơn vị</th>
+                          <th className="px-3 py-2 text-right text-gray-600">SL</th>
+                          <th className="px-3 py-2 text-right text-gray-600">Đơn giá</th>
+                          <th className="px-3 py-2 text-right text-gray-600">Thành tiền</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {(orderSummaryForConfirm.orderDetails || []).map((d: any, idx: number) => (
+                          <tr key={idx}>
+                            <td className="px-3 py-2">{d.productName || `PU#${d.productUnitId}`}</td>
+                            <td className="px-3 py-2">{d.unitName || '—'}</td>
+                            <td className="px-3 py-2 text-right">{d.quantity}</td>
+                            <td className="px-3 py-2 text-right">{formatCurrency(d.unitPrice || 0)}</td>
+                            <td className="px-3 py-2 text-right font-medium">{formatCurrency(d.subtotal || ((d.unitPrice||0)*(d.quantity||0)))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-600">Đang tải chi tiết đơn hàng...</div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => setShowCompleteConfirmModal(false)} className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Hủy</button>
+              <button
+                onClick={async () => {
+                  try {
+                    if (!currentOrder?.id) return
+                    // Tiếp tục cập nhật COMPLETED
+                    const completedResult = await updateOrderStatusAPI(currentOrder.id, 'COMPLETED')
+                    setOrderStatus('COMPLETED')
+                    setCurrentOrder(completedResult.data || completedResult)
+                    setSuccess('Đơn hàng đã hoàn thành! Giao dịch thành công.')
+                    // Sau khi hoàn thành, cập nhật trạng thái thanh toán thành PAID
+                    try {
+                      await updatePaymentStatus(currentOrder.id)
+                    } catch (e) {
+                      console.error('❌ Failed to mark payment PAID on complete:', e)
+                    }
+                    setShowCompleteConfirmModal(false)
+                  } catch (e: any) {
+                    setError('Lỗi khi hoàn thành đơn hàng: ' + (e?.message || ''))
+                  }
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                OK, hoàn thành
+              </button>
             </div>
           </div>
         </div>

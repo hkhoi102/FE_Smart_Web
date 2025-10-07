@@ -16,7 +16,7 @@ import Login from '@/pages/Login'
 import UserLogin from '@/pages/UserLogin'
 import Admin from '@/pages/Admin'
 import PriceHeaderDetail from '@/pages/PriceHeaderDetail'
-import InventoryCheckCreate from '@/pages/InventoryCheckCreate'
+// InventoryCheckCreate is rendered inside Admin when tab=inventory-check-create
 import InventoryImportExportDetail from '@/components/InventoryImportExportDetail'
 
 function App() {
@@ -62,7 +62,7 @@ function App() {
                 path="/admin/inventory-check/create"
                 element={
                   <ProtectedRoute>
-                    <InventoryCheckCreate />
+                    <Admin />
                   </ProtectedRoute>
                 }
               />

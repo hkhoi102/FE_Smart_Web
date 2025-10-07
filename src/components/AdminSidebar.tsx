@@ -202,7 +202,7 @@ const AdminSidebar = ({ currentTab, onTabChange }: AdminSidebarProps) => {
   console.log('Rendering sidebar, isCollapsed:', isCollapsed)
 
   return (
-    <div className={`${isCollapsed ? 'w-16' : 'w-96'} bg-white border-r border-green-200 h-screen overflow-y-auto sticky top-0 transition-all duration-300 ease-in-out`}>
+    <div className={`${isCollapsed ? 'w-16' : 'w-96'} bg-white border-r border-green-200 h-screen overflow-y-auto sticky top-0 transition-all duration-300 ease-in-out flex-shrink-0`}>
       {/* Logo */}
       <div className={`flex items-center ${isCollapsed ? 'px-2 py-6 justify-center' : 'px-4 py-6'} border-b border-gray-200`}>
         <div className="flex items-center">

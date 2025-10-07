@@ -61,6 +61,7 @@ const ProductFormWithUnitsAndPrices = ({
   })
 
   // Price header states (only when editing)
+  // Giữ state và setter vì còn dùng ở dưới (tạo header)
   const [unitPriceHeaders, setUnitPriceHeaders] = useState<Map<number, Array<{ id: number; name: string; description?: string; timeStart?: string; timeEnd?: string }>>>(new Map())
   const [showCreateHeaderModal, setShowCreateHeaderModal] = useState(false)
   const [newHeaderData, setNewHeaderData] = useState({
@@ -71,9 +72,8 @@ const ProductFormWithUnitsAndPrices = ({
   })
   const [selectedHeaderIds, setSelectedHeaderIds] = useState<Map<number, number | ''>>(new Map())
   // Price header selection moved to Price page
+  // Legacy states removed from UI (handled in Price page)
   const [selectedHeaderInfos] = useState<Map<number, { name: string; timeStart?: string; timeEnd?: string }>>(new Map())
-  // No-op setter to satisfy legacy calls
-  const setSelectedHeaderInfos = (_updater: any) => {}
 
   // Error handling states
   const [errorMessage, setErrorMessage] = useState<string>('')
@@ -89,7 +89,7 @@ const ProductFormWithUnitsAndPrices = ({
     if (product) {
       setFormData({
         name: product.name,
-        code: (product as any).code || '',
+        code: (product as any).code || (product as any).productCode || '',
         description: product.description,
         category_id: (product as any).categoryId || (product as any).category_id,
         image_url: (product as any).imageUrl || (product as any).image_url || '',
@@ -97,6 +97,19 @@ const ProductFormWithUnitsAndPrices = ({
         active: (product as any).active ? 1 : 0,
       })
       setImagePreview((product as any).imageUrl || (product as any).image_url || '')
+
+      // Nếu thiếu mã sản phẩm trong dữ liệu danh sách, tải lại chi tiết để lấy code chính xác
+      if (!(product as any).code && product.id) {
+        ;(async () => {
+          try {
+            const full = await ProductService.getProductById(product.id!)
+            const codeVal = (full as any)?.code || (full as any)?.productCode || ''
+            if (codeVal) {
+              setFormData(prev => ({ ...prev, code: codeVal }))
+            }
+          } catch {}
+        })()
+      }
 
       // Load product units
       // Show all units including "Lon" (id=1) when editing
@@ -268,7 +281,8 @@ const ProductFormWithUnitsAndPrices = ({
   }
 
   // Header selection handled in Price page
-  const handleHeaderSelection = (_unitId: number, _headerId: number) => { return }
+  // noop
+  const handleHeaderSelection = (_unitId: number, _headerId: number) => { /* noop */ }
 
   const addPriceToUnit = (unitId: number, price: number, validFrom: string, validTo: string = '') => {
     const unitSelectedHeaderId = selectedHeaderIds.get(unitId)
@@ -289,10 +303,10 @@ const ProductFormWithUnitsAndPrices = ({
   }
 
   // Price editing moved out of this modal
-  const removePriceFromUnit = (_unitId: number, _priceIndex: number) => { return }
+  const removePriceFromUnit = (_unitId: number, _priceIndex: number) => { /* noop */ }
 
   // Price modal moved to Price page
-  const openPriceModal = (_unitId: number) => { return }
+  const openPriceModal = (_unitId: number) => { /* noop */ }
 
   const closePriceModal = () => {
     setShowPriceModal(false)
@@ -355,7 +369,7 @@ const ProductFormWithUnitsAndPrices = ({
   }
 
   // Creating headers is handled in Price page
-  const openCreateHeaderModal = (_unitId?: number) => { return }
+  const openCreateHeaderModal = (_unitId?: number) => { /* noop */ }
 
   const closeCreateHeaderModal = () => {
     setShowCreateHeaderModal(false)
@@ -506,18 +520,13 @@ const ProductFormWithUnitsAndPrices = ({
       return
     }
 
-    // Validation for price header when editing and has prices
-    if (product && productUnits.some(unit => unit.prices.length > 0)) {
-      // Kiểm tra tất cả units có giá đều phải có selectedHeaderId
-      const unitsWithPrices = productUnits.filter(unit => unit.prices.length > 0)
-      for (const unit of unitsWithPrices) {
-        const unitSelectedHeaderId = selectedHeaderIds.get(unit.id)
-        if (!unitSelectedHeaderId) {
-          alert(`Vui lòng chọn bảng giá cho đơn vị: ${unit.unitName}`)
-          return
-        }
-      }
+    // Bắt buộc nhập mã sản phẩm
+    if (!formData.code || !formData.code.trim()) {
+      alert('Vui lòng nhập mã sản phẩm (code)')
+      return
     }
+
+    // Không ràng buộc giá trong modal Sản phẩm; phần giá xử lý ở trang Giá
 
     const productData = {
       name: formData.name,
@@ -757,9 +766,8 @@ const ProductFormWithUnitsAndPrices = ({
                   return // Dừng quá trình
                 }
               } else {
-                console.log('⏭️ Skipping price processing:', {
-                  reason: !product ? 'Not editing' : !unit.prices.length ? 'No prices' : 'No header name'
-                })
+                // Không chọn header thì bỏ qua thêm giá trong modal sản phẩm
+                console.log('⏭️ Skipping price processing in product modal')
               }
             }
           } catch (unitErr) {

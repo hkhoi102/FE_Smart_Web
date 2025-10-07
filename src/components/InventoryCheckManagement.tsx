@@ -177,7 +177,7 @@ const InventoryCheckManagement = () => {
   }, [searchTerm, statusFilter, warehouseFilter])
 
   const handleAddCheck = () => {
-    navigate('/admin/inventory-check/create')
+    navigate({ pathname: '/admin', search: '?tab=inventory-check-create' })
   }
 
   const handleEditCheck = (check: InventoryCheck) => {
@@ -523,6 +523,7 @@ const InventoryCheckManagement = () => {
             📊 Xuất tất cả Excel
           </button>
           <button
+            type="button"
             onClick={handleAddCheck}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
           >
