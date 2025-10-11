@@ -34,7 +34,7 @@ const InventoryImportExportCreate = () => {
     if (selectedWarehouse) {
       loadProductsByWarehouse(selectedWarehouse)
     }
-  }, [selectedWarehouse])
+  }, [selectedWarehouse, slipType])
 
   const loadWarehouses = async () => {
     try {
@@ -48,91 +48,137 @@ const InventoryImportExportCreate = () => {
 
   const loadProductsByWarehouse = async (warehouseId: number) => {
     try {
-      console.log('🔄 Loading low stock products for warehouse:', warehouseId)
+      console.log('🔄 Loading products for warehouse:', warehouseId, 'Type:', slipType)
       setLoading(true)
 
-      // Gọi API low-stock để lấy sản phẩm sắp hết hàng theo kho
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/products/low-stock?threshold=20&warehouseId=${warehouseId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json'
-        }
-      })
+      let response: Response
+
+      if (slipType === 'IMPORT') {
+        // Nhập hàng: Chỉ lấy sản phẩm sắp hết hàng
+        console.log('📦 Loading LOW STOCK products for import')
+        response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/products/low-stock?threshold=20&warehouseId=${warehouseId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      } else {
+        // Xuất hàng: Lấy tất cả sản phẩm trong kho
+        console.log('📦 Loading ALL products for export')
+        response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/inventory/stock?warehouseId=${warehouseId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      }
 
       console.log('📡 API Response status:', response.status)
 
       if (!response.ok) {
         const errorText = await response.text()
         console.error('❌ API Error:', errorText)
-        throw new Error(`Failed to fetch low stock products: ${response.status} ${errorText}`)
+        throw new Error(`Failed to fetch products: ${response.status} ${errorText}`)
       }
 
-      const lowStockResponse = await response.json()
-      console.log('📦 Low stock response received:', lowStockResponse)
+      const apiResponse = await response.json()
+      console.log('📦 API response received:', apiResponse)
 
       // Lấy data từ response
-      const lowStockData = lowStockResponse.data || lowStockResponse
-      console.log('📦 Low stock data extracted:', lowStockData)
-      console.log('📦 Data type:', typeof lowStockData)
-      console.log('📦 Data length:', Array.isArray(lowStockData) ? lowStockData.length : 'Not an array')
+      const productsData = apiResponse.data || apiResponse
+      console.log('📦 Products data extracted:', productsData)
+      console.log('📦 Data type:', typeof productsData)
+      console.log('📦 Data length:', Array.isArray(productsData) ? productsData.length : 'Not an array')
 
       const productUnits: ProductUnit[] = []
 
       // Kiểm tra cấu trúc data
-      if (lowStockData && Array.isArray(lowStockData) && lowStockData.length > 0) {
-        console.log('✅ Processing', lowStockData.length, 'low stock items')
+      if (productsData && Array.isArray(productsData) && productsData.length > 0) {
+        console.log('✅ Processing', productsData.length, 'products')
 
-        // Sắp xếp theo số lượng tồn kho (ít nhất lên đầu)
-        const sortedData = lowStockData.sort((a: any, b: any) => (a.quantity || 0) - (b.quantity || 0))
+        // Sắp xếp theo số lượng tồn kho
+        const sortedData = productsData.sort((a: any, b: any) => {
+          const aQty = a.availableQuantity || a.quantity || 0
+          const bQty = b.availableQuantity || b.quantity || 0
+          return slipType === 'IMPORT' ? aQty - bQty : bQty - aQty // Import: ít nhất lên đầu, Export: nhiều nhất lên đầu
+        })
         console.log('📊 Sorted data:', sortedData)
 
-        // Xử lý từng sản phẩm và các đơn vị của nó
-        for (const product of sortedData) {
-          console.log('🔍 Processing product:', product)
+        // Debug chi tiết cho item đầu tiên
+        if (sortedData.length > 0) {
+          console.log('🔍 First item structure:', sortedData[0])
+          console.log('🔍 First item keys:', Object.keys(sortedData[0]))
+          console.log('🔍 First item productName:', sortedData[0].productName)
+          console.log('🔍 First item unitName:', sortedData[0].unitName)
+        }
 
-          if (product.productUnits && Array.isArray(product.productUnits)) {
-            // Xử lý từng đơn vị của sản phẩm
-            for (const unit of product.productUnits) {
-              console.log('🔧 Processing unit:', unit)
+        // Xử lý từng productUnit từ API
+        for (const productUnitData of sortedData) {
+          console.log('🔍 Processing productUnit:', productUnitData)
+          console.log('🔍 ProductUnit keys:', Object.keys(productUnitData))
+          console.log('🔍 productUnitId:', productUnitData.id)
 
+          // API chỉ trả về productUnitId, cần dùng ProductService.getProductUnitById để lấy thông tin
+          try {
+            console.log('📦 Fetching product unit details for productUnitId:', productUnitData.id)
+            const productUnitDetail = await ProductService.getProductUnitById(productUnitData.id)
+            console.log('📋 Fetched product unit detail:', productUnitDetail)
+
+            if (productUnitDetail) {
               const productUnit: ProductUnit = {
-                id: unit.id || `${product.id}_${unit.unitName}`,
-                productId: product.id,
-                productName: product.name || `Product ${product.id}`,
-                unitName: unit.unitName || 'Cái',
-                systemQuantity: unit.availableQuantity || unit.quantity || 0,
+                id: productUnitData.id,
+                productId: productUnitDetail.productId || productUnitData.productId,
+                productName: productUnitDetail.productName || `Product ${productUnitDetail.productId}`,
+                unitName: productUnitDetail.unitName || 'Cái',
+                systemQuantity: productUnitData.availableQuantity || productUnitData.quantity || 0,
                 selected: false,
                 actualQuantity: 0,
                 note: ''
               }
               productUnits.push(productUnit)
-              console.log('✅ Added product unit:', productUnit)
+              console.log('✅ Added product unit with fetched details:', productUnit)
+            } else {
+              console.warn('⚠️ Product unit detail not found for productUnitId:', productUnitData.id)
+              // Fallback với ID
+              const productUnit: ProductUnit = {
+                id: productUnitData.id,
+                productId: productUnitData.productId || 0,
+                productName: `Product Unit ${productUnitData.id}`,
+                unitName: 'Cái',
+                systemQuantity: productUnitData.availableQuantity || productUnitData.quantity || 0,
+                selected: false,
+                actualQuantity: 0,
+                note: ''
+              }
+              productUnits.push(productUnit)
+              console.log('✅ Added product unit with fallback:', productUnit)
             }
-          } else {
-            // Fallback nếu không có productUnits
+          } catch (error) {
+            console.error('❌ Error fetching product unit detail:', error)
+            // Fallback với ID
             const productUnit: ProductUnit = {
-              id: product.id,
-              productId: product.id,
-              productName: product.name || `Product ${product.id}`,
+              id: productUnitData.id,
+              productId: productUnitData.productId || 0,
+              productName: `Product Unit ${productUnitData.id}`,
               unitName: 'Cái',
-              systemQuantity: product.quantity || 0,
+              systemQuantity: productUnitData.availableQuantity || productUnitData.quantity || 0,
               selected: false,
               actualQuantity: 0,
               note: ''
             }
             productUnits.push(productUnit)
-            console.log('✅ Added fallback product unit:', productUnit)
+            console.log('✅ Added product unit with error fallback:', productUnit)
           }
         }
       } else {
-        console.warn('⚠️ No low stock data or empty array received')
+        console.warn('⚠️ No products data or empty array received')
       }
 
       console.log('🎯 Final product units:', productUnits)
       console.log('🎯 Product units count:', productUnits.length)
       setProducts(productUnits)
     } catch (error) {
-      console.error('❌ Error loading low stock products:', error)
+      console.error('❌ Error loading products:', error)
       setProducts([])
     } finally {
       setLoading(false)
