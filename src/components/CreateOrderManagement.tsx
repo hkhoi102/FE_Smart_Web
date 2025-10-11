@@ -70,7 +70,6 @@ const CreateOrderManagement: React.FC = () => {
   const [showCameraScanner, setShowCameraScanner] = useState(false)
   const videoRef = React.useRef<HTMLVideoElement | null>(null)
   const streamRef = React.useRef<MediaStream | null>(null)
-  const scanLoopRef = React.useRef<number | null>(null)
   const zxingReaderRef = React.useRef<any>(null)
 
   // POS specific states
@@ -355,62 +354,16 @@ const CreateOrderManagement: React.FC = () => {
     handleAddProduct()
   }
 
-  // Camera barcode scanning using native BarcodeDetector (Chromium-based browsers)
-  const startCameraScanner = async () => {
+
+  // Handle barcode scanning from image file
+  const handleImageBarcodeScan = async (file: File) => {
     try {
+      setLoading(true)
       setError(null)
-      setShowCameraScanner(true)
-      // Request back camera
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
+      setSuccess(null)
+      console.log('📷 Scanning barcode from image:', file.name)
 
-      // Prefer native BarcodeDetector when available
-      const isSupported = (window as any).BarcodeDetector && typeof (window as any).BarcodeDetector === 'function'
-      if (!isSupported) {
-        // Fallback to ZXing if not supported
-        await startZxingFallback()
-        return
-      }
-
-      const detector = isSupported ? new (window as any).BarcodeDetector({ formats: ['ean_13', 'code_128', 'ean_8', 'qr_code'] }) : null
-      const startTime = Date.now()
-      const scanFrame = async () => {
-        try {
-          if (!videoRef.current || videoRef.current.readyState !== 4 || !detector) {
-            scanLoopRef.current = requestAnimationFrame(scanFrame)
-            return
-          }
-          const barcodes = await detector.detect(videoRef.current)
-          if (barcodes && barcodes.length > 0) {
-            const value = barcodes[0].rawValue || barcodes[0].rawValue
-            await stopCameraScanner()
-            await handleBarcodeScan(String(value))
-            return
-          }
-          // If no result after 3 seconds, fallback to ZXing (more robust on many devices)
-          if (Date.now() - startTime > 3000) {
-            await startZxingFallback()
-            return
-          }
-        } catch (e) {
-          // continue scanning silently
-        }
-        scanLoopRef.current = requestAnimationFrame(scanFrame)
-      }
-      scanLoopRef.current = requestAnimationFrame(scanFrame)
-    } catch (e: any) {
-      setError('Không thể mở camera: ' + (e?.message || ''))
-      await stopCameraScanner()
-    }
-  }
-
-  const startZxingFallback = async () => {
-    try {
-      // Dynamically load ZXing UMD bundle
+      // Load ZXing library
       const ensure = () => new Promise<void>((resolve, reject) => {
         if ((window as any).ZXing && (window as any).ZXing.BrowserMultiFormatReader) return resolve()
         const s = document.createElement('script')
@@ -421,43 +374,252 @@ const CreateOrderManagement: React.FC = () => {
         document.head.appendChild(s)
       })
       await ensure()
+
+      const ZX = (window as any).ZXing
+      if (!ZX || !ZX.BrowserMultiFormatReader) {
+        throw new Error('ZXing not available')
+      }
+
+      // Create image element
+      const img = new Image()
+      img.onload = async () => {
+        try {
+          // Create ZXing reader
+          const reader = new ZX.BrowserMultiFormatReader()
+          const hints = new Map()
+          hints.set(ZX.DecodeHintType.POSSIBLE_FORMATS, [
+            ZX.BarcodeFormat.EAN_13,
+            ZX.BarcodeFormat.EAN_8,
+            ZX.BarcodeFormat.CODE_128,
+            ZX.BarcodeFormat.CODE_39,
+            ZX.BarcodeFormat.UPC_A,
+            ZX.BarcodeFormat.UPC_E,
+            ZX.BarcodeFormat.QR_CODE
+          ])
+          hints.set(ZX.DecodeHintType.TRY_HARDER, true)
+          reader.hints = hints
+
+          console.log('📷 Scanning image with ZXing...')
+
+          // Try to decode from image URL
+          const result = await reader.decodeFromImageUrl(img.src)
+
+          if (result && result.getText) {
+            const text = result.getText()
+            console.log('📷 ZXing found barcode from image:', text)
+            await handleBarcodeScan(String(text))
+          } else {
+            setError('Không tìm thấy mã vạch trong hình ảnh')
+          }
+        } catch (e: any) {
+          console.error('📷 Image barcode scan error:', e)
+          setError('Không thể quét mã vạch từ hình ảnh: ' + (e?.message || 'Lỗi không xác định'))
+        } finally {
+          setLoading(false)
+        }
+      }
+
+      img.onerror = () => {
+        setError('Không thể tải hình ảnh')
+        setLoading(false)
+      }
+
+      // Load image from file
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        img.src = e.target?.result as string
+      }
+      reader.readAsDataURL(file)
+
+    } catch (e: any) {
+      console.error('📷 Image barcode scan failed:', e)
+      setError('Lỗi khi quét mã vạch từ hình ảnh: ' + (e?.message || 'Lỗi không xác định'))
+      setLoading(false)
+    }
+  }
+
+  // Camera barcode scanning using native BarcodeDetector (Chromium-based browsers)
+  const startCameraScanner = async () => {
+    try {
+      setError(null)
+      setShowCameraScanner(true)
+
+      // Stop any existing streams first
+      if (streamRef.current) {
+        console.log('📷 Stopping existing stream...')
+        streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+      }
+
+      // Clear video element completely
+      if (videoRef.current) {
+        console.log('📷 Clearing video element...')
+        videoRef.current.pause()
+        videoRef.current.srcObject = null
+        videoRef.current.load()
+      }
+
+      // Wait for cleanup
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Request back camera with better quality for barcode scanning
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920, min: 640 },
+          height: { ideal: 1080, min: 480 },
+          frameRate: { ideal: 30, min: 15 }
+        },
+        audio: false
+      })
+      streamRef.current = stream
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        // Don't call play() here - let ZXing handle it
+        console.log('📷 Camera started successfully')
+      }
+
+      // Use ZXing for barcode detection
+      await startZxingFallback()
+    } catch (e: any) {
+      console.error('📷 Camera error:', e)
+      setError('Không thể mở camera: ' + (e?.message || ''))
+      await stopCameraScanner()
+    }
+  }
+
+  const startZxingFallback = async () => {
+    try {
+      // Dynamically load ZXing UMD bundle
+      const ensure = () => new Promise<void>((resolve, reject) => {
+        if ((window as any).ZXing && (window as any).ZXing.BrowserMultiFormatReader) {
+          return resolve()
+        }
+        const s = document.createElement('script')
+        s.src = 'https://unpkg.com/@zxing/library@latest'
+        s.async = true
+        s.onload = () => resolve()
+        s.onerror = () => reject(new Error('Cannot load ZXing'))
+        document.head.appendChild(s)
+      })
+      await ensure()
+
       const ZX = (window as any).ZXing
       if (!ZX || !ZX.BrowserMultiFormatReader) throw new Error('ZXing not available')
+
       const reader = new ZX.BrowserMultiFormatReader()
+
+      // Configure ZXing with enhanced settings for faster detection
+      const hints = new Map()
+      hints.set(ZX.DecodeHintType.POSSIBLE_FORMATS, [
+        ZX.BarcodeFormat.EAN_13,
+        ZX.BarcodeFormat.EAN_8,
+        ZX.BarcodeFormat.CODE_128,
+        ZX.BarcodeFormat.CODE_39,
+        ZX.BarcodeFormat.UPC_A,
+        ZX.BarcodeFormat.UPC_E,
+        ZX.BarcodeFormat.QR_CODE,
+        ZX.BarcodeFormat.CODE_93,
+        ZX.BarcodeFormat.CODABAR,
+        ZX.BarcodeFormat.ITF
+      ])
+      hints.set(ZX.DecodeHintType.TRY_HARDER, true)
+      hints.set(ZX.DecodeHintType.CHARACTER_SET, 'UTF-8')
+      hints.set(ZX.DecodeHintType.ASSUME_GS1, false)
+      hints.set(ZX.DecodeHintType.ALSO_INVERTED, true) // Try inverted barcodes
+      reader.hints = hints
+
       zxingReaderRef.current = reader
-      if (!videoRef.current) return
-      // Use default device (back camera chosen by facingMode in getUserMedia)
-      await reader.decodeFromVideoDevice(null, videoRef.current, async (result: any) => {
-        if (result && result.getText) {
-          const text = result.getText()
-          await stopCameraScanner()
-          await handleBarcodeScan(String(text))
+
+      if (!videoRef.current) {
+        return
+      }
+
+      // Wait for video to be ready
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // Check if video is ready
+      if (!videoRef.current || videoRef.current.readyState !== 4) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+
+      // Start continuous scanning with video element
+      let isScanning = true
+      const scanLoop = async () => {
+        try {
+          if (!isScanning) {
+            return
+          }
+
+          if (videoRef.current && videoRef.current.readyState === 4) {
+            const result = await reader.decodeFromVideoElement(videoRef.current)
+            if (result && result.getText) {
+              const text = result.getText()
+              console.log('📷 ZXing found barcode:', text)
+              isScanning = false
+              await stopCameraScanner()
+              await handleBarcodeScan(String(text))
+              return
+            }
+          }
+        } catch (e: any) {
+          // Silent error handling
         }
-        // keep scanning on errors
-      })
-    } catch (e) {
+
+        // Continue scanning - faster for quick detection
+        if (isScanning) {
+          setTimeout(scanLoop, 50) // Scan every 50ms for faster detection
+        }
+      }
+
+      // Store scanning control
+      zxingReaderRef.current = { reader, stop: () => { isScanning = false } }
+
+      // Start the scanning loop
+      scanLoop()
+
+    } catch (e: any) {
+      console.error('📷 ZXing error:', e)
       setError('Trình duyệt không hỗ trợ quét mã tự động. Vui lòng nhập mã hoặc dùng thiết bị khác.')
     }
   }
 
   const stopCameraScanner = async () => {
     try {
-      if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current)
-      scanLoopRef.current = null
+      // Stop ZXing scanning
       if (zxingReaderRef.current) {
-        try { zxingReaderRef.current.reset() } catch (_) {}
+        if (typeof zxingReaderRef.current.stop === 'function') {
+          zxingReaderRef.current.stop()
+        }
+        if (typeof zxingReaderRef.current.reset === 'function') {
+          try {
+            await zxingReaderRef.current.reset()
+          } catch (e) {
+            // Silent error handling
+          }
+        }
         zxingReaderRef.current = null
       }
+
+      // Stop video stream
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          track.stop()
+        })
+        streamRef.current = null
+      }
+
+      // Clear video element
       if (videoRef.current) {
         videoRef.current.pause()
         videoRef.current.srcObject = null
+        videoRef.current.load() // Reset video element
       }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop())
-        streamRef.current = null
-      }
-    } finally {
+
       setShowCameraScanner(false)
+    } catch (e: any) {
+      console.error('📷 Stop camera error:', e)
     }
   }
 
@@ -1046,6 +1208,11 @@ const CreateOrderManagement: React.FC = () => {
                 </label>
                 <div className="flex space-x-2">
                   <input
+                    ref={(input) => {
+                      if (input && isPOSMode) {
+                        input.focus()
+                      }
+                    }}
                     type="text"
                     value={barcodeInput}
                     onChange={(e) => setBarcodeInput(e.target.value)}
@@ -1065,6 +1232,10 @@ const CreateOrderManagement: React.FC = () => {
                   >
                     Quét bằng camera
                   </button>
+
+
+
+
                 </div>
               </div>
 
@@ -1792,8 +1963,43 @@ const CreateOrderManagement: React.FC = () => {
               </button>
             </div>
             <div className="space-y-3">
-              <video ref={videoRef} className="w-full rounded border bg-black" playsInline muted />
-              <div className="text-xs text-gray-500">Hướng camera vào mã vạch/QR. Khi nhận diện được, sản phẩm sẽ được thêm vào giỏ.</div>
+              <div className="relative">
+                <video ref={videoRef} className="w-full rounded border bg-black" playsInline muted />
+                {/* Scanning overlay with guide frame */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="relative">
+                    {/* Main scanning frame */}
+                    <div className="w-64 h-32 border-2 border-green-400 rounded-lg bg-transparent">
+                      {/* Corner indicators */}
+                      <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-green-400 rounded-tl-lg"></div>
+                      <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-green-400 rounded-tr-lg"></div>
+                      <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-green-400 rounded-bl-lg"></div>
+                      <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-green-400 rounded-br-lg"></div>
+
+                      {/* Scanning line animation */}
+                      <div className="absolute inset-0 overflow-hidden rounded-lg">
+                        <div className="absolute top-0 left-0 w-full h-0.5 bg-green-400 animate-pulse"></div>
+                        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-green-400 animate-pulse" style={{animationDelay: '0.5s'}}></div>
+                      </div>
+                    </div>
+
+                    {/* Center dot */}
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-green-400 rounded-full animate-ping"></div>
+                  </div>
+                </div>
+
+                {/* Instructions overlay */}
+                {/* <div className="absolute bottom-4 left-4 right-4 bg-black bg-opacity-70 text-white p-3 rounded-lg">
+                  <div className="text-sm font-medium mb-1">📷 Hướng dẫn quét mã vạch:</div>
+                  <div className="text-xs space-y-1">
+                    <div>• Đưa mã vạch vào khung xanh lá</div>
+                    <div>• Giữ camera ổn định</div>
+                    <div>• Đảm bảo ánh sáng đủ</div>
+                    <div>• Sản phẩm sẽ tự động thêm vào giỏ</div>
+                  </div>
+                </div> */}
+              </div>
+
               <div className="flex justify-end">
                 <button onClick={stopCameraScanner} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Đóng</button>
               </div>
