@@ -62,15 +62,18 @@ const CreateOrderManagement: React.FC = () => {
   const [orderSummaryForConfirm, setOrderSummaryForConfirm] = useState<any>(null)
   const [pendingCompleteOrderId, setPendingCompleteOrderId] = useState<number | null>(null)
   const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false)
+  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false)
 
   // Form states for adding products
   const [selectedProduct, setSelectedProduct] = useState<number | ''>('')
   const [quantity, setQuantity] = useState(1)
   const [showAddProduct, setShowAddProduct] = useState(false)
+  const [quantityInputs, setQuantityInputs] = useState<{ [key: number]: string }>({})
   const [showCameraScanner, setShowCameraScanner] = useState(false)
   const videoRef = React.useRef<HTMLVideoElement | null>(null)
   const streamRef = React.useRef<MediaStream | null>(null)
   const zxingReaderRef = React.useRef<any>(null)
+  const barcodeInputRef = React.useRef<HTMLInputElement | null>(null)
 
   // POS specific states
   const [barcodeInput, setBarcodeInput] = useState('')
@@ -82,6 +85,13 @@ const CreateOrderManagement: React.FC = () => {
   useEffect(() => {
     fetchInitialData()
   }, [])
+
+  // Focus barcode input only on initial mount in POS mode
+  useEffect(() => {
+    if (isPOSMode && barcodeInputRef.current) {
+      barcodeInputRef.current.focus()
+    }
+  }, [isPOSMode])
 
   // Gọi API preview khi giỏ hàng thay đổi
   useEffect(() => {
@@ -245,11 +255,17 @@ const CreateOrderManagement: React.FC = () => {
 
     if (existingItem) {
       // Update existing item
+      const newQuantity = existingItem.quantity + quantity
       setOrderItems(prev => prev.map(item =>
         item.productUnitId === selectedProduct
-          ? { ...item, quantity: item.quantity + quantity, subtotal: (item.quantity + quantity) * item.unitPrice }
+          ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.unitPrice }
           : item
       ))
+      // Update input state
+      setQuantityInputs(prev => ({
+        ...prev,
+        [selectedProduct]: newQuantity.toString()
+      }))
     } else {
       // Add new item
       const newItem: OrderItem = {
@@ -261,6 +277,11 @@ const CreateOrderManagement: React.FC = () => {
         subtotal: quantity * product.price
       }
       setOrderItems(prev => [...prev, newItem])
+      // Initialize input state
+      setQuantityInputs(prev => ({
+        ...prev,
+        [selectedProduct]: quantity.toString()
+      }))
     }
 
     // Reset form
@@ -989,9 +1010,59 @@ const CreateOrderManagement: React.FC = () => {
 
   const handleRemoveItem = (productUnitId: number) => {
     setOrderItems(prev => prev.filter(item => item.productUnitId !== productUnitId))
+    // Remove input state
+    setQuantityInputs(prev => {
+      const newState = { ...prev }
+      delete newState[productUnitId]
+      return newState
+    })
+  }
+
+  const resetOrderForm = () => {
+    // Reset all order-related states to initial values
+    setOrderItems([])
+    setQuantityInputs({})
+    setSelectedCustomer(null)
+    setSelectedPromotion(null)
+    setPaymentMethod('COD')
+    setShippingAddress('')
+    setOrderNotes('')
+    setCurrentOrder(null)
+    setOrderStatus(null)
+    setPaymentInfo(null)
+    setOrderPreview(null)
+    setError(null)
+    setSuccess(null)
+    setShowCompleteConfirmModal(false)
+    setOrderSummaryForConfirm(null)
+    setPendingCompleteOrderId(null)
+    setShowPaymentSuccessModal(false)
+    setShowPaymentMethodModal(false)
+    setBarcodeInput('')
+    setQuickSearch('')
+
+    // Focus back to barcode input for next order
+    if (barcodeInputRef.current) {
+      barcodeInputRef.current.focus()
+    }
+  }
+
+  const handleContinueToPayment = () => {
+    if (orderItems.length === 0) {
+      setError('Vui lòng thêm sản phẩm vào giỏ hàng')
+      return
+    }
+    setShowPaymentMethodModal(true)
+  }
+
+  const handleConfirmPaymentMethod = () => {
+    setShowPaymentMethodModal(false)
+    // Proceed with order creation using selected payment method
+    handleCreateOrder()
   }
 
   const handleUpdateQuantity = (productUnitId: number, newQuantity: number) => {
+    // Only remove if explicitly set to 0 or negative, not if input is empty
     if (newQuantity <= 0) {
       handleRemoveItem(productUnitId)
       return
@@ -1002,6 +1073,33 @@ const CreateOrderManagement: React.FC = () => {
         ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.unitPrice }
         : item
     ))
+
+    // Update input state to match the new quantity
+    setQuantityInputs(prev => ({
+      ...prev,
+      [productUnitId]: newQuantity.toString()
+    }))
+  }
+
+  const handleQuantityInputChange = (productUnitId: number, value: string) => {
+    // Always update input state first - this allows typing
+    setQuantityInputs(prev => ({
+      ...prev,
+      [productUnitId]: value
+    }))
+
+    // Only update order if value is a valid positive number
+    if (value !== '' && !isNaN(Number(value))) {
+      const numValue = Number(value)
+      if (numValue > 0) {
+        // Update order items without updating input state again
+        setOrderItems(prev => prev.map(item =>
+          item.productUnitId === productUnitId
+            ? { ...item, quantity: numValue, subtotal: numValue * item.unitPrice }
+            : item
+        ))
+      }
+    }
   }
 
   const calculateTotals = () => {
@@ -1202,11 +1300,7 @@ const CreateOrderManagement: React.FC = () => {
                 </label>
                 <div className="flex space-x-2">
                   <input
-                    ref={(input) => {
-                      if (input && isPOSMode) {
-                        input.focus()
-                      }
-                    }}
+                    ref={barcodeInputRef}
                     type="text"
                     value={barcodeInput}
                     onChange={(e) => setBarcodeInput(e.target.value)}
@@ -1224,7 +1318,7 @@ const CreateOrderManagement: React.FC = () => {
                     onClick={startCameraScanner}
                     className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                   >
-                    Quét bằng camera
+                    Quét mã vạch
                   </button>
 
 
@@ -1399,8 +1493,25 @@ const CreateOrderManagement: React.FC = () => {
                           <input
                             type="number"
                             min="1"
-                            value={item.quantity}
-                            onChange={(e) => handleUpdateQuantity(item.productUnitId, parseInt(e.target.value) || 0)}
+                            value={quantityInputs[item.productUnitId] !== undefined ? quantityInputs[item.productUnitId] : item.quantity}
+                            onChange={(e) => handleQuantityInputChange(item.productUnitId, e.target.value)}
+                            onBlur={(e) => {
+                              // When user finishes typing, ensure we have a valid value
+                              const value = e.target.value
+                              if (value === '' || isNaN(Number(value)) || Number(value) <= 0) {
+                                // Reset to current quantity if invalid
+                                setQuantityInputs(prev => ({
+                                  ...prev,
+                                  [item.productUnitId]: item.quantity.toString()
+                                }))
+                              } else {
+                                // Ensure input state matches the final value
+                                setQuantityInputs(prev => ({
+                                  ...prev,
+                                  [item.productUnitId]: value
+                                }))
+                              }
+                            }}
                             className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                           />
                         </td>
@@ -1489,58 +1600,6 @@ const CreateOrderManagement: React.FC = () => {
 
         {/* Right Column - Order Summary */}
         <div className="space-y-6">
-          {/* Payment Method */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Phương thức thanh toán</h2>
-
-            <div className="space-y-3">
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="cod"
-                  name="paymentMethod"
-                  value="COD"
-                  checked={paymentMethod === 'COD'}
-                  onChange={(e) => setPaymentMethod(e.target.value as 'COD' | 'BANK_TRANSFER')}
-                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                />
-                <label htmlFor="cod" className="ml-2 text-sm font-medium text-gray-900">
-                  {isPOSMode ? 'Tiền mặt' : 'Thanh toán khi nhận hàng (COD)'}
-                </label>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="bank_transfer"
-                  name="paymentMethod"
-                  value="BANK_TRANSFER"
-                  checked={paymentMethod === 'BANK_TRANSFER'}
-                  onChange={(e) => setPaymentMethod(e.target.value as 'COD' | 'BANK_TRANSFER')}
-                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                />
-                <label htmlFor="bank_transfer" className="ml-2 text-sm font-medium text-gray-900">
-                  {isPOSMode ? 'Chuyển khoản' : 'Chuyển khoản ngân hàng'}
-                </label>
-              </div>
-            </div>
-
-            {isPOSMode && (
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center">
-                  <div className="text-blue-500 text-lg mr-2">💳</div>
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">
-                      Bán hàng tại quầy
-                    </p>
-                    <p className="text-xs text-blue-600">
-                      Khách hàng thanh toán trực tiếp tại cửa hàng
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
 
           {/* Order Summary */}
           <div className="bg-white shadow rounded-lg p-6">
@@ -1732,18 +1791,106 @@ const CreateOrderManagement: React.FC = () => {
 
             <div className="mt-6">
               <button
-                onClick={handleCreateOrder}
+                onClick={isPOSMode ? handleContinueToPayment : handleCreateOrder}
                 disabled={loading || (!isPOSMode && !selectedCustomer) || orderItems.length === 0 || (isPOSMode && currentOrder)}
                 className="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-lg"
               >
                 {loading ? 'Đang xử lý...' :
-                 isPOSMode ? (currentOrder ? 'Đang xử lý đơn hàng...' : 'Hoàn thành bán hàng') :
+                 isPOSMode ? (currentOrder ? 'Đang xử lý đơn hàng...' : 'Tiếp tục') :
                  'Tạo đơn hàng'}
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Payment Method Selection Modal */}
+      {showPaymentMethodModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Chọn phương thức thanh toán</h3>
+              <button
+                onClick={() => setShowPaymentMethodModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="text-sm text-gray-600 mb-4">
+                Tổng tiền: <span className="font-semibold text-lg text-green-600">{formatCurrency(total)}</span>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    id="modal_cod"
+                    name="modal_paymentMethod"
+                    value="COD"
+                    checked={paymentMethod === 'COD'}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'COD' | 'BANK_TRANSFER')}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <label htmlFor="modal_cod" className="ml-3 flex items-center">
+                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Tiền mặt</div>
+                      <div className="text-xs text-gray-500">Thanh toán trực tiếp tại quầy</div>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    id="modal_bank_transfer"
+                    name="modal_paymentMethod"
+                    value="BANK_TRANSFER"
+                    checked={paymentMethod === 'BANK_TRANSFER'}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'COD' | 'BANK_TRANSFER')}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <label htmlFor="modal_bank_transfer" className="ml-3 flex items-center">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Chuyển khoản</div>
+                      <div className="text-xs text-gray-500">Thanh toán qua QR code</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  onClick={() => setShowPaymentMethodModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleConfirmPaymentMethod}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Hoàn thành bán hàng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payment QR Modal */}
       {showPaymentModal && paymentInfo && (
@@ -1927,7 +2074,7 @@ const CreateOrderManagement: React.FC = () => {
               <button
                 onClick={() => {
                   setShowPaymentSuccessModal(false)
-                  handleClearCart()
+                  resetOrderForm()
                 }}
                 className="bg-green-600 text-white py-3 px-6 rounded-md hover:bg-green-700 font-medium text-lg"
               >
@@ -2071,6 +2218,11 @@ const CreateOrderManagement: React.FC = () => {
                       console.error('❌ Failed to mark payment PAID on complete:', e)
                     }
                     setShowCompleteConfirmModal(false)
+
+                    // Reset form after a short delay to show success message
+                    setTimeout(() => {
+                      resetOrderForm()
+                    }, 2000)
                   } catch (e: any) {
                     setError('Lỗi khi hoàn thành đơn hàng: ' + (e?.message || ''))
                   }

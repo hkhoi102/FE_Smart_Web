@@ -1,8 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import Input from './Input'
 import CategoryMenu from './CategoryMenu'
-import AccountDropdown from './AccountDropdown'
 import { useCart } from '../contexts/CartContext'
 import { useUserAuth } from '../contexts/UserAuthContext'
 
@@ -177,10 +175,10 @@ const Layout = ({ children }: LayoutProps) => {
                 <div className="absolute z-30 mt-2 md:block">
                   <CategoryMenu
                     activeCategory={currentCategory}
-                    onSelect={(label) => {
-                      console.log('Selected category:', label)
+                    onSelect={(category) => {
+                      console.log('Selected category:', category)
                       setIsCategoriesOpen(false)
-                      navigate(`/products?category=${encodeURIComponent(label)}`)
+                      navigate(`/products?category=${encodeURIComponent(category.name)}`)
                     }}
                   />
                 </div>

@@ -28,14 +28,13 @@ const InventoryImportExportCreate = () => {
 
   useEffect(() => {
     loadWarehouses()
-    loadProducts()
   }, [])
 
   useEffect(() => {
-    if (selectedWarehouse && products.length > 0) {
-      loadProductQuantities(selectedWarehouse)
+    if (selectedWarehouse) {
+      loadProductsByWarehouse(selectedWarehouse)
     }
-  }, [selectedWarehouse, products.length])
+  }, [selectedWarehouse])
 
   const loadWarehouses = async () => {
     try {
@@ -46,106 +45,97 @@ const InventoryImportExportCreate = () => {
     }
   }
 
-  const loadProductQuantities = async (warehouseId: number) => {
-    try {
-      console.log('Loading product quantities for warehouse:', warehouseId)
-      // Gọi API để lấy số lượng sản phẩm trong kho
-      const inventoryData = await InventoryService.getStock({ warehouseId })
-      console.log('Inventory data:', inventoryData)
 
-      // Cập nhật số lượng cho từng sản phẩm
-      setProducts(prev => prev.map(product => {
-        const inventoryItem = inventoryData.find(item => item.productUnitId === product.id)
-        return {
-          ...product,
-          systemQuantity: inventoryItem ? inventoryItem.quantity : 0
+  const loadProductsByWarehouse = async (warehouseId: number) => {
+    try {
+      console.log('🔄 Loading low stock products for warehouse:', warehouseId)
+      setLoading(true)
+
+      // Gọi API low-stock để lấy sản phẩm sắp hết hàng theo kho
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/products/low-stock?threshold=20&warehouseId=${warehouseId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json'
         }
-      }))
-    } catch (error) {
-      console.error('Error loading product quantities:', error)
-      // Nếu có lỗi, giữ nguyên số lượng 0
-    }
-  }
+      })
 
-  const loadProducts = async () => {
-    try {
-      console.log('Loading products...')
-      const data = await ProductService.getProducts(1, 1000)
-      console.log('Products data:', data)
+      console.log('📡 API Response status:', response.status)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ API Error:', errorText)
+        throw new Error(`Failed to fetch low stock products: ${response.status} ${errorText}`)
+      }
+
+      const lowStockResponse = await response.json()
+      console.log('📦 Low stock response received:', lowStockResponse)
+
+      // Lấy data từ response
+      const lowStockData = lowStockResponse.data || lowStockResponse
+      console.log('📦 Low stock data extracted:', lowStockData)
+      console.log('📦 Data type:', typeof lowStockData)
+      console.log('📦 Data length:', Array.isArray(lowStockData) ? lowStockData.length : 'Not an array')
 
       const productUnits: ProductUnit[] = []
 
-      if (data.products && data.products.length > 0) {
-        // Load từng sản phẩm và lấy units thực tế
-        for (const product of data.products) {
-          try {
-            // Gọi API lấy chi tiết sản phẩm để có units
-            const productDetail = await ProductService.getProductById(product.id)
-            console.log('Product detail:', productDetail)
+      // Kiểm tra cấu trúc data
+      if (lowStockData && Array.isArray(lowStockData) && lowStockData.length > 0) {
+        console.log('✅ Processing', lowStockData.length, 'low stock items')
 
-            if (productDetail.productUnits && productDetail.productUnits.length > 0) {
-              // Chỉ lấy đơn vị mặc định (isDefault = true)
-              const defaultUnit = productDetail.productUnits.find(unit => unit.isDefault)
-              if (defaultUnit) {
-                productUnits.push({
-                  id: defaultUnit.id,
-                  productId: product.id,
-                  productName: product.name,
-                  unitName: defaultUnit.unitName || 'Cái',
-                  systemQuantity: 0, // Sẽ được cập nhật khi chọn kho
-                  selected: false,
-                  actualQuantity: 0,
-                  note: ''
-                })
-              } else {
-                // Nếu không có đơn vị mặc định, lấy đơn vị đầu tiên
-                const firstUnit = productDetail.productUnits[0]
-                productUnits.push({
-                  id: firstUnit.id,
-                  productId: product.id,
-                  productName: product.name,
-                  unitName: firstUnit.unitName || 'Cái',
-                  systemQuantity: 0,
-                  selected: false,
-                  actualQuantity: 0,
-                  note: ''
-                })
-              }
-            } else {
-              // Nếu không có units, tạo một unit mặc định
-              productUnits.push({
-                id: product.id,
+        // Sắp xếp theo số lượng tồn kho (ít nhất lên đầu)
+        const sortedData = lowStockData.sort((a: any, b: any) => (a.quantity || 0) - (b.quantity || 0))
+        console.log('📊 Sorted data:', sortedData)
+
+        // Xử lý từng sản phẩm và các đơn vị của nó
+        for (const product of sortedData) {
+          console.log('🔍 Processing product:', product)
+
+          if (product.productUnits && Array.isArray(product.productUnits)) {
+            // Xử lý từng đơn vị của sản phẩm
+            for (const unit of product.productUnits) {
+              console.log('🔧 Processing unit:', unit)
+
+              const productUnit: ProductUnit = {
+                id: unit.id || `${product.id}_${unit.unitName}`,
                 productId: product.id,
-                productName: product.name,
-                unitName: 'Cái',
-                systemQuantity: 0,
+                productName: product.name || `Product ${product.id}`,
+                unitName: unit.unitName || 'Cái',
+                systemQuantity: unit.availableQuantity || unit.quantity || 0,
                 selected: false,
                 actualQuantity: 0,
                 note: ''
-              })
+              }
+              productUnits.push(productUnit)
+              console.log('✅ Added product unit:', productUnit)
             }
-          } catch (productError) {
-            console.error('Error loading product detail:', productError)
-            // Nếu lỗi load chi tiết sản phẩm, tạo unit mặc định
-            productUnits.push({
+          } else {
+            // Fallback nếu không có productUnits
+            const productUnit: ProductUnit = {
               id: product.id,
               productId: product.id,
-              productName: product.name,
+              productName: product.name || `Product ${product.id}`,
               unitName: 'Cái',
-              systemQuantity: 0,
+              systemQuantity: product.quantity || 0,
               selected: false,
               actualQuantity: 0,
               note: ''
-            })
+            }
+            productUnits.push(productUnit)
+            console.log('✅ Added fallback product unit:', productUnit)
           }
         }
+      } else {
+        console.warn('⚠️ No low stock data or empty array received')
       }
 
-      console.log('Product units:', productUnits)
+      console.log('🎯 Final product units:', productUnits)
+      console.log('🎯 Product units count:', productUnits.length)
       setProducts(productUnits)
     } catch (error) {
-      console.error('Error loading products:', error)
+      console.error('❌ Error loading low stock products:', error)
       setProducts([])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -237,12 +227,12 @@ const InventoryImportExportCreate = () => {
             <h1 className="text-2xl font-bold text-gray-900">Tạo phiếu nhập xuất hàng</h1>
             <p className="text-gray-600">Tạo phiếu nhập xuất hàng mới</p>
           </div>
-          <button
+          {/* <button
             onClick={handleBack}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
           >
             ← Quay lại
-          </button>
+          </button> */}
         </div>
 
         {/* Progress Steps */}

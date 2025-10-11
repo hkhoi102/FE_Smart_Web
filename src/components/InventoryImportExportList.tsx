@@ -55,7 +55,19 @@ const InventoryImportExportList = () => {
       const params = selectedWarehouse ? { warehouseId: selectedWarehouse } : undefined
       const data = await InventoryService.listDocuments(params)
       console.log('Documents data:', data)
-      setDocuments(data)
+      // Map data to ensure all required fields are present
+      const mappedData = data.map((doc: any) => ({
+        id: doc.id,
+        type: doc.type,
+        status: doc.status,
+        referenceNumber: doc.referenceNumber,
+        note: doc.note,
+        warehouseId: doc.warehouseId || 0, // Default value if missing
+        warehouseName: doc.warehouseName,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt
+      }))
+      setDocuments(mappedData)
     } catch (error) {
       console.error('Error loading documents:', error)
     } finally {
@@ -134,9 +146,6 @@ const InventoryImportExportList = () => {
     }
   }
 
-  const handleRefresh = () => {
-    loadDocuments()
-  }
 
   // Pagination logic
   const itemsPerPage = 10

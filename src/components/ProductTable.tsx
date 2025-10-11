@@ -43,6 +43,9 @@ const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: 
         <thead className="bg-gray-50">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              STT
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Mã SP
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -64,10 +67,13 @@ const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: 
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {buildRows().map(({ product, unit }) => (
+          {buildRows().map(({ product, unit }, index) => (
               <tr key={`${product.id}-${unit ? unit.id : 'nou'}`} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  #{product.id}
+                  {index + 1}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {product.code || `#${product.id}`}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">

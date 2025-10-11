@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { ProductService, Product, ProductCategory, CreateProductRequest, UpdateProductRequest } from '@/services/productService'
 import { InventoryService, WarehouseDto, StockLocationDto } from '@/services/inventoryService'
 import { Pagination, ProductTable, ProductFormWithUnitsAndPrices, Modal, UnitManagement, PriceManagement, AccountManagement, InventoryManagement, InventoryCheckManagement, WarehouseTab, PromotionManagement, OrderManagement, OrderProcessingManagement, OrderListManagement, AdminSidebar } from '@/components'
@@ -177,7 +177,21 @@ const Admin = () => {
     if (isAuthenticated) {
       loadProducts()
     }
-  }, [pagination.current_page, searchTerm, selectedCategory])
+  }, [pagination.current_page, selectedCategory])
+
+  // Filter products locally based on search term
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return products
+    }
+
+    return products.filter(product =>
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.categoryName?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [products, searchTerm])
 
   // After products load, detect units that already have price headers to drive the button label
   useEffect(() => {
@@ -213,7 +227,7 @@ const Admin = () => {
       const response = await ProductService.getProducts(
         pagination.current_page,
         pagination.items_per_page,
-        searchTerm || undefined,
+        undefined, // Không search qua API nữa
         selectedCategory
       )
       setProducts(response.products)
@@ -264,7 +278,7 @@ const Admin = () => {
 
   const handleSearch = (value: string) => {
     setSearchTerm(value)
-    setPagination(prev => ({ ...prev, current_page: 1 }))
+    // Không cần reset pagination vì search là local
   }
 
   const handleCategoryFilter = (categoryId: number | undefined) => {
@@ -744,7 +758,7 @@ const Admin = () => {
                     </select>
                   </div>
 
-                  <div className="flex items-end">
+                  {/* <div className="flex items-end">
                     <button
                       onClick={() => {
                         setSearchTerm('')
@@ -755,7 +769,7 @@ const Admin = () => {
                     >
                       Xóa bộ lọc
                     </button>
-                  </div>
+                  </div> */}
                 </div>
               </div>
 
@@ -764,7 +778,12 @@ const Admin = () => {
                 <div className="px-6 py-4 border-b border-gray-200">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-medium text-gray-900">
-                      Danh sách sản phẩm ({pagination.total_items})
+                      Danh sách sản phẩm ({filteredProducts.length})
+                      {searchTerm && (
+                        <span className="text-sm text-gray-500 ml-2">
+                          (từ {pagination.total_items} sản phẩm)
+                        </span>
+                      )}
                     </h3>
                     <div className="flex items-center gap-2">
                       <button
@@ -791,7 +810,7 @@ const Admin = () => {
                 ) : (
                   <>
                     <ProductTable
-                      products={products}
+                      products={filteredProducts}
                       categories={categories}
                       onEdit={handleEditProduct}
                       onDelete={handleDeleteProduct}
@@ -1462,7 +1481,7 @@ const UnitRow = ({ productId, product, unit }: { productId: number; product: Pro
       <div className="text-sm text-gray-800">
         <span className="font-medium">{unit.unitName}</span>
         <span className="ml-2 text-gray-600">Hệ số: {unit.conversionFactor ?? unit.conversionRate ?? 1}</span>
-        {unit.isDefault && <span className="ml-2 px-2 py-0.5 text-xs rounded bg-green-100 text-green-800">Mặc định</span>}
+        {unit.isDefault && <span className="ml-2 px-2 py-0.5 text-xs rounded bg-green-100 text-green-800">Đơn vị cơ bản</span>}
       </div>
       <div className="flex items-center gap-4">
         <div className="text-sm text-gray-800">

@@ -193,12 +193,12 @@ const InventoryCheckCreate = () => {
         {/* Admin-like header and tabs (match InventoryManagement) */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-gray-900">Quản lý kho</h2>
-          <button
+          {/* <button
             onClick={() => navigate('/admin?tab=inventory')}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
           >
             ← Quay lại
-          </button>
+          </button> */}
         </div>
 
         {/* Title */}
