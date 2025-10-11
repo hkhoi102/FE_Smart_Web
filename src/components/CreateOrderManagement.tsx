@@ -93,6 +93,34 @@ const CreateOrderManagement: React.FC = () => {
     }
   }, [isPOSMode])
 
+  // Auto-start camera scanner when component mounts in POS mode
+  useEffect(() => {
+    if (isPOSMode) {
+      // Delay a bit to ensure component is fully loaded
+      const timer = setTimeout(() => {
+        console.log('📷 Auto-starting camera scanner...')
+        startCameraScanner()
+      }, 2000) // Delay 2 seconds to ensure component is ready
+
+      return () => clearTimeout(timer)
+    }
+  }, []) // Empty dependency array to run only once on mount
+
+  // Monitor camera status and restart if needed
+  useEffect(() => {
+    if (isPOSMode && showCameraScanner) {
+      const checkCameraStatus = setInterval(() => {
+        // Check if video element exists and has stream
+        if (videoRef.current && !videoRef.current.srcObject) {
+          console.log('📷 Camera stream lost, restarting...')
+          startCameraScanner()
+        }
+      }, 5000) // Check every 5 seconds
+
+      return () => clearInterval(checkCameraStatus)
+    }
+  }, [isPOSMode, showCameraScanner])
+
   // Gọi API preview khi giỏ hàng thay đổi
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -462,8 +490,14 @@ const CreateOrderManagement: React.FC = () => {
   // Camera barcode scanning using native BarcodeDetector (Chromium-based browsers)
   const startCameraScanner = async () => {
     try {
+      console.log('📷 Starting camera scanner...')
       setError(null)
       setShowCameraScanner(true)
+
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Trình duyệt không hỗ trợ camera. Vui lòng sử dụng HTTPS hoặc trình duyệt mới hơn.')
+      }
 
       // Stop any existing streams first
       if (streamRef.current) {
@@ -483,6 +517,7 @@ const CreateOrderManagement: React.FC = () => {
       // Wait for cleanup
       await new Promise(resolve => setTimeout(resolve, 500))
 
+      console.log('📷 Requesting camera access...')
       // Request back camera with better quality for barcode scanning
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -502,33 +537,58 @@ const CreateOrderManagement: React.FC = () => {
       }
 
       // Use ZXing for barcode detection
+      console.log('📷 Starting ZXing barcode detection...')
       await startZxingFallback()
     } catch (e: any) {
       console.error('📷 Camera error:', e)
-      setError('Không thể mở camera: ' + (e?.message || ''))
+      let errorMessage = 'Không thể mở camera: '
+
+      if (e.name === 'NotAllowedError') {
+        errorMessage += 'Bị từ chối quyền truy cập camera. Vui lòng cho phép quyền truy cập camera và thử lại.'
+      } else if (e.name === 'NotFoundError') {
+        errorMessage += 'Không tìm thấy camera. Vui lòng kiểm tra thiết bị.'
+      } else if (e.name === 'NotSupportedError') {
+        errorMessage += 'Trình duyệt không hỗ trợ camera. Vui lòng sử dụng HTTPS hoặc trình duyệt mới hơn.'
+      } else {
+        errorMessage += e?.message || 'Lỗi không xác định'
+      }
+
+      setError(errorMessage)
       await stopCameraScanner()
     }
   }
 
   const startZxingFallback = async () => {
     try {
+      console.log('📷 Loading ZXing library...')
       // Dynamically load ZXing UMD bundle
       const ensure = () => new Promise<void>((resolve, reject) => {
         if ((window as any).ZXing && (window as any).ZXing.BrowserMultiFormatReader) {
+          console.log('📷 ZXing already loaded')
           return resolve()
         }
+        console.log('📷 Loading ZXing from CDN...')
         const s = document.createElement('script')
         s.src = 'https://unpkg.com/@zxing/library@latest'
         s.async = true
-        s.onload = () => resolve()
-        s.onerror = () => reject(new Error('Cannot load ZXing'))
+        s.onload = () => {
+          console.log('📷 ZXing loaded successfully')
+          resolve()
+        }
+        s.onerror = () => {
+          console.error('📷 Failed to load ZXing')
+          reject(new Error('Cannot load ZXing library'))
+        }
         document.head.appendChild(s)
       })
       await ensure()
 
       const ZX = (window as any).ZXing
-      if (!ZX || !ZX.BrowserMultiFormatReader) throw new Error('ZXing not available')
+      if (!ZX || !ZX.BrowserMultiFormatReader) {
+        throw new Error('ZXing library not available')
+      }
 
+      console.log('📷 Creating ZXing reader...')
       const reader = new ZX.BrowserMultiFormatReader()
 
       // Configure ZXing with enhanced settings for faster detection
@@ -554,38 +614,87 @@ const CreateOrderManagement: React.FC = () => {
       zxingReaderRef.current = reader
 
       if (!videoRef.current) {
-        return
+        console.error('📷 Video element not available')
+        throw new Error('Video element not available')
       }
 
+      console.log('📷 Waiting for video to be ready...')
       // Wait for video to be ready
       await new Promise(resolve => setTimeout(resolve, 1000))
 
       // Check if video is ready
       if (!videoRef.current || videoRef.current.readyState !== 4) {
+        console.log('📷 Video not ready, waiting more...')
         await new Promise(resolve => setTimeout(resolve, 500))
       }
 
+      console.log('📷 Starting barcode scanning loop...')
       // Start continuous scanning with video element
       let isScanning = true
+      let lastScannedCode = '' // Track last scanned code to avoid duplicates
+      let lastScanTime = 0 // Track last scan time
+
       const scanLoop = async () => {
         try {
           if (!isScanning) {
+            console.log('📷 Scanning stopped')
             return
           }
 
-          if (videoRef.current && videoRef.current.readyState === 4) {
-            const result = await reader.decodeFromVideoElement(videoRef.current)
-            if (result && result.getText) {
-              const text = result.getText()
-              console.log('📷 ZXing found barcode:', text)
-              isScanning = false
-              await stopCameraScanner()
-              await handleBarcodeScan(String(text))
+          // Check if video is still ready
+          if (!videoRef.current || videoRef.current.readyState !== 4) {
+            console.log('📷 Video not ready, waiting...')
+            if (isScanning) {
+              setTimeout(scanLoop, 200) // Wait longer if video not ready
+            }
+            return
+          }
+
+          // Try to decode barcode
+          const result = await reader.decodeFromVideoElement(videoRef.current)
+          if (result && result.getText) {
+            const text = result.getText()
+            const currentTime = Date.now()
+
+            // Avoid scanning the same code within 2 seconds
+            if (text === lastScannedCode && (currentTime - lastScanTime) < 2000) {
+              console.log('📷 Duplicate code ignored:', text)
+              if (isScanning) {
+                setTimeout(scanLoop, 100) // Check again in 100ms
+              }
               return
             }
+
+            console.log('📷 ZXing found barcode:', text)
+            lastScannedCode = text
+            lastScanTime = currentTime
+
+            // Chỉ hiển thị mã vạch vào input, không tự động gọi API
+            setBarcodeInput(text)
+            setSuccess(`Đã quét được mã vạch: ${text}`)
+
+            // Tự động focus vào input để người dùng có thể nhấn Enter
+            setTimeout(() => {
+              if (barcodeInputRef.current) {
+                barcodeInputRef.current.focus()
+                console.log('📷 Focused on barcode input')
+              }
+            }, 100)
+
+            // Reset success message sau 2 giây
+            setTimeout(() => {
+              setSuccess(null)
+            }, 2000)
+
+            // Continue scanning immediately
+            if (isScanning) {
+              setTimeout(scanLoop, 100) // Continue in 100ms
+            }
+            return
           }
         } catch (e: any) {
-          // Silent error handling
+          // Silent error handling for scanning loop
+          console.log('📷 Scanning error (normal):', e.message)
         }
 
         // Continue scanning - faster for quick detection
@@ -595,14 +704,21 @@ const CreateOrderManagement: React.FC = () => {
       }
 
       // Store scanning control
-      zxingReaderRef.current = { reader, stop: () => { isScanning = false } }
+      zxingReaderRef.current = {
+        reader,
+        stop: () => {
+          console.log('📷 Stopping scanning...')
+          isScanning = false
+        }
+      }
 
       // Start the scanning loop
+      console.log('📷 Starting scan loop...')
       scanLoop()
 
     } catch (e: any) {
       console.error('📷 ZXing error:', e)
-      setError('Trình duyệt không hỗ trợ quét mã tự động. Vui lòng nhập mã hoặc dùng thiết bị khác.')
+      setError('Không thể khởi động barcode scanner: ' + (e?.message || 'Lỗi không xác định'))
     }
   }
 
@@ -1287,11 +1403,11 @@ const CreateOrderManagement: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Order Details */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6 relative">
           {/* POS Quick Actions */}
           {isPOSMode && (
             <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Thao tác nhanh</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Thao tác</h2>
 
               {/* Barcode Scanner */}
               <div className="mb-4">
@@ -1309,22 +1425,13 @@ const CreateOrderManagement: React.FC = () => {
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                   />
                   <button
-                    onClick={() => handleBarcodeScan(barcodeInput)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    Quét
-                  </button>
-                  <button
                     onClick={startCameraScanner}
                     className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                   >
-                    Quét mã vạch
+                    📷 Quét mã vạch
                   </button>
-
-
-
-
                 </div>
+
               </div>
 
               {/* Quick Search */}
@@ -1596,6 +1703,61 @@ const CreateOrderManagement: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Camera Scanner - Fixed at bottom right of left column */}
+          {isPOSMode && showCameraScanner && (
+            <div className="fixed bottom-4 right-4 w-80 bg-white rounded-lg shadow-2xl border-2 border-green-400 z-40">
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Đưa mã vào khung xanh</h3>
+                  <button onClick={stopCameraScanner} className="text-gray-400 hover:text-gray-600">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+              
+
+                <div className="space-y-2">
+                  <div className="relative">
+                    <video ref={videoRef} className="w-full h-48 rounded border bg-black object-cover" playsInline muted />
+                    {/* Scanning overlay with guide frame */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="relative">
+                        {/* Main scanning frame - smaller for corner display */}
+                        <div className="w-48 h-24 border-2 border-green-400 rounded-lg bg-transparent">
+                          {/* Corner indicators */}
+                          <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-green-400 rounded-tl-lg"></div>
+                          <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-green-400 rounded-tr-lg"></div>
+                          <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-green-400 rounded-bl-lg"></div>
+                          <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-green-400 rounded-br-lg"></div>
+
+                          {/* Scanning line animation */}
+                          <div className="absolute inset-0 overflow-hidden rounded-lg">
+                            <div className="absolute top-0 left-0 w-full h-0.5 bg-green-400 animate-pulse"></div>
+                            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-green-400 animate-pulse" style={{animationDelay: '0.5s'}}></div>
+                          </div>
+                        </div>
+
+                        {/* Center dot */}
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-green-400 rounded-full animate-ping"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    {/* <div className="text-xs text-gray-600">
+                      🔍 Đang quét...
+                    </div> */}
+                    <button onClick={stopCameraScanner} className="px-3 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700">
+                      Đóng
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Column - Order Summary */}
@@ -2091,63 +2253,6 @@ const CreateOrderManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Camera Scanner Modal */}
-      {showCameraScanner && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-xl w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Quét mã bằng camera</h3>
-              <button onClick={stopCameraScanner} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div className="relative">
-                <video ref={videoRef} className="w-full rounded border bg-black" playsInline muted />
-                {/* Scanning overlay with guide frame */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="relative">
-                    {/* Main scanning frame */}
-                    <div className="w-64 h-32 border-2 border-green-400 rounded-lg bg-transparent">
-                      {/* Corner indicators */}
-                      <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-green-400 rounded-tl-lg"></div>
-                      <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-green-400 rounded-tr-lg"></div>
-                      <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-green-400 rounded-bl-lg"></div>
-                      <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-green-400 rounded-br-lg"></div>
-
-                      {/* Scanning line animation */}
-                      <div className="absolute inset-0 overflow-hidden rounded-lg">
-                        <div className="absolute top-0 left-0 w-full h-0.5 bg-green-400 animate-pulse"></div>
-                        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-green-400 animate-pulse" style={{animationDelay: '0.5s'}}></div>
-                      </div>
-                    </div>
-
-                    {/* Center dot */}
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-green-400 rounded-full animate-ping"></div>
-                  </div>
-                </div>
-
-                {/* Instructions overlay */}
-                {/* <div className="absolute bottom-4 left-4 right-4 bg-black bg-opacity-70 text-white p-3 rounded-lg">
-                  <div className="text-sm font-medium mb-1">📷 Hướng dẫn quét mã vạch:</div>
-                  <div className="text-xs space-y-1">
-                    <div>• Đưa mã vạch vào khung xanh lá</div>
-                    <div>• Giữ camera ổn định</div>
-                    <div>• Đảm bảo ánh sáng đủ</div>
-                    <div>• Sản phẩm sẽ tự động thêm vào giỏ</div>
-                  </div>
-                </div> */}
-              </div>
-
-              <div className="flex justify-end">
-                <button onClick={stopCameraScanner} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Đóng</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Confirm Complete Modal */}
       {showCompleteConfirmModal && (
