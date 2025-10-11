@@ -1825,7 +1825,7 @@ const CreateOrderManagement: React.FC = () => {
             ) : (
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tạm tính12:</span>
+                  <span className="text-gray-600">Tạm tính:</span>
                   <span className="font-medium">{formatCurrency(subtotal)}</span>
                 </div>
 
