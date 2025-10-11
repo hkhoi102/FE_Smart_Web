@@ -172,12 +172,6 @@ const InventoryImportExportList = () => {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={handleRefresh}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              Làm mới
-            </button>
-            <button
               onClick={() => navigate('/admin?tab=inventory-import-export')}
               className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
             >

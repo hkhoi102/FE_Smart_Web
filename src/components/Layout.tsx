@@ -137,12 +137,12 @@ const Layout = ({ children }: LayoutProps) => {
                     </button>
                   </div>
                 ) : (
-                  <Link
-                    to="/user-login"
+                  <a
+                    href="http://localhost:3000/login"
                     className="text-sm text-gray-700 hover:text-primary-600"
                   >
                     Đăng nhập
-                  </Link>
+                  </a>
                 )}
               </div>
               <Link to="/wishlist" className="hidden md:flex items-center gap-2 text-gray-700 hover:text-primary-600">

@@ -440,13 +440,13 @@ const Admin = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {/* Header */}
+      {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-4">
             <div className="flex justify-between items-center">
-              <div>
+            <div>
                 <h1 className="text-2xl font-bold text-gray-900">Trang quản trị</h1>
-                <p className="text-gray-600">Chào mừng, {user?.fullName} ({user?.role})</p>
+              <p className="text-gray-600">Chào mừng, {user?.fullName} ({user?.role})</p>
               </div>
               <div className="flex items-center gap-4">
                 {/* Search */}
@@ -484,18 +484,18 @@ const Admin = () => {
                     <span className="text-sm font-medium text-gray-700">
                       {user?.fullName?.charAt(0) || 'U'}
                     </span>
-                  </div>
-                  <button
-                    onClick={handleLogout}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                  >
-                    Đăng xuất
-                  </button>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+            >
+              Đăng xuất
+            </button>
                 </div>
               </div>
-            </div>
           </div>
-        </header>
+        </div>
+      </header>
 
         {/* Content Area */}
         <main className="flex-1 p-6 overflow-y-auto">
@@ -504,7 +504,7 @@ const Admin = () => {
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Quản lý</h2>
               <p className="text-gray-600">Chọn một mục con từ menu bên trái để quản lý.</p>
-            </div>
+          </div>
           )}
 
           {currentTab === 'overview' && (
@@ -883,7 +883,7 @@ const Admin = () => {
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Xử lý đơn trả về</h2>
               <p className="text-gray-600">Chức năng xử lý đơn trả về sẽ được triển khai ở đây.</p>
-            </div>
+        </div>
           )}
 
           {currentTab === 'create-order' && (
@@ -896,7 +896,7 @@ const Admin = () => {
               <p className="text-gray-600">Chức năng xem lịch sử nhập xuất sẽ được triển khai ở đây.</p>
             </div>
           )}
-        </main>
+      </main>
       </div>
 
       {/* Product Modal */}

@@ -112,12 +112,12 @@ const Checkout: React.FC = () => {
             <p className="text-gray-600 mb-6">Bạn cần đăng nhập để tiếp tục thanh toán</p>
           </div>
           <div className="space-y-3">
-            <Link
-              to="/user-login"
+            <a
+              href="http://localhost:3000/login"
               className="w-full bg-primary-600 text-white py-3 px-4 rounded-lg hover:bg-primary-700 transition-colors font-medium inline-block"
             >
               Đăng nhập
-            </Link>
+            </a>
             <Link
               to="/cart"
               className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors font-medium inline-block"

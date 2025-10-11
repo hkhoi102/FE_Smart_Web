@@ -51,7 +51,7 @@ export default function MyOrders() {
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
-      navigate('/user-login')
+      window.location.href = 'http://localhost:3000/login'
       return
     }
 
