@@ -5,7 +5,7 @@ interface ModalProps {
   onClose: () => void
   title: string
   children: ReactNode
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
 }
 
 const Modal = ({ isOpen, onClose, title, children, size = 'lg' }: ModalProps) => {
@@ -29,22 +29,23 @@ const Modal = ({ isOpen, onClose, title, children, size = 'lg' }: ModalProps) =>
 
   if (!isOpen) return null
 
-  const sizeClasses = {
+  const sizeClasses: Record<Required<ModalProps>['size'], string> = {
     sm: 'max-w-md',
     md: 'max-w-lg',
     lg: 'max-w-4xl',
-    xl: 'max-w-6xl'
+    xl: 'max-w-6xl',
+    full: 'max-w-[95vw]'
   }
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Backdrop */}
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
           onClick={onClose}
         />
-        
+
         {/* Modal */}
         <div className={`relative w-full ${sizeClasses[size]} bg-white rounded-lg shadow-xl`}>
           {/* Header */}
@@ -61,7 +62,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'lg' }: ModalProps) =>
               </svg>
             </button>
           </div>
-          
+
           {/* Content */}
           <div className="p-6">
             {children}

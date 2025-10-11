@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useCart } from '../contexts/CartContext'
 
 const Cart: React.FC = () => {
-  const { state: cartState, updateQuantity, removeFromCart } = useCart()
+  const { state: cartState, updateQuantity, removeFromCart, reviewCart, removePromotion } = useCart()
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -21,10 +21,16 @@ const Cart: React.FC = () => {
     removeFromCart(id)
   }
 
+  const handleRefreshCart = () => {
+    reviewCart()
+  }
 
+  // Use review data if available, fallback to local calculation
+  const reviewData = cartState.reviewData
+  const subtotal = reviewData?.subtotal ?? cartState.totalAmount
+  const discountAmount = reviewData?.discountAmount ?? 0
   const shippingCost = 0 // Free shipping
-  const subtotal = cartState.totalAmount
-  const total = subtotal + shippingCost
+  const total = reviewData?.totalAmount ?? (subtotal + shippingCost)
 
   if (cartState.items.length === 0) {
     return (
@@ -45,8 +51,8 @@ const Cart: React.FC = () => {
             </div>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">Giỏ hàng của bạn đang trống</h2>
             <p className="text-gray-600 mb-8">Hãy thêm một số sản phẩm vào giỏ hàng để bắt đầu mua sắm!</p>
-            <Link 
-              to="/products" 
+            <Link
+              to="/products"
               className="inline-flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
             >
               Tiếp tục mua sắm
@@ -89,11 +95,11 @@ const Cart: React.FC = () => {
                       {/* Product Info */}
                       <div className="md:col-span-6">
                         <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0">
-                            <img 
-                              src="/images/fresh_fruit.png" 
+                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
+                            <img
+                              src={item.imageUrl || '/images/fresh_fruit.png'}
                               alt={item.name}
-                              className="w-full h-full object-cover rounded-lg"
+                              className="w-full h-full object-cover"
                             />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -101,7 +107,7 @@ const Cart: React.FC = () => {
                               {item.name}
                             </h3>
                             <p className="text-sm text-gray-500 mt-1">
-                              {item.category_name} • {item.unit}
+                              {item.categoryName || ''} • {item.unitName || ''}
                             </p>
                           </div>
                         </div>
@@ -167,9 +173,6 @@ const Cart: React.FC = () => {
                 >
                   ← Trở về Shop
                 </Link>
-                <button className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-                  Cập nhật giỏ
-                </button>
               </div>
             </div>
           </div>
@@ -178,18 +181,64 @@ const Cart: React.FC = () => {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Tổng thanh toán</h2>
-              
+
               <div className="space-y-4">
                 <div className="flex justify-between text-gray-600">
                   <span>Tạm tính:</span>
                   <span>{formatCurrency(subtotal)}</span>
                 </div>
-                
+
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Giảm giá:</span>
+                    <span className="font-medium">-{formatCurrency(discountAmount)}</span>
+                  </div>
+                )}
+
+
+                {reviewData?.appliedPromotion && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span className="text-sm font-medium text-green-800">
+                          {reviewData.appliedPromotion.name}
+                        </span>
+                      </div>
+                      <button
+                        onClick={removePromotion}
+                        className="text-green-600 hover:text-green-800 transition-colors"
+                        title="Xóa khuyến mãi"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <p className="text-xs text-green-600 mt-1">
+                      Tiết kiệm {formatCurrency(reviewData.appliedPromotion.discountAmount)}
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex justify-between text-gray-600">
                   <span>Phí vận chuyển:</span>
                   <span className="text-primary-600 font-medium">Miễn phí</span>
                 </div>
-                
+
+                {cartState.error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      <span className="text-sm text-red-800">{cartState.error}</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="border-t pt-4">
                   <div className="flex justify-between text-lg font-semibold text-gray-900">
                     <span>Tổng cộng:</span>
@@ -198,7 +247,7 @@ const Cart: React.FC = () => {
                 </div>
               </div>
 
-              <Link 
+              <Link
                 to="/checkout"
                 className="block w-full mt-6 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors font-medium text-center"
               >

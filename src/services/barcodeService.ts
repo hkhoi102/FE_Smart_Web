@@ -47,6 +47,51 @@ export const BarcodeService = {
   },
 
   /**
+   * Get barcodes by product unit id
+   */
+  async getBarcodesByProductUnit(productUnitId: number): Promise<BarcodeDto[]> {
+    const response = await fetch(`${API_BASE_URL}/products/units/${productUnitId}/barcodes`, {
+      method: 'GET',
+      headers: authHeaders()
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to get barcodes: ${response.statusText}`)
+    }
+
+    const result = await response.json()
+    return result.data || []
+  },
+
+  /**
+   * Fallback: Get barcodes by product + productUnit id (for some BE routes)
+   */
+  async getBarcodesByProductAndUnit(productId: number, productUnitId: number): Promise<BarcodeDto[]> {
+    // Backend hiện có endpoint: GET /api/products/{productId}/barcodes
+    // Ta gọi endpoint đó rồi lọc theo productUnitId
+    const response = await fetch(`${API_BASE_URL}/products/${productId}/barcodes`, {
+      method: 'GET',
+      headers: authHeaders()
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to get barcodes: ${response.statusText}`)
+    }
+
+    const result = await response.json().catch(() => ({} as any))
+    const arr = Array.isArray(result?.data) ? result.data : (Array.isArray(result) ? result : [])
+    return arr.filter((b: any) => (b?.productUnitId ?? b?.product_unit_id) === productUnitId)
+      .map((b: any) => ({
+        id: b.id,
+        productUnitId: b.productUnitId ?? b.product_unit_id,
+        code: b.code,
+        type: b.type ?? 'EAN13',
+        createdAt: b.createdAt ?? b.created_at ?? '',
+        updatedAt: b.updatedAt ?? b.updated_at ?? ''
+      }))
+  },
+
+  /**
    * Delete barcode
    */
   async deleteBarcode(barcodeId: number): Promise<void> {

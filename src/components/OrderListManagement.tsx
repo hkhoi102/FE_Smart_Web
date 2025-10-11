@@ -98,7 +98,7 @@ const OrderListManagement: React.FC = () => {
       const unitMap: Record<number, { productName?: string; unitName?: string }> = { ...unitInfoCache }
       unitResults.forEach((info, idx) => {
         const key = uniqueUnitIds[idx]
-        if (info) unitMap[key] = { productName: info.name, unitName: info.unitName }
+        if (info) unitMap[key] = { productName: info.productName, unitName: info.unitName }
       })
       // Attach names into details
       Object.keys(detailMap).forEach((orderId) => {
@@ -466,123 +466,206 @@ const OrderListManagement: React.FC = () => {
 
       {/* Search and Filter */}
       <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Tìm kiếm và Lọc</h3>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Tìm kiếm và Lọc</h3>
+              <p className="text-sm text-gray-500">Lọc và tìm kiếm đơn hàng theo nhiều tiêu chí</p>
+            </div>
+          </div>
+          <button
+            onClick={handleClearFilters}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Xóa bộ lọc
+          </button>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          {/* Search */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tìm kiếm</label>
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
             <input
               type="text"
               placeholder="ID, khách hàng, tổng tiền..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
           </div>
+        </div>
 
-          {/* Status Filter (only show COMPLETED / CANCELLED per requirement) */}
+        {/* Filter Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Status Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="ALL">Tất cả</option>
-              <option value="COMPLETED">Hoàn thành</option>
-              <option value="CANCELLED">Đã hủy</option>
-            </select>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Trạng thái</label>
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="block w-full px-4 py-2.5 pr-8 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
+              >
+                <option value="ALL">Tất cả</option>
+                <option value="COMPLETED">Hoàn thành</option>
+                <option value="CANCELLED">Đã hủy</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           {/* Payment Status Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Thanh toán</label>
-            <select
-              value={paymentStatusFilter}
-              onChange={(e) => setPaymentStatusFilter(e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="ALL">Tất cả</option>
-              <option value="PAID">Đã thanh toán</option>
-              <option value="UNPAID">Chưa thanh toán</option>
-
-            </select>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Thanh toán</label>
+            <div className="relative">
+              <select
+                value={paymentStatusFilter}
+                onChange={(e) => setPaymentStatusFilter(e.target.value as any)}
+                className="block w-full px-4 py-2.5 pr-8 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
+              >
+                <option value="ALL">Tất cả</option>
+                <option value="PAID">Đã thanh toán</option>
+                <option value="UNPAID">Chưa thanh toán</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           {/* Payment Method Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phương thức</label>
-            <select
-              value={paymentMethodFilter}
-              onChange={(e) => setPaymentMethodFilter(e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="ALL">Tất cả</option>
-              <option value="COD">COD</option>
-              <option value="BANK_TRANSFER">Chuyển khoản</option>
-              <option value="CREDIT_CARD">Thẻ tín dụng</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          {/* Date Range */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Từ ngày</label>
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Đến ngày</label>
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            />
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Phương thức</label>
+            <div className="relative">
+              <select
+                value={paymentMethodFilter}
+                onChange={(e) => setPaymentMethodFilter(e.target.value as any)}
+                className="block w-full px-4 py-2.5 pr-8 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
+              >
+                <option value="ALL">Tất cả</option>
+                <option value="COD">COD</option>
+                <option value="BANK_TRANSFER">Chuyển khoản</option>
+                <option value="CREDIT_CARD">Thẻ tín dụng</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           {/* Sort */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sắp xếp</label>
-            <div className="flex space-x-2">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="created_at">Ngày tạo</option>
-                <option value="id">ID</option>
-                <option value="total_amount">Tổng tiền</option>
-                <option value="customer_id">Khách hàng</option>
-              </select>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Sắp xếp</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="block w-full px-4 py-2.5 pr-8 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
+                >
+                  <option value="created_at">Ngày tạo</option>
+                  <option value="id">ID</option>
+                  <option value="total_amount">Tổng tiền</option>
+                  <option value="customer_id">Khách hàng</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
               <button
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-3 py-2.5 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors"
                 title={sortOrder === 'asc' ? 'Tăng dần' : 'Giảm dần'}
               >
-                {sortOrder === 'asc' ? '↑' : '↓'}
+                {sortOrder === 'asc' ? (
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-600">
-            Hiển thị {filteredOrders.length} / {orders.length} đơn hàng
+        {/* Date Range */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Từ ngày</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              />
+            </div>
           </div>
-          <button
-            onClick={handleClearFilters}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Xóa bộ lọc
-          </button>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Đến ngày</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Results Summary */}
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span className="text-sm font-medium text-gray-700">
+              Hiển thị <span className="text-blue-600 font-semibold">{filteredOrders.length}</span> / {orders.length} đơn hàng
+            </span>
+          </div>
+          {(searchTerm || statusFilter !== 'ALL' || paymentStatusFilter !== 'ALL' || paymentMethodFilter !== 'ALL' || dateRange.start || dateRange.end) && (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Đang áp dụng bộ lọc
+            </div>
+          )}
         </div>
       </div>
 

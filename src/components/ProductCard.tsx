@@ -26,7 +26,7 @@ const ProductCard = ({
   // Get image URL - prioritize imageUrl prop, fallback to mapped images
   const getImageUrl = () => {
     if (product.imageUrl) return product.imageUrl
-    
+
     const imageMap: { [key: string]: string } = {
       'Coca Cola 330ml': '/images/beverages.png',
       'Pepsi 330ml': '/images/beverages.png',
@@ -44,23 +44,31 @@ const ProductCard = ({
     return imageMap[product.name] || '/images/fresh_fruit.png'
   }
 
-  const hasDiscount = product.originalPrice && product.originalPrice > product.price
+  // Derive display unit and price from productUnits
+  const defaultUnit = (product.productUnits && product.productUnits.find(u => u.isDefault)) || product.productUnits?.[0]
+  const displayUnitName = defaultUnit?.unitName || ''
+  const displayPrice = defaultUnit?.currentPrice ?? defaultUnit?.convertedPrice
+  const hasPrice = typeof displayPrice === 'number' && (displayPrice as number) > 0
+  const hasDiscount = false
+
+  // Show unit count if multiple units (should be 1 now since we expanded)
+  const unitCount = product.productUnits?.length || 0
 
   return (
     <>
-      <div 
-        className={`bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow duration-200 ${className}`} 
+      <div
+        className={`bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow duration-200 ${className}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         {...props}
       >
         <div className="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden relative group">
-          <img 
-            src={getImageUrl()} 
-            alt={product.name} 
-            className="object-cover w-full h-full" 
+          <img
+            src={getImageUrl()}
+            alt={product.name}
+            className="object-cover w-full h-full"
           />
-          
+
           {/* Quick View Button - appears on hover */}
           <div className={`absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
             <button
@@ -82,35 +90,47 @@ const ProductCard = ({
       <div className="p-4 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-            {product.category_name}
+            {product.categoryName}
           </span>
-          <span className="text-xs text-gray-500">
-            {product.unit}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">
+              {displayUnitName}
+            </span>
+            {unitCount > 1 && (
+              <span className="text-xs text-primary-600 bg-primary-50 px-2 py-1 rounded-full">
+                +{unitCount - 1} đơn vị
+              </span>
+            )}
+          </div>
         </div>
 
         <h3 className="text-gray-900 font-medium line-clamp-2 min-h-[2.5rem]">
           <Link to={`/product/${product.id}`} className="hover:text-primary-600">
             {product.name}
+            {displayUnitName && (
+              <span className="text-sm text-gray-500 font-normal"> - {displayUnitName}</span>
+            )}
           </Link>
         </h3>
 
         <div className="flex items-center gap-2">
           <span className="text-primary-600 font-semibold text-lg">
-            {formatCurrency(product.price)}
+            {typeof displayPrice === 'number' && displayPrice > 0 ? formatCurrency(displayPrice) : 'Liên hệ'}
           </span>
           {hasDiscount && (
-            <span className="text-gray-400 line-through text-sm">
-              {formatCurrency(product.originalPrice!)}
-            </span>
+            <span className="text-gray-400 line-through text-sm">{/* no original price for now */}</span>
           )}
         </div>
 
-        <button 
-          onClick={() => addToCart(product)}
-          className="mt-2 w-full bg-primary-600 hover:bg-primary-700 text-white text-sm py-2 rounded-lg transition-colors"
+        <button
+          onClick={() => {
+            if (!hasPrice) return
+            addToCart(product)
+          }}
+          disabled={!hasPrice}
+          className={`mt-2 w-full text-white text-sm py-2 rounded-lg transition-colors ${hasPrice ? 'bg-primary-600 hover:bg-primary-700' : 'bg-gray-300 cursor-not-allowed'}`}
         >
-          Thêm vào giỏ
+          {hasPrice ? 'Thêm vào giỏ' : 'Liên hệ để mua'}
         </button>
       </div>
     </div>

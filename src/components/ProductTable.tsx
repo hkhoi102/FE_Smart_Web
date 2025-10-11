@@ -5,18 +5,18 @@ interface ProductTableProps {
   categories: ProductCategory[]
   onEdit: (product: Product) => void
   onDelete: (id: number) => void
+  // Đã ẩn nút thêm đơn vị và tạo/xem giá theo yêu cầu
+  onViewDetail?: (product: Product) => void
 }
 
-const ProductTable = ({ products, categories, onEdit, onDelete }: ProductTableProps) => {
+const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: ProductTableProps) => {
 
   const formatPrice = (price?: number) => {
     if (price === undefined || price === null) return '—'
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN')
-  }
+  // HSD đã bỏ khỏi bảng, giữ lại nếu tái sử dụng ở nơi khác
 
   const getCategoryName = (product: Product) => {
     if (product.categoryName) return product.categoryName
@@ -43,6 +43,9 @@ const ProductTable = ({ products, categories, onEdit, onDelete }: ProductTablePr
         <thead className="bg-gray-50">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              STT
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Mã SP
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -57,19 +60,20 @@ const ProductTable = ({ products, categories, onEdit, onDelete }: ProductTablePr
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Giá
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              HSD
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+
+            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
               Thao tác
             </th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {buildRows().map(({ product, unit }) => (
+          {buildRows().map(({ product, unit }, index) => (
               <tr key={`${product.id}-${unit ? unit.id : 'nou'}`} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  #{product.id}
+                  {index + 1}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {product.code || `#${product.id}`}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
@@ -101,20 +105,30 @@ const ProductTable = ({ products, categories, onEdit, onDelete }: ProductTablePr
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {formatPrice(unit?.currentPrice)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {product.expirationDate ? formatDate(product.expirationDate) : 'Không có'}
-                </td>
+
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {onViewDetail && (
+                      <button
+                        onClick={() => onViewDetail(product)}
+                        className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                        title="Xem chi tiết sản phẩm"
+                      >
+                        Chi tiết
+                      </button>
+                    )}
+                    {/* Ẩn các nút: "+ Đơn vị" và "Tạo giá/Xem giá" theo yêu cầu */}
                     <button
                       onClick={() => onEdit(product)}
-                      className="text-green-600 hover:text-green-900"
+                      className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                      title="Chỉnh sửa sản phẩm"
                     >
                       Sửa
                     </button>
                     <button
                       onClick={() => onDelete(product.id)}
-                      className="text-red-600 hover:text-red-900"
+                      className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                      title="Xóa sản phẩm"
                     >
                       Xóa
                     </button>

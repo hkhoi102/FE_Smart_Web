@@ -6,7 +6,7 @@ import { ProductService, Product } from '../services/productService'
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const { addToCart } = useCart()
-  
+
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
@@ -42,15 +42,15 @@ const ProductDetail: React.FC = () => {
   useEffect(() => {
     const fetchProduct = async () => {
       if (!id) return
-      
+
       try {
         setLoading(true)
         const products = await ProductService.getAll()
         const foundProduct = products.find(p => p.id === parseInt(id))
-        
+
         if (foundProduct) {
           setProduct(foundProduct)
-          
+
           // Get related products (same category)
           const related = products
             .filter(p => p.category_id === foundProduct.category_id && p.id !== foundProduct.id)
@@ -69,7 +69,7 @@ const ProductDetail: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!product) return
-    
+
     for (let i = 0; i < quantity; i++) {
       addToCart(product)
     }
@@ -97,8 +97,8 @@ const ProductDetail: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Không tìm thấy sản phẩm</h2>
-          <Link 
-            to="/products" 
+          <Link
+            to="/products"
             className="inline-flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             Quay lại danh sách sản phẩm
@@ -281,7 +281,7 @@ const ProductDetail: React.FC = () => {
                 <p className="text-gray-600 leading-relaxed mb-4">
                   Nulla mauris tellus, feugiat quis pharetra sed, gravida ac dui. Sed iaculis, metus faucibus elementum tincidunt, turpis mi viverra velit, pellentesque tristique neque mi eget nulla. Proin luctus elementum neque et tempus.
                 </p>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
                   <div>
                     <h4 className="font-medium text-gray-900 mb-3">Những gì làm cho chúng tôi khác biệt</h4>
@@ -304,7 +304,7 @@ const ProductDetail: React.FC = () => {
                       </li>
                     </ul>
                   </div>
-                  
+
                   <div className="bg-gray-50 p-6 rounded-lg">
                     <div className="flex items-center gap-4 mb-4">
                       <div className="w-16 h-16 bg-red-100 rounded-lg flex items-center justify-center">
@@ -315,7 +315,7 @@ const ProductDetail: React.FC = () => {
                         <p className="text-sm text-gray-600">Save your 64% money with us</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 bg-green-100 rounded-lg flex items-center justify-center">
                         <span className="text-2xl">🌿</span>
@@ -358,7 +358,7 @@ const ProductDetail: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-medium text-gray-900 mb-4">Thông tin dinh dưỡng</h4>
                     <div className="space-y-3">
@@ -399,10 +399,10 @@ const ProductDetail: React.FC = () => {
               {relatedProducts.map((relatedProduct) => (
                 <div key={relatedProduct.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow duration-200">
                   <div className="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden">
-                    <img 
-                      src={getImageUrl(relatedProduct.name)} 
-                      alt={relatedProduct.name} 
-                      className="object-cover w-full h-full" 
+                    <img
+                      src={getImageUrl(relatedProduct.name)}
+                      alt={relatedProduct.name}
+                      className="object-cover w-full h-full"
                     />
                   </div>
                   <div className="p-4 space-y-2">
@@ -424,7 +424,7 @@ const ProductDetail: React.FC = () => {
                         {formatCurrency(relatedProduct.price)}
                       </span>
                     </div>
-                    <button 
+                    <button
                       onClick={() => addToCart(relatedProduct)}
                       className="mt-2 w-full bg-primary-600 hover:bg-primary-700 text-white text-sm py-2 rounded-lg transition-colors"
                     >

@@ -1,9 +1,8 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import Input from './Input'
 import CategoryMenu from './CategoryMenu'
-import AccountDropdown from './AccountDropdown'
 import { useCart } from '../contexts/CartContext'
+import { useUserAuth } from '../contexts/UserAuthContext'
 
 interface LayoutProps {
   children: ReactNode
@@ -14,10 +13,11 @@ const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { state: cartState } = useCart()
+  const { user, isAuthenticated, logout } = useUserAuth()
   const [isCategoriesOpen, setIsCategoriesOpen] = useState<boolean>(false)
   const [headerSearchTerm, setHeaderSearchTerm] = useState<string>('')
   const categoriesRef = useRef<HTMLDivElement | null>(null)
-  
+
   // Get current active category from URL (only on products page)
   const currentCategory = location.pathname === '/products' ? searchParams.get('category') || '' : ''
 
@@ -72,7 +72,7 @@ const Layout = ({ children }: LayoutProps) => {
           <p>Chào mừng đến với Siêu Thị Thông Minh — Thực phẩm tươi ngon giao hàng nhanh chóng</p>
           <div className="flex items-center gap-6">
             <span>Trợ giúp</span>
-            <span>Theo dõi đơn hàng</span>
+            <Link to="/my-orders" className="hover:text-white underline-offset-2 hover:underline">Theo dõi đơn hàng</Link>
             <span>Liên hệ: +84 123 456 789</span>
           </div>
         </div>
@@ -109,7 +109,7 @@ const Layout = ({ children }: LayoutProps) => {
             </div>
 
             {/* Mobile Search Button */}
-            <button 
+            <button
               onClick={() => navigate('/products')}
               className="md:hidden p-2 text-gray-700 hover:text-primary-600"
               title="Tìm kiếm sản phẩm"
@@ -122,7 +122,26 @@ const Layout = ({ children }: LayoutProps) => {
             {/* Icons */}
             <div className="flex items-center gap-4">
               <div className="hidden md:block">
-                <AccountDropdown />
+                {isAuthenticated ? (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-700">
+                      Xin chào, <span className="font-medium">{user?.fullName}</span>
+                    </span>
+                    <button
+                      onClick={logout}
+                      className="text-sm text-gray-600 hover:text-primary-600"
+                    >
+                      Đăng xuất
+                    </button>
+                  </div>
+                ) : (
+                  <a
+                    href="http://localhost:3000/login"
+                    className="text-sm text-gray-700 hover:text-primary-600"
+                  >
+                    Đăng nhập
+                  </a>
+                )}
               </div>
               <Link to="/wishlist" className="hidden md:flex items-center gap-2 text-gray-700 hover:text-primary-600">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
@@ -154,13 +173,13 @@ const Layout = ({ children }: LayoutProps) => {
               {/* Dropdown */}
               {isCategoriesOpen && (
                 <div className="absolute z-30 mt-2 md:block">
-                  <CategoryMenu 
+                  <CategoryMenu
                     activeCategory={currentCategory}
-                    onSelect={(label) => { 
-                      console.log('Selected category:', label)
+                    onSelect={(category) => {
+                      console.log('Selected category:', category)
                       setIsCategoriesOpen(false)
-                      navigate(`/products?category=${encodeURIComponent(label)}`)
-                    }} 
+                      navigate(`/products?category=${encodeURIComponent(category.name)}`)
+                    }}
                   />
                 </div>
               )}
@@ -202,7 +221,7 @@ const Layout = ({ children }: LayoutProps) => {
             <div className="flex flex-wrap gap-4 text-sm">
               <Link to="/about" className="hover:text-white">Giới thiệu</Link>
               <Link to="/contact" className="hover:text-white">Liên hệ</Link>
-              <Link to="#" className="hover:text-white">Đơn hàng</Link>
+              <Link to="/my-orders" className="hover:text-white">Đơn hàng</Link>
               <Link to="#" className="hover:text-white">Trợ giúp</Link>
             </div>
           </div>

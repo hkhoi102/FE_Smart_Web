@@ -21,7 +21,7 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
 
   const getImageUrl = () => {
     if (product.imageUrl) return product.imageUrl
-    
+
     const imageMap: { [key: string]: string } = {
       'Coca Cola 330ml': '/images/beverages.png',
       'Pepsi 330ml': '/images/beverages.png',
@@ -41,6 +41,10 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
 
 
   const handleAddToCart = () => {
+    // Block adding if all units have no price
+    const units = product.productUnits || []
+    const hasAnyPrice = units.some(u => typeof (u.currentPrice ?? u.convertedPrice) === 'number' && (u.currentPrice ?? u.convertedPrice)! > 0)
+    if (!hasAnyPrice) return
     for (let i = 0; i < quantity; i++) {
       addToCart(product)
     }
@@ -53,21 +57,19 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
     }
   }
 
-  const hasDiscount = product.originalPrice && product.originalPrice > product.price
-  const discountPercent = hasDiscount 
-    ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100)
-    : 0
+  const hasDiscount = false
+  const discountPercent = 0
 
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black bg-opacity-50"
         onClick={onClose}
       />
-      
+
       {/* Modal */}
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
         {/* Close Button */}
@@ -117,15 +119,39 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
               <span className="text-sm text-gray-400">SKU: {product.id}</span>
             </div>
 
-            {/* Price */}
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-3xl font-bold text-primary-600">
-                {formatCurrency(product.price)}
-              </span>
-              {hasDiscount && (
-                <span className="text-xl text-gray-400 line-through">
-                  {formatCurrency(product.originalPrice!)}
-                </span>
+            {/* Price and Units */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Giá theo đơn vị tính</h3>
+              {product.productUnits && product.productUnits.length > 0 ? (
+                <div className="space-y-3">
+                  {product.productUnits.map((unit) => (
+                    <div key={unit.id} className={`flex items-center justify-between p-3 rounded-lg bg-gray-50`}>
+                      <div className="flex items-center gap-3">
+                        <span className="font-medium text-gray-900">{unit.unitName}</span>
+                        {unit.isDefault && (
+                          <span className="text-xs bg-primary-100 text-primary-600 px-2 py-1 rounded-full">
+                            Mặc định
+                          </span>
+                        )}
+                        {/* current unit indicator removed */}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-semibold text-primary-600">
+                          {typeof (unit.currentPrice ?? unit.convertedPrice) === 'number' && (unit.currentPrice ?? unit.convertedPrice)! > 0
+                            ? formatCurrency((unit.currentPrice ?? unit.convertedPrice) as number)
+                            : 'Liên hệ'}
+                        </div>
+                        {unit.conversionFactor && unit.conversionFactor !== 1 && (
+                          <div className="text-xs text-gray-500">
+                            Tỷ lệ: {unit.conversionFactor}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-500 text-sm">Chưa có thông tin giá</div>
               )}
             </div>
 
@@ -164,9 +190,10 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
 
               <button
                 onClick={handleAddToCart}
-                className="flex-1 bg-primary-600 text-white py-3 px-6 rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center justify-center gap-2"
+                className="flex-1 bg-primary-600 text-white py-3 px-6 rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                disabled={!((product.productUnits||[]).some(u => typeof (u.currentPrice ?? u.convertedPrice) === 'number' && (u.currentPrice ?? u.convertedPrice)! > 0))}
               >
-                Thêm vào Giỏ
+                {((product.productUnits||[]).some(u => typeof (u.currentPrice ?? u.convertedPrice) === 'number' && (u.currentPrice ?? u.convertedPrice)! > 0)) ? 'Thêm vào Giỏ' : 'Liên hệ để mua'}
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l-1 12H6L5 9z"/>
                 </svg>
@@ -183,11 +210,11 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
             <div className="space-y-2 text-sm">
               <div>
                 <span className="text-gray-600">Danh mục: </span>
-                <span className="text-gray-900">{product.category_name}</span>
+                <span className="text-gray-900">{product.categoryName}</span>
               </div>
               <div>
                 <span className="text-gray-600">Tag: </span>
-                <span className="text-gray-900">Vegetables, Healthy, {product.category_name}, {product.name.split(' ')[0]}</span>
+                <span className="text-gray-900">Vegetables, Healthy, {product.categoryName}, {product.name.split(' ')[0]}</span>
               </div>
             </div>
 

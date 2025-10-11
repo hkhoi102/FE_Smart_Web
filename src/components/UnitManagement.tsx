@@ -14,7 +14,8 @@ const UnitManagement = () => {
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null)
   const [formData, setFormData] = useState({
     name: '',
-    description: ''
+    description: '',
+    isDefault: false,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -33,20 +34,20 @@ const UnitManagement = () => {
 
   const handleAddUnit = () => {
     setEditingUnit(null)
-    setFormData({ name: '', description: '' })
+    setFormData({ name: '', description: '', isDefault: false })
     setIsModalOpen(true)
   }
 
   const handleEditUnit = (unit: Unit) => {
     setEditingUnit(unit)
-    setFormData({ name: unit.name, description: unit.description || '' })
+    setFormData({ name: unit.name, description: unit.description || '', isDefault: (unit as any).isDefault ? true : false })
     setIsModalOpen(true)
   }
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setEditingUnit(null)
-    setFormData({ name: '', description: '' })
+    setFormData({ name: '', description: '', isDefault: false })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,9 +58,9 @@ const UnitManagement = () => {
     setIsSubmitting(true)
     try {
       if (editingUnit) {
-        await ProductService.updateUnit(editingUnit.id, { name: formData.name, description: formData.description })
+        await ProductService.updateUnit(editingUnit.id, { name: formData.name, description: formData.description, isDefault: formData.isDefault })
       } else {
-        await ProductService.createUnit({ name: formData.name, description: formData.description })
+        await ProductService.createUnit({ name: formData.name, description: formData.description, isDefault: formData.isDefault })
       }
       await loadUnits()
       handleCloseModal()
@@ -175,6 +176,17 @@ const UnitManagement = () => {
                       placeholder="Nhập mô tả đơn vị tính"
                     />
                   </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    id="uomIsDefault"
+                    type="checkbox"
+                    checked={formData.isDefault}
+                    onChange={(e) => setFormData(prev => ({ ...prev, isDefault: e.target.checked }))}
+                    className="h-4 w-4 text-green-600 border-gray-300 rounded"
+                  />
+                  <label htmlFor="uomIsDefault" className="text-sm text-gray-700">Đơn vị cơ bản (mặc định)</label>
+                </div>
                 </div>
 
                 <div className="flex justify-end space-x-3 mt-6">

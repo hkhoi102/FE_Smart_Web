@@ -1,124 +1,90 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ProductService } from '@/services/productService'
+import Pagination from './Pagination'
 
-interface PriceRow { id: number; productId: number; productName: string; unitId: number; unitName: string; price: number; validFrom: string; validTo?: string }
-
-interface Product { id: number; name: string }
+interface PriceHeader { id: number; name: string; description?: string; timeStart?: string; timeEnd?: string; active?: boolean; createdAt?: string }
 
 const PriceManagement = () => {
-  const [prices, setPrices] = useState<PriceRow[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingPrice, setEditingPrice] = useState<PriceRow | null>(null)
-  const [formData, setFormData] = useState({
-    productUnitId: '',
-    price: '',
-    startDate: '',
-    endDate: ''
-  })
-  const [unitOptions, setUnitOptions] = useState<Array<{ id: number; name: string; productId: number; productName: string }>>([])
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const navigate = useNavigate()
+  const [headers, setHeaders] = useState<PriceHeader[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formData, setFormData] = useState({ name: '', description: '', timeStart: '', timeEnd: '' })
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    total_pages: 1,
+    total_items: 0,
+    items_per_page: 10
+  })
+  const [currentPage, setCurrentPage] = useState(1)
 
-  const loadProducts = async () => {
-    const res = await ProductService.getProducts(1, 1000)
-    const mapped = res.products.map((p: any) => ({ id: p.id, name: p.name, productUnits: p.productUnits || [] }))
-    setProducts(mapped.map(p => ({ id: p.id, name: p.name })))
-    const allPU: Array<{ id: number; name: string; productId: number; productName: string }> = []
-    mapped.forEach(p => (p.productUnits || []).forEach((u: any) => allPU.push({ id: u.id, name: u.unitName, productId: p.id, productName: p.name })))
-    setUnitOptions(allPU)
+  const loadHeaders = async () => {
+    try {
+      const list = await ProductService.listPriceHeaders()
+      setHeaders(list)
+    } catch {}
   }
-  const loadDefaultPrices = async () => {
-    // optional: can fetch for first product
-    if (products.length === 0) return
-    const list: PriceRow[] = []
-    for (const p of products) {
-      try {
-        const pr = await ProductService.getProductPrices(p.id)
-        pr.forEach((x: any) => list.push({ id: x.id, productId: p.id, productName: p.name, unitId: x.unitId, unitName: x.unitName || '', price: x.price, validFrom: x.validFrom || x.timeStart || x.startDate || '', validTo: x.validTo || x.timeEnd || x.endDate }))
-      } catch {
-        // ignore
-      }
-    }
-    setPrices(list)
-  }
-  useEffect(() => { loadProducts() }, [])
-  useEffect(() => { if (products.length) loadDefaultPrices() }, [products])
 
-  // no-op; unitOptions đã build từ products
+  useEffect(() => { loadHeaders() }, [])
 
-  const filteredPrices = prices.filter(price =>
-    price.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    price.unitName.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredHeaders = headers.filter(h =>
+    (h.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (h.description || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleAddPrice = () => {
-    setEditingPrice(null)
-    const today = new Date().toISOString().split('T')[0]
-    setFormData({ productUnitId: '', price: '', startDate: today, endDate: '' })
-    setIsModalOpen(true)
-  }
+  // Pagination logic
+  const itemsPerPage = 10
+  const totalItems = filteredHeaders.length
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedHeaders = filteredHeaders.slice(startIndex, endIndex)
 
-  const handleEditPrice = (price: PriceRow) => {
-    setEditingPrice(price)
-    setFormData({
-      productUnitId: (unitOptions.find(o => o.productId === price.productId && o.name === price.unitName)?.id || '').toString(),
-      price: price.price.toString(),
-      startDate: price.validFrom,
-      endDate: price.validTo || ''
+  // Update pagination state
+  useEffect(() => {
+    setPagination({
+      current_page: currentPage,
+      total_pages: totalPages,
+      total_items: totalItems,
+      items_per_page: itemsPerPage
     })
-    setIsModalOpen(true)
+  }, [currentPage, totalPages, totalItems, itemsPerPage])
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-    setEditingPrice(null)
-    const today = new Date().toISOString().split('T')[0]
-    setFormData({ productUnitId: '', price: '', startDate: today, endDate: '' })
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
+
+  const openCreateModal = () => {
+    setFormData({ name: '', description: '', timeStart: '', timeEnd: '' })
+    setIsModalOpen(true)
   }
+  const closeModal = () => { setIsModalOpen(false) }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!formData.productUnitId || !formData.price || !formData.startDate) {
-      alert('Vui lòng điền đầy đủ thông tin')
-      return
-    }
-
+    if (!formData.name.trim()) return
     setIsSubmitting(true)
-
     try {
-      const selectedPU = unitOptions.find(o => o.id === parseInt(formData.productUnitId))
-      if (!selectedPU) return
-      const productId = selectedPU.productId
-      const validFrom = formData.startDate ? `${formData.startDate}T00:00:00` : ''
-      const validTo = formData.endDate ? `${formData.endDate}T23:59:59` : undefined
-      const payload = { unitId: parseInt(formData.productUnitId), price: parseFloat(formData.price), validFrom, validTo }
-      if (editingPrice) await ProductService.updateProductPrice(productId, editingPrice.id, payload)
-      else await ProductService.addProductPrice(productId, payload)
-      // reload prices for this product
-      const pr = await ProductService.getProductPrices(productId)
-      const name = products.find(p => p.id === productId)?.name || ''
-      setPrices(pr.map((x: any) => ({ id: x.id, productId, productName: name, unitId: x.unitId, unitName: x.unitName || '', price: x.price, validFrom: x.validFrom || x.timeStart || '', validTo: x.validTo || x.timeEnd })))
-      handleCloseModal()
+      await ProductService.createGlobalPriceHeader({
+        name: formData.name.trim(),
+        description: formData.description?.trim() || undefined,
+        timeStart: formData.timeStart || undefined,
+        timeEnd: formData.timeEnd || undefined,
+        active: true
+      })
+      closeModal()
+      await loadHeaders()
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const handleDeletePrice = async (row: PriceRow) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa giá này?')) return
-    await ProductService.deleteProductPrice(row.productId, row.id)
-    const pr = await ProductService.getProductPrices(row.productId)
-    const name = products.find(p => p.id === row.productId)?.name || ''
-    setPrices(pr.map((x: any) => ({ id: x.id, productId: row.productId, productName: name, unitId: x.unitId, unitName: x.unitName || '', price: x.price, validFrom: x.validFrom || '', validTo: x.validTo })))
-  }
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(price)
   }
 
   const formatDateSafe = (value?: string) => {
@@ -130,23 +96,16 @@ const PriceManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Quản lý giá</h2>
-        <button
-          onClick={handleAddPrice}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-        >
-          Thêm giá mới
-        </button>
+        <button onClick={openCreateModal} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">Tạo bảng giá</button>
       </div>
 
-      {/* Search */}
       <div className="flex justify-between items-center">
         <div className="flex-1 max-w-md">
           <input
             type="text"
-            placeholder="Tìm kiếm theo tên sản phẩm hoặc đơn vị..."
+            placeholder="Tìm theo tên hoặc mô tả bảng giá..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -154,64 +113,35 @@ const PriceManagement = () => {
         </div>
       </div>
 
-      {/* Prices Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sản phẩm
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Đơn vị
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Giá
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ngày bắt đầu
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ngày kết thúc
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thao tác
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên bảng giá</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mô tả</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hiệu lực từ</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hiệu lực đến</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredPrices.map((price) => (
-                <tr key={price.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {price.productName}
+              {paginatedHeaders.map(h => (
+                <tr key={h.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{h.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{h.description || '—'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateSafe(h.timeStart)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateSafe(h.timeEnd)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-2 py-0.5 rounded-full text-xs border ${h.active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>{h.active ? 'Đang hiệu lực' : 'Ngưng' }</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {price.unitName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                    {formatPrice(price.price)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDateSafe(price.validFrom)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDateSafe(price.validTo)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <div className="flex items-center justify-center">
                       <button
-                        onClick={() => handleEditPrice(price)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        onClick={() => handleDeletePrice(price)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Xóa
-                      </button>
+                        className="px-3 py-1.5 rounded-md text-white bg-orange-600 hover:bg-orange-700"
+                        onClick={() => navigate(`/admin/prices/${h.id}`)}
+                      >Thêm giá</button>
                     </div>
                   </td>
                 </tr>
@@ -221,104 +151,74 @@ const PriceManagement = () => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination
+          pagination={pagination}
+          onPageChange={handlePageChange}
+        />
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleCloseModal} />
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={closeModal} />
 
             <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="flex items-center justify-between p-6 border-b">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {editingPrice ? 'Chỉnh sửa giá' : 'Thêm giá mới'}
-                </h3>
-                <button
-                  onClick={handleCloseModal}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                <h3 className="text-lg font-semibold text-gray-900">Tạo bảng giá</h3>
+                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
 
               <form onSubmit={handleSubmit} className="p-6">
                 <div className="space-y-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị của sản phẩm *</label>
-                    <select
-                      value={formData.productUnitId}
-                      onChange={(e) => setFormData(prev => ({ ...prev, productUnitId: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      required
-                    >
-                      <option value="">Chọn Product Unit</option>
-                      {unitOptions.map(u => (
-                        <option key={u.id} value={u.id}>{u.productName} — {u.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Giá (VND) *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tên bảng giá *</label>
                     <input
-                      type="number"
-                      value={formData.price}
-                      onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      placeholder="Nhập giá"
-                      min="0"
-                      step="1000"
+                      placeholder="VD: Bảng giá tháng 10/2025"
                       required
                     />
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Mô tả</label>
+                    <input
+                      type="text"
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      placeholder="Ghi chú ngắn về bảng giá"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Ngày bắt đầu *
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Hiệu lực từ</label>
                       <input
-                        type="date"
-                        value={formData.startDate}
-                        onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                        type="datetime-local"
+                        value={formData.timeStart}
+                        onChange={(e) => setFormData(prev => ({ ...prev, timeStart: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        required
                       />
                     </div>
-
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Ngày kết thúc *
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Hiệu lực đến</label>
                       <input
-                        type="date"
-                        value={formData.endDate}
-                        onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                        type="datetime-local"
+                        value={formData.timeEnd}
+                        onChange={(e) => setFormData(prev => ({ ...prev, timeEnd: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        required
                       />
                     </div>
                   </div>
                 </div>
-
                 <div className="flex justify-end space-x-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {isSubmitting ? 'Đang lưu...' : (editingPrice ? 'Cập nhật' : 'Thêm')}
-                  </button>
+                  <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Hủy</button>
+                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50">{isSubmitting ? 'Đang lưu...' : 'Tạo'}</button>
                 </div>
               </form>
             </div>
