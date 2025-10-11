@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Modal from './Modal'
 import { PromotionServiceApi, PromotionMutations } from '@/services/promotionService'
 import { ProductService } from '@/services/productService'
 
 const PromotionHeaderManagement: React.FC = () => {
+  const navigate = useNavigate()
   const [headers, setHeaders] = useState<any[]>([])
   const [filterText, setFilterText] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
@@ -179,11 +181,6 @@ const PromotionHeaderManagement: React.FC = () => {
     return matchText && matchStatus && matchStart && matchEnd
   })
 
-  // Expand lines under a header row
-  const [expandedHeaderId, setExpandedHeaderId] = useState<number | null>(null)
-  const [expandedLinesByHeader, setExpandedLinesByHeader] = useState<Record<number, any[]>>({})
-  const [productNameCache, setProductNameCache] = useState<Record<number, string>>({})
-  const [categoryNameCache, setCategoryNameCache] = useState<Record<number, string>>({})
   const [lineEditOpen, setLineEditOpen] = useState(false)
   const [lineEditing, setLineEditing] = useState<any | null>(null)
   const [lineDetails, setLineDetails] = useState<any[]>([])
@@ -195,53 +192,9 @@ const PromotionHeaderManagement: React.FC = () => {
     } catch { setLineDetails([]) }
     setLineEditOpen(true)
   }
-  const toggleExpandHeader = async (headerId: number) => {
-    if (expandedHeaderId === headerId) {
-      setExpandedHeaderId(null)
-      return
-    }
-    setExpandedHeaderId(headerId)
-    if (!expandedLinesByHeader[headerId]) {
-      try {
-        const lines = await PromotionServiceApi.getLinesAll(headerId)
-        const mapped = lines.map((l: any) => ({
-          id: l.id,
-          targetType: l.targetType,
-          targetId: l.targetId,
-          type: l.type || l.promotionType,
-          startDate: l.startDate,
-          endDate: l.endDate,
-          active: l.active,
-        }))
-        setExpandedLinesByHeader(prev => ({ ...prev, [headerId]: mapped }))
-        // Load target names for better display
-        // Categories: load once if needed
-        const needsCategory = mapped.some(m => String(m.targetType).toUpperCase() === 'CATEGORY')
-        if (needsCategory && Object.keys(categoryNameCache).length === 0) {
-          try {
-            const cats = await ProductService.getCategories()
-            const rec: Record<number, string> = {}
-            ;(cats || []).forEach((c: any) => { rec[c.id] = c.name })
-            setCategoryNameCache(rec)
-          } catch {}
-        }
-        // Products: targetId is productUnitId → resolve via getProductUnitById
-        const unitIds = mapped.filter(m => String(m.targetType).toUpperCase() === 'PRODUCT').map(m => m.targetId)
-        for (const unitId of unitIds) {
-          if (!productNameCache[unitId]) {
-            try {
-              const info = await ProductService.getProductUnitById(unitId)
-              const title = info?.productName ? `${info.productName}` : `#${unitId}`
-              setProductNameCache(prev => ({ ...prev, [unitId]: title }))
-            } catch {
-              setProductNameCache(prev => ({ ...prev, [unitId]: `#${unitId}` }))
-            }
-          }
-        }
-      } catch {
-        setExpandedLinesByHeader(prev => ({ ...prev, [headerId]: [] }))
-      }
-    }
+
+  const handlePromotionNameClick = (header: any) => {
+    navigate(`/admin/promotion/${header.id}`)
   }
 
   return (
@@ -423,13 +376,17 @@ const PromotionHeaderManagement: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredHeaders.map((header) => (
-                  <>
-                  <tr key={header.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => toggleExpandHeader(header.id)}>
+                  <tr key={header.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {header.id}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {header.name}
+                      <button
+                        onClick={() => handlePromotionNameClick(header)}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                      >
+                        {header.name}
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(header.start_date)}
@@ -474,60 +431,6 @@ const PromotionHeaderManagement: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                  {expandedHeaderId === header.id && (
-                    <tr>
-                      <td className="px-6 py-4 bg-gray-50" colSpan={7}>
-
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-100">
-                              <tr>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loại</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Áp dụng cho</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mục tiêu</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bắt đầu</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kết thúc</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {(expandedLinesByHeader[header.id] || []).map((l: any) => (
-                                <tr key={l.id} className="hover:bg-gray-50">
-                                  <td className="px-3 py-2 text-sm text-gray-700">{l.id}</td>
-                                  <td className="px-3 py-2 text-sm text-gray-700">{viType(l.type)}</td>
-                                  <td className="px-3 py-2 text-sm text-gray-700">{viTarget(l.targetType)}</td>
-                                  <td className="px-3 py-2 text-sm text-gray-700">
-                                    {String(l.targetType).toUpperCase() === 'PRODUCT'
-                                      ? (productNameCache[l.targetId] || `#${l.targetId}`)
-                                      : String(l.targetType).toUpperCase() === 'CATEGORY'
-                                        ? (categoryNameCache[l.targetId] || `#${l.targetId}`)
-                                        : `Khách hàng #${l.targetId}`}
-                                  </td>
-                                  <td className="px-3 py-2 text-sm text-gray-700">{l.startDate ? formatDate(l.startDate) : '-'}</td>
-                                  <td className="px-3 py-2 text-sm text-gray-700">{l.endDate ? formatDate(l.endDate) : '-'}</td>
-                                  <td className="px-3 py-2">
-                                    <div className="flex items-center gap-2">
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${l.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                        {l.active ? 'Kích hoạt' : 'Tạm dừng'}
-                                      </span>
-                                      <button className="text-xs text-blue-600 hover:text-blue-800" onClick={() => openLineEditor(l)}>Sửa</button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                              {(expandedLinesByHeader[header.id] || []).length === 0 && (
-                                <tr>
-                                  <td className="px-3 py-2 text-sm text-gray-500" colSpan={7}>Chưa có dòng khuyến mãi</td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  </>
                 ))}
               </tbody>
             </table>
@@ -761,6 +664,7 @@ const PromotionHeaderManagement: React.FC = () => {
           onClose={() => setLineEditOpen(false)}
         />
       )}
+
     </div>
   )
 }
