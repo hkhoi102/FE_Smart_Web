@@ -284,13 +284,6 @@ const ImportExportManagement = () => {
         <h2 className="text-2xl font-bold text-gray-900">Nhập/Xuất Kho</h2>
         <div className="flex gap-2">
           <button
-            onClick={loadData}
-            disabled={loading}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50"
-          >
-            {loading ? 'Đang tải...' : 'Làm mới'}
-          </button>
-          <button
             onClick={handleAddTransaction}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
           >

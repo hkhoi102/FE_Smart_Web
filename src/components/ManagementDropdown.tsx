@@ -17,7 +17,7 @@ const ManagementDropdown = ({ currentTab, onTabChange }: ManagementDropdownProps
       case 'units':
         return 'Quản lý đơn vị'
       case 'prices':
-        return 'Quản lý giá'
+        return 'Giá'
       default:
         return 'Quản lý'
     }
@@ -90,7 +90,7 @@ const ManagementDropdown = ({ currentTab, onTabChange }: ManagementDropdownProps
                   currentTab === 'prices' ? 'text-green-600 bg-green-50' : 'text-gray-700'
                 }`}
               >
-                Quản lý giá
+                Giá
               </button>
             </div>
           </div>

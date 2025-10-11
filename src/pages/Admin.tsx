@@ -1,14 +1,27 @@
 import { useAuth } from '@/contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import React, { useEffect, useState, useMemo } from 'react'
 import { ProductService, Product, ProductCategory, CreateProductRequest, UpdateProductRequest } from '@/services/productService'
 import { InventoryService, WarehouseDto, StockLocationDto } from '@/services/inventoryService'
-import { Pagination, ProductTable, ProductForm, Modal, UnitManagement, ManagementDropdown, PriceManagement, AccountManagement, InventoryManagement, WarehouseTab, PromotionManagement, OrderManagement, BarcodeModal, AddBarcodeModal } from '@/components'
+import { Pagination, ProductTable, ProductFormWithUnitsAndPrices, Modal, UnitManagement, PriceManagement, AccountManagement, InventoryManagement, InventoryCheckManagement, WarehouseTab, PromotionManagement, OrderManagement, OrderProcessingManagement, OrderListManagement, AdminSidebar } from '@/components'
+import CreateOrderManagement from '@/components/CreateOrderManagement'
+import InventoryImportExportCreate from '@/components/InventoryImportExportCreate'
+import InventoryImportExportList from '@/components/InventoryImportExportList'
+import PriceHeaderDetail from '@/pages/PriceHeaderDetail'
+import InventoryCheckCreate from '@/pages/InventoryCheckCreate'
 import CategoryManagement from '@/components/CategoryManagement'
 
 const Admin = () => {
   const { user, logout, isAuthenticated } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { headerId } = useParams<{ headerId?: string }>()
+
+  // Detect create inventory check page
+  const isInventoryCheckCreate = location.pathname === '/admin/inventory-check/create'
+
+  // Detect price header detail page
+  const isPriceHeaderDetail = location.pathname.startsWith('/admin/prices/') && headerId
 
   // State for products
   const [products, setProducts] = useState<Product[]>([])
@@ -22,20 +35,55 @@ const Admin = () => {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>()
-  const [currentTab, setCurrentTab] = useState<'overview' | 'products' | 'categories' | 'units' | 'prices' | 'inventory' | 'warehouses' | 'accounts' | 'promotions' | 'orders'>('overview')
+  type TabType = 'overview' | 'management' | 'products' | 'categories' | 'units' | 'prices' | 'inventory' | 'inventory-management' | 'inventory-import-export' | 'inventory-import-export-list' | 'inventory-check-create' | 'inventory-check' | 'warehouses' | 'warehouse-list' | 'warehouse-history' | 'accounts' | 'promotions' | 'orders' | 'order-processing' | 'order-list' | 'return-processing' | 'create-order'
+
+  const [currentTab, setCurrentTab] = useState<TabType>(
+    (new URLSearchParams(location.search).get('tab') as TabType) ||
+    (isInventoryCheckCreate ? 'inventory-check-create' :
+     isPriceHeaderDetail ? 'prices' : 'overview')
+  )
+
+  // Keep tab in sync with URL changes (e.g., when navigating back from create page)
+  useEffect(() => {
+    const tabFromUrl = (new URLSearchParams(location.search).get('tab') as any) || undefined
+    if (isInventoryCheckCreate) {
+      setCurrentTab('inventory-check-create')
+    } else if (isPriceHeaderDetail) {
+      setCurrentTab('prices')
+    } else if (tabFromUrl) {
+      setCurrentTab(tabFromUrl)
+    } else if (!tabFromUrl && currentTab !== 'overview') {
+      setCurrentTab('overview')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.search])
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isUnitModalOpen, setIsUnitModalOpen] = useState(false)
-  const [unitForm, setUnitForm] = useState<{ productId: number | ''; unitId: number | ''; conversionFactor: number; isDefault: boolean }>({ productId: '', unitId: '', conversionFactor: 1, isDefault: false })
+  // row-level actions
+  const [unitModalOpen, setUnitModalOpen] = useState(false)
+  const [targetProduct] = useState<Product | null>(null)
+  const [unitForm, setUnitForm] = useState<{ unitId: number | ''; conversionFactor: number; isDefault: boolean; barcodeCode: string; barcodeType: string }>({ unitId: '', conversionFactor: 1, isDefault: false, barcodeCode: '', barcodeType: 'EAN13' })
   const [allUnits, setAllUnits] = useState<Array<{ id: number; name: string; isDefault?: boolean }>>([])
+  const [detailedProduct, setDetailedProduct] = useState<Product | null>(null)
+  const [barcodeInputs, setBarcodeInputs] = useState<Record<number, { code: string; type: string }>>({})
+  const [unitCFEdit, setUnitCFEdit] = useState<Record<number, number>>({})
+  // price modal states
+  const [priceModalOpen, setPriceModalOpen] = useState(false)
+  const [selectedUnit] = useState<{ productUnitId: number; unitId?: number; unitName?: string } | null>(null)
+  const [priceHistory, setPriceHistory] = useState<Array<{ id: number; unitId: number; unitName?: string; price: number; validFrom?: string; validTo?: string; priceHeaderId?: number }>>([])
+  const [unitsWithHeader, setUnitsWithHeader] = useState<Set<number>>(new Set())
+  const [headerByUnit, setHeaderByUnit] = useState<Record<number, number>>({})
+  // Headers không hiển thị trong UI
+  const [newPrice, setNewPrice] = useState<{ price: string; validFrom: string; validTo: string }>({ price: '', validFrom: '', validTo: '' })
+  const [priceLoading, setPriceLoading] = useState(false)
 
-  // Barcode modal states
-  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false)
-  const [selectedProductForBarcode, setSelectedProductForBarcode] = useState<Product | null>(null)
-  const [isAddBarcodeModalOpen, setIsAddBarcodeModalOpen] = useState(false)
+  // View detail modal
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null)
+
   // Import/Upload modals
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -43,17 +91,9 @@ const Admin = () => {
   const [importStockLocationId, setImportStockLocationId] = useState<string>('')
   const [warehouses, setWarehouses] = useState<WarehouseDto[]>([])
   const [stockLocations, setStockLocations] = useState<StockLocationDto[]>([])
-  const [isUploadImageModalOpen, setIsUploadImageModalOpen] = useState(false)
-  const [uploadTargetProductId, setUploadTargetProductId] = useState<number | ''>('')
-  const [uploadImageFile, setUploadImageFile] = useState<File | null>(null)
 
-  useEffect(() => {
-    if (!isUnitModalOpen) return
-    // Load all units once when modal opens
-    ProductService.getUnits()
-      .then(res => setAllUnits(res.map((u: any) => ({ id: u.id, name: u.name, isDefault: u.isDefault }))))
-      .catch(() => setAllUnits([]))
-  }, [isUnitModalOpen])
+
+
 
   // Notification modal
   const [notify, setNotify] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' }>({ open: false, title: '', message: '', type: 'success' })
@@ -88,6 +128,35 @@ const Admin = () => {
       .then(setWarehouses)
       .catch(() => setWarehouses([]))
   }, [])
+  // preload units when needed
+  useEffect(() => {
+    if (!unitModalOpen) return
+    ProductService.getUnits()
+      .then(res => setAllUnits(res.map((u: any) => ({ id: u.id, name: u.name, isDefault: u.isDefault }))))
+      .catch(() => setAllUnits([]))
+    if (targetProduct?.id) {
+      ProductService.getProductById(targetProduct.id)
+        .then(p => {
+          setDetailedProduct(p)
+          // Prefill barcode inputs per unit with existing barcode
+          const mp: Record<number, { code: string; type: string }> = {}
+          const units = (p.productUnits || []) as any[]
+          const productAny = p as unknown as { barcodeList?: Array<{ id: number; productUnitId: number; code: string; type?: string }> }
+          for (const u of units) {
+            const list = (u.barcodes && u.barcodes.length > 0)
+              ? u.barcodes
+              : (productAny?.barcodeList || []).filter(b => b.productUnitId === (u.id ?? u.unitId))
+            if (list && list.length > 0) {
+              mp[u.id] = { code: list[0].code, type: list[0].type || 'EAN13' }
+            }
+          }
+          setBarcodeInputs(mp)
+        })
+        .catch(() => setDetailedProduct(targetProduct))
+    }
+    // Always reset isDefault when opening (avoid setting new default if one exists)
+    setUnitForm(prev => ({ ...prev, isDefault: false }))
+  }, [unitModalOpen])
 
   useEffect(() => {
     const wid = importWarehouseId ? Number(importWarehouseId) : undefined
@@ -108,7 +177,49 @@ const Admin = () => {
     if (isAuthenticated) {
       loadProducts()
     }
-  }, [pagination.current_page, searchTerm, selectedCategory])
+  }, [pagination.current_page, selectedCategory])
+
+  // Filter products locally based on search term
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return products
+    }
+
+    return products.filter(product =>
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.categoryName?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [products, searchTerm])
+
+  // After products load, detect units that already have price headers to drive the button label
+  useEffect(() => {
+    if (!products || products.length === 0) {
+      setUnitsWithHeader(new Set())
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      const pairs: Array<{ productId: number; productUnitId: number }> = []
+      for (const p of products) {
+        for (const u of (p.productUnits || [])) {
+          pairs.push({ productId: p.id, productUnitId: u.id })
+        }
+      }
+      const acc = new Set<number>()
+      await Promise.all(pairs.map(async ({ productId, productUnitId }) => {
+        try {
+          const hs = await ProductService.getPriceHeaders(productId, productUnitId)
+          if (Array.isArray(hs) && hs.length > 0) acc.add(productUnitId)
+        } catch {
+          // ignore
+        }
+      }))
+      if (!cancelled) setUnitsWithHeader(acc)
+    })()
+    return () => { cancelled = true }
+  }, [products])
 
   const loadProducts = async () => {
     setLoading(true)
@@ -116,7 +227,7 @@ const Admin = () => {
       const response = await ProductService.getProducts(
         pagination.current_page,
         pagination.items_per_page,
-        searchTerm || undefined,
+        undefined, // Không search qua API nữa
         selectedCategory
       )
       setProducts(response.products)
@@ -167,7 +278,7 @@ const Admin = () => {
 
   const handleSearch = (value: string) => {
     setSearchTerm(value)
-    setPagination(prev => ({ ...prev, current_page: 1 }))
+    // Không cần reset pagination vì search là local
   }
 
   const handleCategoryFilter = (categoryId: number | undefined) => {
@@ -207,13 +318,14 @@ const Admin = () => {
       }
       const payload: CreateProductRequest | UpdateProductRequest = {
         name: productData.name,
+        code: productData.code || '',
         description: productData.description,
         imageUrl: productData.image_url || productData.imageUrl,
         expirationDate: productData.expiration_date || productData.expirationDate,
         categoryId: productData.category_id || productData.categoryId,
         active: (productData.active === 1) ? true : !!productData.active,
       }
-      if (editingProduct) await ProductService.updateProduct(editingProduct.id, payload)
+      if (editingProduct) await ProductService.updateProductWithImage(editingProduct.id, payload as UpdateProductRequest, undefined)
       else await ProductService.createProduct(payload)
 
       // Reload products
@@ -240,19 +352,87 @@ const Admin = () => {
     }
   }
 
-  const handleAddBarcode = (product: Product) => {
-    setSelectedProductForBarcode(product)
-    setIsBarcodeModalOpen(true)
+  // --- Price modal helpers ---
+  // Load price history and headers once when opening price modal
+  useEffect(() => {
+    if (!priceModalOpen || !targetProduct || !selectedUnit) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        setPriceLoading(true)
+        const rowsRaw = await ProductService.getUnitPriceHistory(targetProduct.id, selectedUnit.productUnitId)
+        if (cancelled) return
+        const rows = rowsRaw.map((r: any) => ({
+          id: r.id,
+          unitId: r.unitId ?? r.productUnitId ?? selectedUnit.productUnitId,
+          unitName: r.unitName,
+          price: r.price,
+          validFrom: r.timeStart ?? r.validFrom,
+          validTo: r.timeEnd ?? r.validTo,
+          priceHeaderId: r.priceHeaderId ?? r.priceHeader?.id,
+        }))
+        setPriceHistory(rows)
+        // Mark that this unit now has at least one header/price so table button switches to "Xem giá"
+        if (rows.length > 0) {
+          setUnitsWithHeader(prev => new Set(prev).add(selectedUnit.productUnitId))
+        }
+      } catch {
+        if (!cancelled) setPriceHistory([])
+      } finally {
+        if (!cancelled) setPriceLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [priceModalOpen, targetProduct, selectedUnit])
+
+  // Headers not loaded anymore
+
+  const CreatePriceHeaderForm = ({ productId, productUnitId, onCreated }: { productId: number; productUnitId: number; onCreated: (headerId: number) => void }) => {
+    const [name, setName] = useState('')
+    const [description, setDescription] = useState('')
+    const [timeStart, setTimeStart] = useState('')
+    const [timeEnd, setTimeEnd] = useState('')
+    const [active, setActive] = useState(true)
+    return (
+      <form onSubmit={async (e) => {
+        e.preventDefault()
+        if (!name.trim()) return
+        try {
+          const created = await ProductService.createPriceHeader(productId, productUnitId, { name: name.trim(), description: description || undefined, timeStart: timeStart || undefined, timeEnd: timeEnd || undefined, active })
+          setName(''); setDescription(''); setTimeStart(''); setTimeEnd(''); setActive(true)
+          onCreated(created?.id || 0)
+        } catch {}
+      }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Tên bảng giá</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Mô tả (tùy chọn)</label>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Hiệu lực từ (tùy chọn)</label>
+            <input type="datetime-local" value={timeStart} onChange={(e) => setTimeStart(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Đến (tùy chọn)</label>
+            <input type="datetime-local" value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="h-4 w-4 text-green-600 border-gray-300 rounded" />
+            <span className="text-sm">Kích hoạt</span>
+          </div>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <button type="submit" className="px-4 py-2 rounded-md text-white bg-gray-700 hover:bg-gray-800">Tạo đơn giá</button>
+        </div>
+      </form>
+    )
   }
 
-  const handleBarcodeSuccess = () => {
-    // Reload products to get updated barcode information
-    loadProducts()
-  }
 
-  const handleAddBarcodeClick = () => {
-    setIsAddBarcodeModalOpen(true)
-  }
 
 
   const handleLogout = () => {
@@ -265,14 +445,59 @@ const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
+      <AdminSidebar
+        currentTab={currentTab}
+        onTabChange={setCurrentTab}
+      />
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
       {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="px-6 py-4">
+            <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Trang quản trị</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Trang quản trị</h1>
               <p className="text-gray-600">Chào mừng, {user?.fullName} ({user?.role})</p>
+              </div>
+              <div className="flex items-center gap-4">
+                {/* Search */}
+                <div className="hidden md:block">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm..."
+                      className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35m1.1-4.4a6.75 6.75 0 11-13.5 0 6.75 6.75 0 0113.5 0z"/>
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Grid Icon */}
+                <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+                  </svg>
+                </button>
+
+                {/* Bell Icon */}
+                <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg relative">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                  </svg>
+                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
+                </button>
+
+                {/* User Profile */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-gray-700">
+                      {user?.fullName?.charAt(0) || 'U'}
+                    </span>
             </div>
             <button
               onClick={handleLogout}
@@ -280,72 +505,21 @@ const Admin = () => {
             >
               Đăng xuất
             </button>
+                </div>
+              </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          {/* Tabs */}
-          <div className="border-b border-gray-200 mb-6">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setCurrentTab('overview')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentTab === 'overview'
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Tổng quan
-              </button>
-              <ManagementDropdown
-                currentTab={currentTab}
-                onTabChange={setCurrentTab}
-              />
-              <button
-                onClick={() => setCurrentTab('warehouses')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentTab === 'warehouses'
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Kho
-              </button>
-              <button
-                onClick={() => setCurrentTab('accounts')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentTab === 'accounts'
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Tài khoản
-              </button>
-              <button
-                onClick={() => setCurrentTab('promotions')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentTab === 'promotions'
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Khuyến mãi
-              </button>
-              <button
-                onClick={() => setCurrentTab('orders')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentTab === 'orders'
-                    ? 'border-orange-500 text-orange-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Đơn hàng
-              </button>
-            </nav>
+        {/* Content Area */}
+        <main className="flex-1 p-6 overflow-y-auto">
+
+          {currentTab === 'management' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Quản lý</h2>
+              <p className="text-gray-600">Chọn một mục con từ menu bên trái để quản lý.</p>
           </div>
+          )}
 
           {currentTab === 'overview' && (
             <>
@@ -438,39 +612,10 @@ const Admin = () => {
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="bg-white shadow rounded-lg mb-8">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Thao tác nhanh</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button
-                  onClick={handleAddProduct}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                >
-                  Thêm sản phẩm mới
-                </button>
-                <button
-                  onClick={() => setCurrentTab('products')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                >
-                  Quản lý sản phẩm
-                </button>
-                <button
-                  onClick={() => {
-                    calculateStats()
-                    alert('Dữ liệu đã được làm mới!')
-                  }}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                >
-                  Làm mới dữ liệu
-                </button>
-              </div>
-            </div>
-          </div>
 
           {/* Recent Products */}
           <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
+            <div>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">Sản phẩm gần đây</h3>
                 <button
@@ -492,9 +637,6 @@ const Admin = () => {
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Danh mục
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Giá
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Ngày tạo
@@ -531,9 +673,6 @@ const Admin = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {product.categoryName || categories.find(cat => cat.id === product.categoryId)?.name || `ID: ${product.categoryId}`}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          —
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(product.createdAt).toLocaleDateString('vi-VN')}
@@ -584,7 +723,7 @@ const Admin = () => {
                     </select>
                   </div>
 
-                  <div className="flex items-end">
+                  {/* <div className="flex items-end">
                     <button
                       onClick={() => {
                         setSearchTerm('')
@@ -595,7 +734,7 @@ const Admin = () => {
                     >
                       Xóa bộ lọc
                     </button>
-                  </div>
+                  </div> */}
                 </div>
               </div>
 
@@ -604,7 +743,12 @@ const Admin = () => {
                 <div className="px-6 py-4 border-b border-gray-200">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-medium text-gray-900">
-                      Danh sách sản phẩm ({pagination.total_items})
+                      Danh sách sản phẩm ({filteredProducts.length})
+                      {searchTerm && (
+                        <span className="text-sm text-gray-500 ml-2">
+                          (từ {pagination.total_items} sản phẩm)
+                        </span>
+                      )}
                     </h3>
                     <div className="flex items-center gap-2">
                       <button
@@ -613,24 +757,7 @@ const Admin = () => {
                       >
                         Import sản phẩm (Excel)
                       </button>
-                      <button
-                        onClick={() => setIsUploadImageModalOpen(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                      >
-                        Thêm ảnh cho sản phẩm
-                      </button>
-                      <button
-                        onClick={handleAddBarcodeClick}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                      >
-                        Thêm barcode
-                      </button>
-                      <button
-                        onClick={() => setIsUnitModalOpen(true)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                      >
-                        Thêm đơn vị tính cho sản phẩm
-                      </button>
+
                       <button
                         onClick={handleAddProduct}
                         className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
@@ -648,10 +775,19 @@ const Admin = () => {
                 ) : (
                   <>
                     <ProductTable
-                      products={products}
+                      products={filteredProducts}
                       categories={categories}
                       onEdit={handleEditProduct}
                       onDelete={handleDeleteProduct}
+                      onViewDetail={async (p) => {
+                        try {
+                          const fresh = await ProductService.getProductById(p.id)
+                          setDetailProduct(fresh)
+                        } catch {
+                          setDetailProduct(p)
+                        }
+                        setDetailModalOpen(true)
+                      }}
                     />
                     <Pagination
                       pagination={pagination}
@@ -672,14 +808,38 @@ const Admin = () => {
           )}
 
           {currentTab === 'prices' && (
-            <PriceManagement />
+            headerId ? <PriceHeaderDetail /> : <PriceManagement />
           )}
 
           {currentTab === 'inventory' && (
             <InventoryManagement />
           )}
 
+          {currentTab === 'inventory-management' && (
+            <InventoryManagement />
+          )}
+
+          {currentTab === 'inventory-import-export' && (
+            <InventoryImportExportCreate />
+          )}
+
+          {currentTab === 'inventory-import-export-list' && (
+            <InventoryImportExportList />
+          )}
+
+          {currentTab === 'inventory-check-create' && (
+            <InventoryCheckCreate />
+          )}
+
+          {currentTab === 'inventory-check' && (
+            <InventoryCheckManagement />
+          )}
+
           {currentTab === 'warehouses' && (
+            <WarehouseTab />
+          )}
+
+          {currentTab === 'warehouse-list' && (
             <WarehouseTab />
           )}
 
@@ -694,8 +854,34 @@ const Admin = () => {
           {currentTab === 'orders' && (
             <OrderManagement />
           )}
+
+          {currentTab === 'order-processing' && (
+            <OrderProcessingManagement />
+          )}
+
+          {currentTab === 'order-list' && (
+            <OrderListManagement />
+          )}
+
+          {currentTab === 'return-processing' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Xử lý đơn trả về</h2>
+              <p className="text-gray-600">Chức năng xử lý đơn trả về sẽ được triển khai ở đây.</p>
         </div>
+          )}
+
+          {currentTab === 'create-order' && (
+            <CreateOrderManagement />
+          )}
+
+          {currentTab === 'warehouse-history' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Lịch sử nhập xuất</h2>
+              <p className="text-gray-600">Chức năng xem lịch sử nhập xuất sẽ được triển khai ở đây.</p>
+            </div>
+          )}
       </main>
+      </div>
 
       {/* Product Modal */}
       <Modal
@@ -704,7 +890,7 @@ const Admin = () => {
         title={editingProduct ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}
         size="lg"
       >
-        <ProductForm
+        <ProductFormWithUnitsAndPrices
           product={editingProduct as any}
           categories={categories as any}
           onSubmit={handleSubmitProduct}
@@ -713,76 +899,357 @@ const Admin = () => {
         />
       </Modal>
 
-      {/* Modal thêm đơn vị tính cho sản phẩm */}
+      {/* Detail Modal */}
       <Modal
-        isOpen={isUnitModalOpen}
-        onClose={() => setIsUnitModalOpen(false)}
-        title="Thêm đơn vị tính cho sản phẩm"
+        isOpen={detailModalOpen}
+        onClose={() => setDetailModalOpen(false)}
+        title={detailProduct ? `Chi tiết: ${detailProduct.name}` : 'Chi tiết sản phẩm'}
+        size="lg"
+      >
+        {detailProduct ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-4">
+              <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100">
+                {detailProduct.imageUrl ? (
+                  <img src={detailProduct.imageUrl} alt={detailProduct.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">No image</div>
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="text-lg font-semibold text-gray-900">{detailProduct.name}</div>
+                <div className="text-sm text-gray-600 mt-1">{detailProduct.description || '—'}</div>
+                <div className="text-sm text-gray-600 mt-1">Danh mục: {detailProduct.categoryName || categories.find(c => c.id === detailProduct.categoryId)?.name || `ID: ${detailProduct.categoryId}`}</div>
+                <div className="text-sm text-gray-600 mt-1">HSD: {detailProduct.expirationDate ? new Date(detailProduct.expirationDate).toLocaleDateString('vi-VN') : 'Không có'}</div>
+                <div className="text-sm text-gray-600 mt-1">Trạng thái: {detailProduct.active ? 'Hoạt động' : 'Không hoạt động'}</div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="text-sm font-medium text-gray-800 mb-2">Đơn vị & Barcode</div>
+              {(detailProduct.productUnits || []).length === 0 ? (
+                <div className="text-sm text-gray-500">Chưa có đơn vị.</div>
+              ) : (
+                <div className="space-y-2">
+                  {(detailProduct.productUnits || []).map((u: any) => (
+                    <UnitRow key={u.id} productId={detailProduct.id} product={detailProduct} unit={u} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500">Đang tải...</div>
+        )}
+      </Modal>
+
+      {/* Price Modal: Xem/Tạo đơn giá cho đơn vị */}
+      <Modal
+        isOpen={priceModalOpen}
+        onClose={() => setPriceModalOpen(false)}
+        title={targetProduct ? `Lịch sử giá: ${targetProduct.name}${selectedUnit ? ` - ${selectedUnit.unitName}` : ''}` : 'Lịch sử giá'}
+        size="lg"
+      >
+        <div className="space-y-4">
+          {priceModalOpen && targetProduct && selectedUnit && (
+            <></>
+          )}
+
+          {selectedUnit && !priceLoading && !unitsWithHeader.has(selectedUnit.productUnitId) && (
+            <div className="rounded-md border p-4 bg-yellow-50">
+              <div className="text-sm text-yellow-800 mb-2">Chưa có lịch sử giá cho đơn vị này. Vui lòng tạo Bảng giá trước, sau đó thêm giá.</div>
+              <CreatePriceHeaderForm
+                productId={targetProduct?.id || 0}
+                productUnitId={selectedUnit.productUnitId}
+                onCreated={(headerId) => {
+                  setUnitsWithHeader(prev => new Set(prev).add(selectedUnit.productUnitId))
+                  setHeaderByUnit(prev => ({ ...prev, [selectedUnit.productUnitId]: headerId }))
+                  setPriceModalOpen(false)
+                }}
+              />
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-md border">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đơn vị</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giá</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hiệu lực từ</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đến</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {priceLoading ? (
+                  <tr><td className="px-4 py-6 text-sm text-gray-500" colSpan={6}>Đang tải...</td></tr>
+                ) : priceHistory.length === 0 ? (
+                  <tr><td className="px-4 py-3 text-sm text-gray-500" colSpan={6}>Chưa có dữ liệu giá.</td></tr>
+                ) : (
+                  priceHistory.map((p) => (
+                    <tr key={p.id}>
+                      <td className="px-4 py-3 text-sm text-gray-700">{p.unitName || `Unit #${p.unitId}`}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p.price)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{p.validFrom ? new Date(p.validFrom).toLocaleString('vi-VN') : '—'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{p.validTo ? new Date(p.validTo).toLocaleString('vi-VN') : '—'}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {(() => {
+                          const now = Date.now()
+                          const start = p.validFrom ? new Date(p.validFrom).getTime() : undefined
+                          const end = p.validTo ? new Date(p.validTo).getTime() : undefined
+                          let label = '—'
+                          let cls = 'text-gray-700'
+                          if (start && now < start) { label = 'Chuẩn bị'; cls = 'text-blue-600' }
+                          else if (start && (!end || now <= end) && now >= start) { label = 'Hoạt động'; cls = 'text-green-600' }
+                          else if (end && now > end) { label = 'Kết thúc'; cls = 'text-red-600' }
+                          return <span className={cls}>{label}</span>
+                        })()}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {selectedUnit && unitsWithHeader.has(selectedUnit.productUnitId) && (
+            <div className="rounded-md border p-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Giá</label>
+                  <input type="number" min="0" value={newPrice.price} onChange={(e) => setNewPrice(prev => ({ ...prev, price: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Hiệu lực từ</label>
+                  <input type="datetime-local" value={newPrice.validFrom} onChange={(e) => setNewPrice(prev => ({ ...prev, validFrom: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Đến (tùy chọn)</label>
+                  <input type="datetime-local" value={newPrice.validTo} onChange={(e) => setNewPrice(prev => ({ ...prev, validTo: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-md text-white bg-orange-600 hover:bg-orange-700"
+                  onClick={async () => {
+                    if (!targetProduct || !selectedUnit || !newPrice.price || !newPrice.validFrom) {
+                      openNotify('Thiếu thông tin', 'Nhập giá và thời gian', 'error')
+                      return
+                    }
+                    try {
+                      // Lấy headerId: ưu tiên id đã lưu khi tạo header cho đơn vị; sau đó tới lịch sử; cuối cùng list headers
+                      let headerId = headerByUnit[selectedUnit.productUnitId] || priceHistory.find(r => r.priceHeaderId)?.priceHeaderId
+                      if (!headerId) {
+                        const hs = await ProductService.getPriceHeaders(targetProduct.id, selectedUnit.productUnitId)
+                        headerId = Array.isArray(hs) && hs.length > 0 ? hs[0].id : undefined
+                      }
+                      if (!headerId) {
+                        openNotify('Thiếu thông tin', 'Đơn vị chưa có PriceHeader. Hãy tạo đơn giá trước.', 'error')
+                        return
+                      }
+                      await ProductService.addUnitPriceWithHeader(targetProduct.id, selectedUnit.productUnitId, { priceHeaderId: Number(headerId), price: Number(newPrice.price), timeStart: newPrice.validFrom, timeEnd: newPrice.validTo || undefined })
+                      const refreshedRaw = await ProductService.getUnitPriceHistory(targetProduct.id, selectedUnit.productUnitId)
+                      const refreshed = refreshedRaw.map((r: any) => ({ id: r.id, unitId: r.unitId ?? r.productUnitId ?? selectedUnit.productUnitId, unitName: r.unitName, price: r.price, validFrom: r.timeStart ?? r.validFrom, validTo: r.timeEnd ?? r.validTo, priceHeaderId: r.priceHeaderId }))
+                      setPriceHistory(refreshed)
+                      setNewPrice({ price: '', validFrom: '', validTo: '' })
+                      openNotify('Thành công', 'Đã thêm giá vào bảng giá', 'success')
+                    } catch (err) {
+                      openNotify('Thất bại', 'Không thể thêm giá', 'error')
+                    }
+                  }}
+                >Thêm giá</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Row action: Add Unit to Product (with optional barcode) */}
+      <Modal
+        isOpen={unitModalOpen}
+        onClose={() => setUnitModalOpen(false)}
+        title={targetProduct ? `Thêm đơn vị cho: ${targetProduct.name}` : 'Thêm đơn vị'}
         size="md"
       >
         <form
           onSubmit={async (e) => {
             e.preventDefault()
-            if (!unitForm.productId || !unitForm.unitId) {
-              openNotify('Thiếu thông tin', 'Vui lòng chọn sản phẩm và đơn vị tính', 'error')
+            if (!targetProduct || !unitForm.unitId) {
+              openNotify('Thiếu thông tin', 'Vui lòng chọn đơn vị tính', 'error')
               return
             }
             try {
-              const pid = Number(unitForm.productId)
-              const uid = Number(unitForm.unitId)
-              await ProductService.addProductUnit(pid, {
-                unitId: uid,
-                conversionFactor: Number(unitForm.conversionFactor),
-                isDefault: false,
+              await ProductService.addProductUnit(targetProduct.id, {
+                unitId: Number(unitForm.unitId),
+                conversionFactor: Number(unitForm.conversionFactor) || 1,
+                isDefault: !!unitForm.isDefault,
               })
-              setIsUnitModalOpen(false)
-              openNotify('Thành công', 'Đã thêm đơn vị tính cho sản phẩm', 'success')
+              // If barcode provided, get product to find new productUnitId then add barcode
+              if (unitForm.barcodeCode.trim()) {
+                try {
+                  const fresh = await ProductService.getProductById(targetProduct.id)
+                  const pu = (fresh.productUnits || []).find((u: any) => u.unitId === Number(unitForm.unitId))
+                  if (pu?.id) {
+                    const { BarcodeService } = await import('@/services/barcodeService')
+                    await BarcodeService.addBarcode(pu.id, unitForm.barcodeCode.trim(), unitForm.barcodeType || 'EAN13')
+                  }
+                } catch (_) { /* ignore */ }
+              }
+              setUnitForm({ unitId: '', conversionFactor: 1, isDefault: false, barcodeCode: '', barcodeType: 'EAN13' })
+              // refresh details
+              if (targetProduct?.id) {
+                const fresh = await ProductService.getProductById(targetProduct.id)
+                setDetailedProduct(fresh)
+              }
               await loadProducts()
+              await loadProducts()
+              openNotify('Thành công', 'Đã thêm đơn vị cho sản phẩm', 'success')
             } catch (err) {
-              openNotify('Thất bại', 'Không thể thêm đơn vị tính. Vui lòng thử lại.', 'error')
+              openNotify('Thất bại', 'Không thể thêm đơn vị', 'error')
             }
           }}
         >
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Existing units & barcodes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Chọn sản phẩm</label>
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">Đơn vị hiện có</h4>
+              {((detailedProduct?.productUnits || targetProduct?.productUnits || []).length === 0) ? (
+                <div className="text-sm text-gray-500">Chưa có đơn vị.</div>
+              ) : (
+                <div className="space-y-3">
+                  {(detailedProduct?.productUnits || targetProduct?.productUnits || []).map((u: any) => (
+                    <div key={u.id} className="border rounded-md p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-900">
+                          <span className="font-medium">{u.unitName || u.name}</span>
+                          <span className="ml-2 text-gray-600">Hệ số:</span>
+                          <input
+                            type="number"
+                            min={1}
+                            className="ml-2 w-24 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            value={unitCFEdit[u.unitId] ?? (u.conversionFactor ?? u.conversionRate ?? u.conversion_rate ?? 1)}
+                            onChange={(e) => setUnitCFEdit(prev => ({ ...prev, [u.unitId]: Number(e.target.value) }))}
+                          />
+                          <button
+                            type="button"
+                            className="ml-2 text-xs text-blue-600 hover:text-blue-800"
+                            onClick={async () => {
+                              try {
+                                // Attempt both endpoints for compatibility
+                                const cf = Number(unitCFEdit[u.unitId] ?? u.conversionFactor ?? u.conversionRate ?? 1)
+                                try {
+                                  await ProductService.updateProductUnit(targetProduct!.id, u.unitId, { conversionFactor: cf })
+                                } catch (_) {
+                                  await ProductService.updateProductUnitByProductUnitId(u.id ?? u.unitId, { conversionFactor: cf })
+                                }
+                                const fresh = await ProductService.getProductById(targetProduct!.id)
+                                setDetailedProduct(fresh)
+                                openNotify('Thành công', 'Đã cập nhật hệ số quy đổi', 'success')
+                              } catch (err) {
+                                openNotify('Thất bại', 'Không thể cập nhật hệ số', 'error')
+                              }
+                            }}
+                          >Lưu</button>
+                          {u.isDefault && <span className="ml-2 px-2 py-0.5 text-xs rounded bg-green-100 text-green-800">Mặc định</span>}
+                        </div>
+                        {!u.isDefault && (
+                          <button
+                            type="button"
+                            className="text-xs text-green-700 hover:text-green-900"
+                            onClick={async () => {
+                              try {
+                                await ProductService.makeDefaultProductUnit(targetProduct!.id, u.unitId)
+                                const fresh = await ProductService.getProductById(targetProduct!.id)
+                                setDetailedProduct(fresh)
+                                await loadProducts()
+                                openNotify('Thành công', 'Đã đặt đơn vị cơ bản', 'success')
+                              } catch (err) {
+                                openNotify('Thất bại', 'Không thể đặt đơn vị cơ bản', 'error')
+                              }
+                            }}
+                          >Đặt đơn vị cơ bản</button>
+                        )}
+                      </div>
+                      {/* Barcode inline editor (prefilled if exists) */}
+                      <div className="mt-3 text-sm">
+                        <div className="text-gray-700 font-medium mb-1">Barcode</div>
+                        <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <input
+                            type="text"
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            placeholder="Nhập barcode"
+                            value={barcodeInputs[u.id]?.code || ''}
+                            onChange={(e) => setBarcodeInputs(prev => ({ ...prev, [u.id]: { code: e.target.value, type: prev[u.id]?.type || 'EAN13' } }))}
+                          />
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                value={unitForm.productId}
-                onChange={(e) => setUnitForm(prev => ({ ...prev, productId: Number(e.target.value) }))}
-              >
-                <option value="">-- Chọn sản phẩm --</option>
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            value={barcodeInputs[u.id]?.type || 'EAN13'}
+                            onChange={(e) => setBarcodeInputs(prev => ({ ...prev, [u.id]: { code: prev[u.id]?.code || '', type: e.target.value } }))}
+                          >
+                            <option value="EAN13">EAN13</option>
+                            <option value="BARCODE">BARCODE</option>
+                            <option value="QR_CODE">QR_CODE</option>
               </select>
+                          <button
+                            type="button"
+                            className="px-3 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                            onClick={async () => {
+                              const payload = barcodeInputs[u.id]
+                              const productAny = detailedProduct as unknown as { barcodeList?: Array<{ id: number; productUnitId: number; code: string; type?: string }> }
+                              const existing = (u.barcodes && (u as any).barcodes?.length > 0)
+                                ? (u as any).barcodes[0]
+                                : (productAny?.barcodeList || []).find(b => b.productUnitId === (u.id ?? u.unitId))
+                              try {
+                                const { BarcodeService } = await import('@/services/barcodeService')
+                                if (existing && (!payload || !payload.code.trim())) {
+                                  // delete if cleared
+                                  await BarcodeService.deleteBarcode((existing as any).id)
+                                } else if (!existing && payload && payload.code.trim()) {
+                                  // add new
+                                  await BarcodeService.addBarcode(u.id ?? u.unitId, payload.code.trim(), payload.type || 'EAN13')
+                                } else if (existing && payload && payload.code.trim() && payload.code.trim() !== existing.code) {
+                                  // replace
+                                  await BarcodeService.deleteBarcode((existing as any).id)
+                                  await BarcodeService.addBarcode(u.id ?? u.unitId, payload.code.trim(), payload.type || (existing as any).type || 'EAN13')
+                                }
+                                const fresh = await ProductService.getProductById(targetProduct!.id)
+                                setDetailedProduct(fresh)
+                                openNotify('Thành công', 'Đã lưu barcode', 'success')
+                              } catch (err) {
+                                openNotify('Thất bại', 'Không thể lưu barcode', 'error')
+                              }
+                            }}
+                          >Lưu barcode</button>
             </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add new unit */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị tính</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị</label>
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 value={unitForm.unitId}
-                onChange={(e) => {
-                  const value = Number(e.target.value)
-                  let cf = unitForm.conversionFactor
-                  const selected = e.target.options[e.target.selectedIndex]?.text?.toLowerCase()
-                  if (selected?.includes('thùng')) cf = 24
-                  else if (selected?.includes('lốc') || selected?.includes('pack')) cf = 6
-                  setUnitForm(prev => ({ ...prev, unitId: value, conversionFactor: cf }))
-                }}
+                onChange={(e) => setUnitForm(prev => ({ ...prev, unitId: Number(e.target.value) }))}
               >
                 <option value="">-- Chọn đơn vị --</option>
                 {(() => {
-                  const selectedProduct = products.find(p => p.id === Number(unitForm.productId))
-                  const existingUnitIds = new Set((selectedProduct?.productUnits || []).map(u => u.unitId))
+                   const existing = new Set((targetProduct?.productUnits || []).map(u => u.unitId))
                   return allUnits
-                    .filter(u => !existingUnitIds.has(u.id) && !u.isDefault)
+                     .filter(u => !existing.has(u.id))
+                     .filter(u => !u.isDefault) // only non-default units selectable
                     .map(u => (
                       <option key={u.id} value={u.id}>{u.name}</option>
                     ))
                 })()}
               </select>
-              <div className="mt-2 text-xs text-gray-500">Chỉ hiển thị các đơn vị chưa có trong sản phẩm và không đặt mặc định.</div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Hệ số quy đổi</label>
@@ -793,35 +1260,57 @@ const Admin = () => {
                 value={unitForm.conversionFactor}
                 onChange={(e) => setUnitForm(prev => ({ ...prev, conversionFactor: Number(e.target.value) }))}
               />
-              <p className="text-xs text-gray-500 mt-1">Gợi ý: Thùng = 24, Lốc = 6</p>
             </div>
+            {(() => {
+              const hasDefault = (detailedProduct?.productUnits || targetProduct?.productUnits || []).some((u: any) => u.isDefault)
+              return (
             <div className="flex items-center gap-2">
-              <input type="checkbox" id="isDefaultUnit" checked={unitForm.isDefault} onChange={(e) => setUnitForm(prev => ({ ...prev, isDefault: e.target.checked }))} className="h-4 w-4 text-green-600 border-gray-300 rounded" />
-              <label htmlFor="isDefaultUnit" className="text-sm text-gray-700">Đặt làm đơn vị mặc định</label>
+                  <input
+                    type="checkbox"
+                    id="mkDefaultUnit"
+                    checked={unitForm.isDefault && !hasDefault}
+                    disabled={hasDefault}
+                    onChange={(e) => !hasDefault && setUnitForm(prev => ({ ...prev, isDefault: e.target.checked }))}
+                    className="h-4 w-4 text-green-600 border-gray-300 rounded disabled:opacity-50"
+                  />
+                  <label htmlFor="mkDefaultUnit" className="text-sm text-gray-700">
+                    Đặt làm đơn vị mặc định {hasDefault ? '(đã có mặc định)' : ''}
+                  </label>
+                </div>
+              )
+            })()}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Barcode (tùy chọn)</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  value={unitForm.barcodeCode}
+                  onChange={(e) => setUnitForm(prev => ({ ...prev, barcodeCode: e.target.value }))}
+                  placeholder="VD: 8938505974xxx"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Loại barcode</label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  value={unitForm.barcodeType}
+                  onChange={(e) => setUnitForm(prev => ({ ...prev, barcodeType: e.target.value }))}
+                >
+                  <option value="EAN13">EAN13</option>
+                  <option value="BARCODE">BARCODE</option>
+                  <option value="QR_CODE">QR_CODE</option>
+                </select>
+              </div>
             </div>
           </div>
           <div className="mt-6 flex justify-end gap-2">
-            <button type="button" onClick={() => setIsUnitModalOpen(false)} className="px-4 py-2 rounded-md border text-gray-700">Hủy</button>
-            <button type="submit" className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700">Hoàn thành</button>
+            <button type="button" onClick={() => setUnitModalOpen(false)} className="px-4 py-2 rounded-md border text-gray-700">Hủy</button>
+            <button type="submit" className="px-4 py-2 rounded-md text-white bg-purple-600 hover:bg-purple-700">Thêm đơn vị</button>
           </div>
         </form>
       </Modal>
 
-      {/* Barcode Modal */}
-      <BarcodeModal
-        isOpen={isBarcodeModalOpen}
-        onClose={() => setIsBarcodeModalOpen(false)}
-        product={selectedProductForBarcode}
-        onSuccess={handleBarcodeSuccess}
-      />
-
-      {/* Add Barcode Modal */}
-      <AddBarcodeModal
-        isOpen={isAddBarcodeModalOpen}
-        onClose={() => setIsAddBarcodeModalOpen(false)}
-        products={products}
-        onSuccess={handleBarcodeSuccess}
-      />
 
       {/* Import Products Modal */}
       <Modal
@@ -900,63 +1389,7 @@ const Admin = () => {
         </form>
       </Modal>
 
-      {/* Upload Product Image Modal */}
-      <Modal
-        isOpen={isUploadImageModalOpen}
-        onClose={() => setIsUploadImageModalOpen(false)}
-        title="Thêm/Cập nhật ảnh cho sản phẩm"
-        size="md"
-      >
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault()
-            if (!uploadTargetProductId || !uploadImageFile) {
-              openNotify('Thiếu thông tin', 'Vui lòng chọn sản phẩm và ảnh cần tải lên', 'error')
-              return
-            }
-            try {
-              await ProductService.updateProductImage(Number(uploadTargetProductId), uploadImageFile)
-              setIsUploadImageModalOpen(false)
-              setUploadTargetProductId('')
-              setUploadImageFile(null)
-              await loadProducts()
-              openNotify('Thành công', 'Đã cập nhật ảnh sản phẩm', 'success')
-            } catch (err) {
-              openNotify('Thất bại', 'Không thể cập nhật ảnh. Vui lòng thử lại.', 'error')
-            }
-          }}
-        >
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Chọn sản phẩm</label>
-              <select
-                value={uploadTargetProductId}
-                onChange={(e) => setUploadTargetProductId(e.target.value ? Number(e.target.value) : '')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              >
-                <option value="">-- Chọn sản phẩm --</option>
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Chọn ảnh</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setUploadImageFile(e.target.files?.[0] || null)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">Hỗ trợ JPG, PNG, WEBP... dung lượng tối đa 5MB</p>
-            </div>
-          </div>
-          <div className="mt-6 flex justify-end gap-2">
-            <button type="button" onClick={() => setIsUploadImageModalOpen(false)} className="px-4 py-2 rounded-md border text-gray-700">Hủy</button>
-            <button type="submit" className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Cập nhật ảnh</button>
-          </div>
-        </form>
-      </Modal>
+
 
       {/* Notification Modal */}
       <Modal
@@ -986,3 +1419,45 @@ const Admin = () => {
 }
 
 export default Admin
+
+// Subcomponent: display a unit row with current price and barcode
+const UnitRow = ({ productId, product, unit }: { productId: number; product: Product; unit: any }) => {
+  const [currentPrice, setCurrentPrice] = useState<number | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const price = await ProductService.getCurrentPrice(productId, unit.id)
+        if (!cancelled) setCurrentPrice(price)
+      } catch {
+        if (!cancelled) setCurrentPrice(null)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [productId, unit?.id])
+
+  const productAny = product as unknown as { barcodeList?: Array<{ productUnitId: number; code: string; type?: string }> }
+  const barcodes = (unit.barcodes && unit.barcodes.length > 0)
+    ? unit.barcodes
+    : (productAny?.barcodeList || []).filter(b => b.productUnitId === (unit.id ?? unit.unitId))
+
+  return (
+    <div className="flex items-center justify-between bg-gray-50 rounded-md p-3">
+      <div className="text-sm text-gray-800">
+        <span className="font-medium">{unit.unitName}</span>
+        <span className="ml-2 text-gray-600">Hệ số: {unit.conversionFactor ?? unit.conversionRate ?? 1}</span>
+        {unit.isDefault && <span className="ml-2 px-2 py-0.5 text-xs rounded bg-green-100 text-green-800">Đơn vị cơ bản</span>}
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="text-sm text-gray-800">
+          Giá hiện tại: {currentPrice !== null ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(currentPrice) : '—'}
+        </div>
+        <div className="text-xs text-gray-600">
+          {barcodes && barcodes.length > 0
+            ? <span>Barcode: {barcodes[0].code} ({barcodes[0].type || 'EAN13'})</span>
+            : <span className="text-gray-400">Chưa có barcode</span>}
+        </div>
+      </div>
+    </div>
+  )
+}

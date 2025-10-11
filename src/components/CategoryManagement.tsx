@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { CategoryService, Category, CreateCategoryRequest, UpdateCategoryRequest } from '@/services/categoryService'
+import Pagination from './Pagination'
 
 const CategoryManagement = () => {
   const [categories, setCategories] = useState<Category[]>([])
@@ -17,6 +18,13 @@ const CategoryManagement = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    total_pages: 1,
+    total_items: 0,
+    items_per_page: 10
+  })
+  const [currentPage, setCurrentPage] = useState(1)
 
   // Load categories from API
   const loadCategories = async () => {
@@ -49,6 +57,34 @@ const CategoryManagement = () => {
     category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     category.description.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  // Pagination logic
+  const itemsPerPage = 9 // 3x3 grid
+  const totalItems = filteredCategories.length
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedCategories = filteredCategories.slice(startIndex, endIndex)
+
+  // Update pagination state
+  useEffect(() => {
+    setPagination({
+      current_page: currentPage,
+      total_pages: totalPages,
+      total_items: totalItems,
+      items_per_page: itemsPerPage
+    })
+  }, [currentPage, totalPages, totalItems, itemsPerPage])
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
 
   const handleAddCategory = () => {
     setEditingCategory(null)
@@ -199,7 +235,7 @@ const CategoryManagement = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-            {filteredCategories.map((category) => (
+            {paginatedCategories.map((category) => (
               <div
                 key={category.id}
                 className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
@@ -262,7 +298,7 @@ const CategoryManagement = () => {
       </div>
 
       {/* Empty State */}
-      {!loading && filteredCategories.length === 0 && (
+      {!loading && paginatedCategories.length === 0 && (
         <div className="text-center py-12">
           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -283,6 +319,13 @@ const CategoryManagement = () => {
         </div>
       )}
 
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination
+          pagination={pagination}
+          onPageChange={handlePageChange}
+        />
+      )}
 
       {/* Detail Modal */}
       {isDetailModalOpen && selectedCategory && (

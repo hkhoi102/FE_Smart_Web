@@ -1,18 +1,18 @@
 function About() {
   const team = [
-    { name: 'Jenny Wilson', role: 'CEO & Founder' },
-    { name: 'Jane Cooper', role: 'Worker' },
-    { name: 'Cody Fisher', role: 'Security Guard' },
-    { name: 'Robert Fox', role: 'Senior Farmer Manager' }
+    { name: 'Nguyễn Văn A', role: 'CEO & Người sáng lập' },
+    { name: 'Trần Thị B', role: 'Nhân viên' },
+    { name: 'Lê Văn C', role: 'Bảo vệ' },
+    { name: 'Phạm Văn D', role: 'Quản lý trang trại cấp cao' }
   ]
 
   const features = [
-    { title: '100% Organic food', desc: '100% healthy & fresh food' },
-    { title: 'Great Support 24/7', desc: 'Best support & contact' },
-    { title: 'Customer Feedback', desc: 'Our happy customer' },
-    { title: '100% Secure Payment', desc: 'We ensure your money' },
-    { title: 'Free Shipping', desc: 'Free shipping with discount' },
-    { title: '100% Organic Food', desc: '100% healthy & fresh food' }
+    { title: '100% Thực phẩm hữu cơ', desc: '100% lành mạnh & tươi ngon' },
+    { title: 'Hỗ trợ 24/7', desc: 'Hỗ trợ tốt nhất & liên hệ' },
+    { title: 'Phản hồi khách hàng', desc: 'Khách hàng hài lòng' },
+    { title: '100% Thanh toán an toàn', desc: 'Chúng tôi đảm bảo tiền của bạn' },
+    { title: 'Miễn phí vận chuyển', desc: 'Miễn phí vận chuyển với giảm giá' },
+    { title: '100% Thực phẩm hữu cơ', desc: '100% lành mạnh & tươi ngon' }
   ]
 
   return (
@@ -20,8 +20,8 @@ function About() {
       {/* Section 1: Text left, image right */}
       <section className="grid md:grid-cols-2 gap-10 items-center">
         <div className="space-y-5">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900">100% Trusted Organic Food Store</h2>
-          <p className="text-gray-600">Morbí porttitor ligula in nunc varius sagittis. Phasellus ut diam dui, laoreet ut tempor ac, cursus vitae eros. Cras quis ultricies elit. Praesent a lacus eu massa volutpat ornare. Vivamus ornare commodo ante, et commodo felis congue vitae.</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Siêu Thị Thực Phẩm Hữu Cơ Đáng Tin Cậy 100%</h2>
+          <p className="text-gray-600">Chúng tôi cam kết mang đến cho bạn những sản phẩm thực phẩm tươi ngon, chất lượng cao nhất. Tất cả sản phẩm đều được chọn lọc kỹ càng từ các trang trại hữu cơ đạt chuẩn quốc tế, đảm bảo an toàn và giàu dinh dưỡng cho sức khỏe gia đình bạn.</p>
         </div>
         <div className="rounded-2xl overflow-hidden bg-gray-100 h-80">
           {/* Replace with your image */}
@@ -35,12 +35,12 @@ function About() {
           <div className="w-full h-full grid place-items-center text-gray-400">Ảnh nông trại</div>
         </div>
         <div>
-          <h3 className="text-3xl font-bold text-gray-900 mb-4">100% Trusted Organic Food Store</h3>
-          <p className="text-gray-600 mb-6">Pellentesque a ante vulputate leo porttitor luctus nec laoreet arcu. Nulla et rhoncus neque. Duis non erat sem. Aenean nec nisl consequat tortor tincidunt feugiat.</p>
+          <h3 className="text-3xl font-bold text-gray-900 mb-4">Siêu Thị Thực Phẩm Hữu Cơ Đáng Tin Cậy 100%</h3>
+          <p className="text-gray-600 mb-6">Với kinh nghiệm hơn 10 năm trong lĩnh vực thực phẩm hữu cơ, chúng tôi tự hào là đối tác đáng tin cậy của hàng ngàn gia đình Việt Nam. Mang đến cho bạn những trải nghiệm mua sắm tốt nhất.</p>
           <div className="grid sm:grid-cols-2 gap-4">
             {features.map((f) => (
               <div key={f.title} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200">
-                <span className="w-8 h-8 rounded-full bg-green-100 text-green-600 grid place-items-center">✓</span>
+                <span className="w-8 h-8 rounded-full bg-green-100 text-primary-600 grid place-items-center">✓</span>
                 <div>
                   <p className="font-semibold text-gray-900 text-sm">{f.title}</p>
                   <p className="text-xs text-gray-600">{f.desc}</p>
@@ -54,14 +54,14 @@ function About() {
       {/* Section 3: Delivery CTA */}
       <section className="grid md:grid-cols-2 gap-10 items-center">
         <div className="space-y-4">
-          <h3 className="text-3xl font-bold text-gray-900">We Delivered, You Enjoy Your Order.</h3>
-          <p className="text-gray-600">Ut suscipit eget mi vel posuere pellentesque nunc, ultrices consectetur velit quam. Mauris sollicitudin dignissim diam, et dictum lacus elementum.</p>
+          <h3 className="text-3xl font-bold text-gray-900">Chúng Tôi Giao Hàng, Bạn Thưởng Thức Đơn Hàng.</h3>
+          <p className="text-gray-600">Dịch vụ giao hàng nhanh chóng, đúng giờ và đảm bảo chất lượng sản phẩm khi đến tay bạn. Chúng tôi cam kết mang lại sự hài lòng tuyệt đối cho khách hàng.</p>
           <ul className="space-y-2 text-gray-700">
-            <li className="flex items-center gap-2"><span className="text-green-600">•</span> Siêu thị miễn phí vận chuyển</li>
-            <li className="flex items-center gap-2"><span className="text-green-600">•</span> Giao hàng nhanh chóng, muộn nhất trong ngày</li>
-            <li className="flex items-center gap-2"><span className="text-green-600">•</span> Miễn cước ít nhất trong tuần đầu</li>
+            <li className="flex items-center gap-2"><span className="text-primary-600">•</span> Siêu thị miễn phí vận chuyển</li>
+            <li className="flex items-center gap-2"><span className="text-primary-600">•</span> Giao hàng nhanh chóng, muộn nhất trong ngày</li>
+            <li className="flex items-center gap-2"><span className="text-primary-600">•</span> Miễn cước ít nhất trong tuần đầu</li>
           </ul>
-          <button className="inline-flex items-center gap-2 bg-green-600 text-white rounded-full px-5 py-2 font-semibold">Mua ngay <span>→</span></button>
+          <button className="inline-flex items-center gap-2 bg-primary-600 text-white rounded-full px-5 py-2 font-semibold">Mua ngay <span>→</span></button>
         </div>
         <div className="rounded-2xl overflow-hidden bg-gray-100 h-80">
           <div className="w-full h-full grid place-items-center text-gray-400">Ảnh giao hàng</div>
@@ -71,8 +71,8 @@ function About() {
       {/* Our Awesome Team */}
       <section>
         <div className="text-center mb-10">
-          <h3 className="text-3xl font-bold text-gray-900">Our Awesome Team</h3>
-          <p className="text-gray-600">Pellentesque a ante vulputate leo porttitor luctus sed eget arcu.</p>
+          <h3 className="text-3xl font-bold text-gray-900">Đội Ngũ Xuất Sắc Của Chúng Tôi</h3>
+          <p className="text-gray-600">Những con người tâm huyết, giàu kinh nghiệm và luôn nỗ lực hết mình vì sự hài lòng của khách hàng.</p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {team.map((m) => (
@@ -98,7 +98,7 @@ function About() {
                 <div className="w-10 h-10 rounded-full bg-gray-200" />
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Khách hàng {i}</p>
-                  <p className="text-xs text-gray-500">Customer</p>
+                  <p className="text-xs text-gray-500">Khách hàng</p>
                 </div>
               </div>
             </div>

@@ -6,11 +6,23 @@ interface CategoryCardProps extends HTMLAttributes<HTMLDivElement> {
   description?: string
   items?: number
   selected?: boolean
+  categoryId?: number
 }
 
-const CategoryCard = ({ imageUrl, name, description, items, selected = false, className = '', ...props }: CategoryCardProps) => {
+const CategoryCard = ({ imageUrl, name, description, items, selected = false, className = '', categoryId, ...props }: CategoryCardProps) => {
   return (
-    <div className={`group bg-white border ${selected ? 'border-primary-500' : 'border-gray-200'} rounded-xl hover:border-primary-500 hover:shadow-sm transition-all duration-200 ${className}`} {...props}>
+    <div
+      className={`group bg-white border ${selected ? 'border-primary-500' : 'border-gray-200'} rounded-xl hover:border-primary-500 hover:shadow-sm transition-all duration-200 ${className}`}
+      onClick={(e) => {
+        // Navigate to products with category filter
+        e.preventDefault()
+        const params = new URLSearchParams()
+        if (categoryId != null) params.set('categoryId', String(categoryId))
+        params.set('category', name)
+        window.location.href = `/products?${params.toString()}`
+      }}
+      {...props}
+    >
       <div className="p-5">
         <div className="h-24 flex items-center justify-center bg-white">
           {imageUrl ? (
