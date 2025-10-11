@@ -612,39 +612,10 @@ const Admin = () => {
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="bg-white shadow rounded-lg mb-8">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Thao tác nhanh</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button
-                  onClick={handleAddProduct}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                >
-                  Thêm sản phẩm mới
-                </button>
-                <button
-                  onClick={() => setCurrentTab('products')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                >
-                  Quản lý sản phẩm
-                </button>
-                <button
-                  onClick={() => {
-                    calculateStats()
-                    alert('Dữ liệu đã được làm mới!')
-                  }}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                >
-                  Làm mới dữ liệu
-                </button>
-              </div>
-            </div>
-          </div>
 
           {/* Recent Products */}
           <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
+            <div>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">Sản phẩm gần đây</h3>
                 <button
@@ -666,9 +637,6 @@ const Admin = () => {
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Danh mục
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Giá
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Ngày tạo
@@ -705,9 +673,6 @@ const Admin = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {product.categoryName || categories.find(cat => cat.id === product.categoryId)?.name || `ID: ${product.categoryId}`}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          —
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(product.createdAt).toLocaleDateString('vi-VN')}
