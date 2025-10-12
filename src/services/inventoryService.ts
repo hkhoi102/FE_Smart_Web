@@ -433,6 +433,97 @@ export const InventoryService = {
     document.body.removeChild(link)
     URL.revokeObjectURL(href)
   },
+
+  // ===== LOT MANAGEMENT APIs =====
+
+  // Create lot
+  async createLot(lotData: {
+    lotNumber: string
+    productUnitId: number
+    warehouseId: number
+    stockLocationId: number
+    expiryDate?: string
+    manufacturingDate?: string
+    supplierName?: string
+    supplierBatchNumber?: string
+    initialQuantity: number
+    note?: string
+  }): Promise<any> {
+    const url = `${API_BASE_URL}/inventory/lots`
+    console.log('🏷️ Creating lot:', lotData)
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(lotData)
+    })
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`Failed to create lot: ${res.status} ${errorText}`)
+    }
+    return await res.json()
+  },
+
+  // Process inbound with lot management (single transaction)
+  async processInboundWithLot(transaction: {
+    productUnitId: number
+    warehouseId: number
+    stockLocationId: number
+    quantity: number
+    note?: string
+    referenceNumber: string
+    transactionDate: string
+    transactionType: 'IMPORT'
+    lotNumber?: string
+    expiryDate?: string
+    manufacturingDate?: string
+    supplierName?: string
+    supplierBatchNumber?: string
+  }): Promise<any> {
+    const url = `${API_BASE_URL}/inventory/inbound/process`
+    console.log('🏷️ Process inbound with lot:', transaction)
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(transaction)
+    })
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`Failed to process inbound: ${res.status} ${errorText}`)
+    }
+    return await res.json()
+  },
+
+  // Process multiple inbound transactions with lots
+  async processMultipleInboundWithLots(transactions: Array<{
+    productUnitId: number
+    warehouseId: number
+    stockLocationId: number
+    quantity: number
+    note?: string
+    referenceNumber: string
+    transactionDate: string
+    transactionType: 'IMPORT'
+    lotNumber?: string
+    expiryDate?: string
+    manufacturingDate?: string
+    supplierName?: string
+    supplierBatchNumber?: string
+  }>): Promise<any[]> {
+    console.log('📦 Processing multiple inbound transactions with lots:', transactions.length)
+    const results = []
+
+    for (const transaction of transactions) {
+      try {
+        const result = await this.processInboundWithLot(transaction)
+        results.push(result)
+      } catch (error) {
+        console.error('❌ Failed to process transaction:', transaction, error)
+        throw error
+      }
+    }
+
+    return results
+  },
 }
 
 
