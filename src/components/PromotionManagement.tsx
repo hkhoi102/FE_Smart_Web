@@ -159,44 +159,7 @@ const PromotionManagement: React.FC = () => {
                   {lines.map((ln, idx) => (
                     <div key={idx} className="rounded-lg border border-gray-200 p-4 bg-gray-50">
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Áp dụng cho</label>
-                          <select value={ln.targetType} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetType:e.target.value as TargetType, targetId: 0}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="PRODUCT">Sản phẩm</option>
-                            <option value="CATEGORY">Danh mục</option>
-
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Mục tiêu</label>
-                          {ln.targetType === 'PRODUCT' && (
-                            <div className="relative">
-                              <input className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tìm sản phẩm..." value={ln.targetNameQuery || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetNameQuery:e.target.value, showSuggest:true}:l))} />
-                              {((ln.targetNameQuery || '').trim().length > 0) && (ln as any).showSuggest && (
-                                <div className="absolute z-10 bg-white border rounded shadow w-full mt-1 max-h-48 overflow-auto">
-                                  {productOptions.filter(p=>p.name.toLowerCase().includes(String(ln.targetNameQuery).toLowerCase())).slice(0,8).map(p=> (
-                                    <div key={p.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:p.id, targetNameQuery:p.name, showSuggest:false}:l))}>{p.name}</div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {ln.targetType === 'CATEGORY' && (
-                            <div className="relative">
-                              <input className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tìm danh mục..." value={ln.targetNameQuery || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetNameQuery:e.target.value, showSuggest:true}:l))} />
-                              {((ln.targetNameQuery || '').trim().length > 0) && (ln as any).showSuggest && (
-                                <div className="absolute z-10 bg-white border rounded shadow w-full mt-1 max-h-48 overflow-auto">
-                                  {categoryOptions.filter(c=>c.name.toLowerCase().includes(String(ln.targetNameQuery).toLowerCase())).slice(0,8).map(c=> (
-                                    <div key={c.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:c.id, targetNameQuery:c.name, showSuggest:false}:l))}>{c.name}</div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {ln.targetType === 'CUSTOMER' && (
-                            <input type="number" value={ln.targetId} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:Number(e.target.value)}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ID khách hàng" />
-                          )}
-                        </div>
+                        {/* Ẩn hoàn toàn Áp dụng cho & Mục tiêu cho mọi loại khuyến mãi theo yêu cầu */}
                         <div>
                           <label className="block text-sm font-medium mb-1">Loại</label>
                           <select value={ln.type} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value as PromotionType}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -236,7 +199,7 @@ const PromotionManagement: React.FC = () => {
                     const h = await PromotionService.createHeader(header)
                     // Tạo các line (không tạo detail)
                     for (const ln of lines) {
-                      await PromotionService.createLine({ promotionHeaderId: h.id, targetType: ln.targetType, targetId: Number(ln.targetId), startDate: ln.lineStartDate || undefined, endDate: ln.lineEndDate || undefined, active: true, type: ln.type })
+                      await PromotionService.createLine({ promotionHeaderId: h.id, targetType: null as any, targetId: null as any, startDate: ln.lineStartDate || undefined, endDate: ln.lineEndDate || undefined, active: true, type: ln.type })
                     }
                     setIsWizardOpen(false)
                     alert('Tạo khuyến mãi thành công')
