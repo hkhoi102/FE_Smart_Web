@@ -12,6 +12,12 @@ interface ProductUnit {
   selected: boolean
   actualQuantity: number
   note: string
+  // Thông tin lô cho nhập kho
+  lotNumber?: string
+  expiryDate?: string
+  manufacturingDate?: string
+  supplierName?: string
+  supplierBatchNumber?: string
 }
 
 const InventoryImportExportCreate = () => {
@@ -25,6 +31,7 @@ const InventoryImportExportCreate = () => {
   const [slipDate, setSlipDate] = useState(new Date().toISOString().slice(0, 16))
   const [notes, setNotes] = useState('')
   const [slipType, setSlipType] = useState<'IMPORT' | 'EXPORT'>('IMPORT')
+  const [showAllProducts, setShowAllProducts] = useState(false)
 
   useEffect(() => {
     loadWarehouses()
@@ -34,7 +41,7 @@ const InventoryImportExportCreate = () => {
     if (selectedWarehouse) {
       loadProductsByWarehouse(selectedWarehouse)
     }
-  }, [selectedWarehouse, slipType])
+  }, [selectedWarehouse, slipType, showAllProducts])
 
   const loadWarehouses = async () => {
     try {
@@ -43,6 +50,12 @@ const InventoryImportExportCreate = () => {
     } catch (error) {
       console.error('Error loading warehouses:', error)
     }
+  }
+
+  const handleLotInfoChange = (productId: number, field: keyof Pick<ProductUnit, 'lotNumber' | 'expiryDate' | 'manufacturingDate' | 'supplierName' | 'supplierBatchNumber'>, value: string) => {
+    setProducts(products.map(product =>
+      product.id === productId ? { ...product, [field]: value } : product
+    ))
   }
 
 
@@ -54,14 +67,24 @@ const InventoryImportExportCreate = () => {
       let response: Response
 
       if (slipType === 'IMPORT') {
-        // Nhập hàng: Chỉ lấy sản phẩm sắp hết hàng
-        console.log('📦 Loading LOW STOCK products for import')
-        response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/products/low-stock?threshold=20&warehouseId=${warehouseId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-            'Content-Type': 'application/json'
-          }
-        })
+        // Nhập hàng: Lấy sản phẩm dựa trên showAllProducts
+        if (showAllProducts) {
+          console.log('📦 Loading ALL products for import (including normal products)')
+          response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/products/inventory-status?lowStockThreshold=0&warehouseId=${warehouseId}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+              'Content-Type': 'application/json'
+            }
+          })
+        } else {
+          console.log('📦 Loading low stock and new products for import')
+          response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/products/inventory-status?lowStockThreshold=100&warehouseId=${warehouseId}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+              'Content-Type': 'application/json'
+            }
+          })
+        }
       } else {
         // Xuất hàng: Lấy tất cả sản phẩm trong kho
         console.log('📦 Loading ALL products for export')
@@ -85,21 +108,53 @@ const InventoryImportExportCreate = () => {
       console.log('📦 API response received:', apiResponse)
 
       // Lấy data từ response
-      const productsData = apiResponse.data || apiResponse
-      console.log('📦 Products data extracted:', productsData)
-      console.log('📦 Data type:', typeof productsData)
-      console.log('📦 Data length:', Array.isArray(productsData) ? productsData.length : 'Not an array')
+      const responseData = apiResponse.data || apiResponse
+      console.log('📦 Response data extracted:', responseData)
 
       const productUnits: ProductUnit[] = []
+
+      // Xử lý dữ liệu dựa trên loại phiếu
+      let productsData: any[] = []
+
+      if (slipType === 'IMPORT') {
+        // Nhập hàng: Xử lý dữ liệu dựa trên showAllProducts
+        if (showAllProducts) {
+          // Lấy tất cả sản phẩm từ inventory-status (bao gồm cả sản phẩm bình thường)
+          const lowStockProducts = responseData.lowStockProducts || []
+          const newProducts = responseData.newProducts || []
+          const normalProducts = responseData.normalProducts || []
+          productsData = [...lowStockProducts, ...newProducts, ...normalProducts]
+          console.log('📦 Low stock products:', lowStockProducts.length)
+          console.log('📦 New products:', newProducts.length)
+          console.log('📦 Normal products:', normalProducts.length)
+          console.log('📦 Total products for import (all):', productsData.length)
+        } else {
+          // Lấy cả lowStockProducts và newProducts (mặc định)
+          const lowStockProducts = responseData.lowStockProducts || []
+          const newProducts = responseData.newProducts || []
+          productsData = [...lowStockProducts, ...newProducts]
+          console.log('📦 Low stock products:', lowStockProducts.length)
+          console.log('📦 New products:', newProducts.length)
+          console.log('📦 Total products for import:', productsData.length)
+        }
+      } else {
+        // Xuất hàng: Lấy tất cả sản phẩm (giữ nguyên logic cũ)
+        productsData = responseData
+      }
+
+      console.log('📦 Products data to process:', productsData)
+      console.log('📦 Data type:', typeof productsData)
+      console.log('📦 Data length:', Array.isArray(productsData) ? productsData.length : 'Not an array')
 
       // Kiểm tra cấu trúc data
       if (productsData && Array.isArray(productsData) && productsData.length > 0) {
         console.log('✅ Processing', productsData.length, 'products')
 
-        // Sắp xếp theo số lượng tồn kho
+        // Sắp xếp theo số lượng tồn kho (lấy từ productUnits)
         const sortedData = productsData.sort((a: any, b: any) => {
-          const aQty = a.availableQuantity || a.quantity || 0
-          const bQty = b.availableQuantity || b.quantity || 0
+          // Lấy số lượng từ productUnits đầu tiên (default unit)
+          const aQty = a.productUnits && a.productUnits.length > 0 ? (a.productUnits[0].availableQuantity || a.productUnits[0].quantity || 0) : 0
+          const bQty = b.productUnits && b.productUnits.length > 0 ? (b.productUnits[0].availableQuantity || b.productUnits[0].quantity || 0) : 0
           return slipType === 'IMPORT' ? aQty - bQty : bQty - aQty // Import: ít nhất lên đầu, Export: nhiều nhất lên đầu
         })
         console.log('📊 Sorted data:', sortedData)
@@ -112,62 +167,103 @@ const InventoryImportExportCreate = () => {
           console.log('🔍 First item unitName:', sortedData[0].unitName)
         }
 
-        // Xử lý từng productUnit từ API
-        for (const productUnitData of sortedData) {
-          console.log('🔍 Processing productUnit:', productUnitData)
-          console.log('🔍 ProductUnit keys:', Object.keys(productUnitData))
-          console.log('🔍 productUnitId:', productUnitData.id)
+        // Xử lý từng sản phẩm từ API
+        for (const productData of sortedData) {
+          console.log('🔍 Processing product:', productData)
+          console.log('🔍 Product keys:', Object.keys(productData))
+          console.log('🔍 productId:', productData.id)
+          console.log('🔍 productName:', productData.name)
+          console.log('🔍 productUnits:', productData.productUnits)
 
-          // API chỉ trả về productUnitId, cần dùng ProductService.getProductUnitById để lấy thông tin
-          try {
-            console.log('📦 Fetching product unit details for productUnitId:', productUnitData.id)
-            const productUnitDetail = await ProductService.getProductUnitById(productUnitData.id)
-            console.log('📋 Fetched product unit detail:', productUnitDetail)
+          if (slipType === 'IMPORT') {
+            // Nhập hàng: Xử lý từng productUnit của sản phẩm
+            if (productData.productUnits && Array.isArray(productData.productUnits) && productData.productUnits.length > 0) {
+              for (const productUnitData of productData.productUnits) {
+                console.log('🔍 Processing productUnit:', productUnitData)
 
-            if (productUnitDetail) {
+                const productUnit: ProductUnit = {
+                  id: productUnitData.id,
+                  productId: productData.id,
+                  productName: productData.name || `Product ${productData.id}`,
+                  unitName: productUnitData.unitName || 'Cái',
+                  systemQuantity: productUnitData.availableQuantity || productUnitData.quantity || 0,
+                  selected: false,
+                  actualQuantity: 0,
+                  note: ''
+                }
+                productUnits.push(productUnit)
+                console.log('✅ Added product unit:', productUnit)
+              }
+            } else {
+              console.warn('⚠️ Product has no productUnits:', productData.name)
+              // Fallback: tạo một productUnit mặc định
               const productUnit: ProductUnit = {
-                id: productUnitData.id,
-                productId: productUnitDetail.productId || productUnitData.productId,
-                productName: productUnitDetail.productName || `Product ${productUnitDetail.productId}`,
-                unitName: productUnitDetail.unitName || 'Cái',
-                systemQuantity: productUnitData.availableQuantity || productUnitData.quantity || 0,
+                id: productData.id,
+                productId: productData.id,
+                productName: productData.name || `Product ${productData.id}`,
+                unitName: 'Cái',
+                systemQuantity: 0,
                 selected: false,
                 actualQuantity: 0,
                 note: ''
               }
               productUnits.push(productUnit)
-              console.log('✅ Added product unit with fetched details:', productUnit)
-            } else {
-              console.warn('⚠️ Product unit detail not found for productUnitId:', productUnitData.id)
+              console.log('✅ Added fallback product unit:', productUnit)
+            }
+          } else {
+            // Xuất hàng: API chỉ trả về productUnitId, cần gọi thêm API để lấy thông tin chi tiết
+            console.log('🔍 Processing export productUnit with ID:', productData.id)
+
+            try {
+              console.log('📦 Fetching product unit details for productUnitId:', productData.id)
+              const productUnitDetail = await ProductService.getProductUnitById(productData.id)
+              console.log('📋 Fetched product unit detail:', productUnitDetail)
+
+              if (productUnitDetail) {
+                const productUnit: ProductUnit = {
+                  id: productData.id,
+                  productId: productUnitDetail.productId || 0,
+                  productName: productUnitDetail.productName || `Product ${productUnitDetail.productId}`,
+                  unitName: productUnitDetail.unitName || 'Cái',
+                  systemQuantity: productData.availableQuantity || productData.quantity || 0,
+                  selected: false,
+                  actualQuantity: 0,
+                  note: ''
+                }
+                productUnits.push(productUnit)
+                console.log('✅ Added product unit with fetched details:', productUnit)
+              } else {
+                console.warn('⚠️ Product unit detail not found for productUnitId:', productData.id)
+                // Fallback với ID
+                const productUnit: ProductUnit = {
+                  id: productData.id,
+                  productId: productData.productId || 0,
+                  productName: `Product Unit ${productData.id}`,
+                  unitName: 'Cái',
+                  systemQuantity: productData.availableQuantity || productData.quantity || 0,
+                  selected: false,
+                  actualQuantity: 0,
+                  note: ''
+                }
+                productUnits.push(productUnit)
+                console.log('✅ Added product unit with fallback:', productUnit)
+              }
+            } catch (error) {
+              console.error('❌ Error fetching product unit detail:', error)
               // Fallback với ID
               const productUnit: ProductUnit = {
-                id: productUnitData.id,
-                productId: productUnitData.productId || 0,
-                productName: `Product Unit ${productUnitData.id}`,
+                id: productData.id,
+                productId: productData.productId || 0,
+                productName: `Product Unit ${productData.id}`,
                 unitName: 'Cái',
-                systemQuantity: productUnitData.availableQuantity || productUnitData.quantity || 0,
+                systemQuantity: productData.availableQuantity || productData.quantity || 0,
                 selected: false,
                 actualQuantity: 0,
                 note: ''
               }
               productUnits.push(productUnit)
-              console.log('✅ Added product unit with fallback:', productUnit)
+              console.log('✅ Added product unit with error fallback:', productUnit)
             }
-          } catch (error) {
-            console.error('❌ Error fetching product unit detail:', error)
-            // Fallback với ID
-            const productUnit: ProductUnit = {
-              id: productUnitData.id,
-              productId: productUnitData.productId || 0,
-              productName: `Product Unit ${productUnitData.id}`,
-              unitName: 'Cái',
-              systemQuantity: productUnitData.availableQuantity || productUnitData.quantity || 0,
-              selected: false,
-              actualQuantity: 0,
-              note: ''
-            }
-            productUnits.push(productUnit)
-            console.log('✅ Added product unit with error fallback:', productUnit)
           }
         }
       } else {
@@ -221,6 +317,16 @@ const InventoryImportExportCreate = () => {
         return
       }
 
+      // Validation cho nhập kho theo lô (bắt buộc)
+      if (slipType === 'IMPORT') {
+        const productsWithoutLotNumber = selectedProducts.filter(p => !p.lotNumber)
+
+        if (productsWithoutLotNumber.length > 0) {
+          alert('Vui lòng nhập số lô cho tất cả sản phẩm đã chọn. Số lô là bắt buộc khi nhập kho.')
+          return
+        }
+      }
+
       // Lấy stock location đầu tiên của kho
       const stockLocations = await InventoryService.getStockLocations(selectedWarehouse!)
       if (stockLocations.length === 0) {
@@ -229,32 +335,61 @@ const InventoryImportExportCreate = () => {
       }
       const stockLocationId = stockLocations[0].id
 
-      // Tạo document (phiếu nhập/xuất)
-      const documentData = {
-        type: (slipType === 'IMPORT' ? 'INBOUND' : 'OUTBOUND') as 'INBOUND' | 'OUTBOUND',
-        warehouseId: selectedWarehouse!,
-        stockLocationId: stockLocationId,
-        referenceNumber: slipName,
-        note: notes
+      // Xử lý khác nhau cho nhập kho và xuất kho
+      if (slipType === 'IMPORT') {
+        // Nhập kho: Sử dụng API processInboundWithLot cho từng sản phẩm
+        const transactions = selectedProducts.map(p => ({
+          productUnitId: p.id,
+          warehouseId: selectedWarehouse!,
+          stockLocationId: stockLocationId,
+          quantity: p.actualQuantity,
+          note: p.note || notes,
+          referenceNumber: slipName,
+          transactionDate: slipDate,
+          transactionType: 'IMPORT' as const,
+          lotNumber: p.lotNumber,
+          expiryDate: p.expiryDate,
+          manufacturingDate: p.manufacturingDate,
+          supplierName: p.supplierName,
+          supplierBatchNumber: p.supplierBatchNumber
+        }))
+
+        console.log('🏷️ Processing inbound transactions with lots:', transactions)
+        await InventoryService.processMultipleInboundWithLots(transactions)
+        alert('Tạo phiếu nhập kho theo lô thành công!')
+      } else {
+        // Xuất kho: Giữ nguyên logic cũ
+        const documentData = {
+          type: 'OUTBOUND' as const,
+          warehouseId: selectedWarehouse!,
+          stockLocationId: stockLocationId,
+          referenceNumber: slipName,
+          note: notes
+        }
+
+        console.log('Creating document:', documentData)
+        const document = await InventoryService.createDocument(documentData)
+        console.log('Document created:', document)
+
+        const documentLines = selectedProducts.map(p => ({
+          productUnitId: p.id,
+          quantity: p.actualQuantity
+        }))
+
+        console.log('Adding document lines:', documentLines)
+        await InventoryService.addDocumentLinesBulk(document.id, documentLines)
+        alert('Tạo phiếu xuất kho thành công! Phiếu đang chờ duyệt.')
       }
 
-      console.log('Creating document:', documentData)
-      const document = await InventoryService.createDocument(documentData)
-      console.log('Document created:', document)
+      // Reset form về trạng thái ban đầu
+      setCurrentStep(1)
+      setProducts([])
+      setSelectedWarehouse(null)
+      setSlipName('')
+      setSlipDate(new Date().toISOString().slice(0, 16))
+      setNotes('')
+      setShowAllProducts(false)
 
-      // Thêm các dòng sản phẩm vào document
-      const documentLines = selectedProducts.map(p => ({
-        productUnitId: p.id,
-        quantity: p.actualQuantity
-      }))
-
-      console.log('Adding document lines:', documentLines)
-      await InventoryService.addDocumentLinesBulk(document.id, documentLines)
-
-      // Không duyệt phiếu ngay, để trạng thái PENDING
-      console.log('Document created with PENDING status:', document.id)
-
-      alert('Tạo phiếu nhập xuất thành công! Phiếu đang chờ duyệt.')
       navigate('/admin?tab=inventory-import-export-list')
     } catch (error) {
       console.error('Error creating slip:', error)
@@ -319,13 +454,21 @@ const InventoryImportExportCreate = () => {
                   </label>
                   <select
                     value={slipType}
-                    onChange={(e) => setSlipType(e.target.value as 'IMPORT' | 'EXPORT')}
+                    onChange={(e) => {
+                      const newSlipType = e.target.value as 'IMPORT' | 'EXPORT'
+                      setSlipType(newSlipType)
+                      // Reset showAllProducts khi chuyển sang xuất kho
+                      if (newSlipType === 'EXPORT') {
+                        setShowAllProducts(false)
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="IMPORT">Nhập kho</option>
                     <option value="EXPORT">Xuất kho</option>
                   </select>
                 </div>
+
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -385,7 +528,26 @@ const InventoryImportExportCreate = () => {
               </div>
 
               <div className="mt-6">
-                <h4 className="text-md font-medium text-gray-900 mb-4">Chọn sản phẩm</h4>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-md font-medium text-gray-900">Chọn sản phẩm</h4>
+
+                  {/* Toggle hiển thị tất cả sản phẩm - chỉ hiện khi nhập kho */}
+                  {slipType === 'IMPORT' && (
+                    <div className="flex items-center space-x-3">
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showAllProducts}
+                          onChange={(e) => setShowAllProducts(e.target.checked)}
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 text-sm font-medium text-green-800">
+                          Hiển thị tất cả sản phẩm
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
                 <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-md">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
@@ -441,6 +603,21 @@ const InventoryImportExportCreate = () => {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Thông tin trạng thái hiển thị - chỉ hiện khi nhập kho */}
+                {slipType === 'IMPORT' && (
+                  <div className="mt-3 space-y-2">
+                    <div className="p-2 bg-green-50 border border-green-200 rounded text-xs text-green-600">
+                      {showAllProducts ?
+                        '📦 Đang hiển thị tất cả sản phẩm ' :
+                        '📦 Đang hiển thị sản phẩm sắp hết hàng và sản phẩm mới'
+                      }
+                    </div>
+                    {/* <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-600">
+                      🏷️ Nhập kho theo lô (bắt buộc) - Sử dụng API /api/inventory/inbound/process để tạo stock lots tự động
+                    </div> */}
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 flex justify-end">
@@ -458,35 +635,68 @@ const InventoryImportExportCreate = () => {
             <div className="p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Nhập số lượng</h3>
 
-              <div className="space-y-4">
-                {products.filter(p => p.selected).map((product) => (
-                  <div key={product.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900">{product.productName}</h4>
-                        <p className="text-sm text-gray-500">Đơn vị: {product.unitName}</p>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Số lượng {slipType === 'IMPORT' ? 'nhập' : 'xuất'}
-                          </label>
+              {/* Bảng nhập số lượng với thông tin lô - 1 hàng duy nhất */}
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
+                        Sản phẩm
+                      </th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">
+                        Đơn vị
+                      </th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">
+                        Số lượng {slipType === 'IMPORT' ? 'nhập' : 'xuất'}
+                      </th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
+                        Ghi chú
+                      </th>
+                      {/* Cột thông tin lô - chỉ hiện khi nhập kho */}
+                      {slipType === 'IMPORT' && (
+                        <>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">
+                            Số lô *
+                          </th>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">
+                            HSD
+                          </th>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">
+                            NSX
+                          </th>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
+                            Nhà cung cấp
+                          </th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {products.filter(p => p.selected).map((product) => (
+                      <tr key={product.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-4">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 truncate">{product.productName}</div>
+                            <div className="text-xs text-gray-500">ID: {product.id}</div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-4 text-sm text-gray-500">
+                          {product.unitName}
+                        </td>
+                        <td className="px-3 py-4">
                           <input
                             type="number"
-                            min="0"
+                            min="1"
                             value={product.actualQuantity}
                             onChange={(e) => {
                               setProducts(prev => prev.map(p =>
                                 p.id === product.id ? { ...p, actualQuantity: Number(e.target.value) } : p
                               ))
                             }}
-                            className="w-24 px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Ghi chú
-                          </label>
+                        </td>
+                        <td className="px-3 py-4">
                           <input
                             type="text"
                             value={product.note}
@@ -496,13 +706,53 @@ const InventoryImportExportCreate = () => {
                               ))
                             }}
                             placeholder="Ghi chú..."
-                            className="w-32 px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                        </td>
+                        {/* Các ô thông tin lô - chỉ hiện khi nhập kho */}
+                        {slipType === 'IMPORT' && (
+                          <>
+                            <td className="px-3 py-4">
+                              <input
+                                type="text"
+                                value={product.lotNumber || ''}
+                                onChange={(e) => handleLotInfoChange(product.id, 'lotNumber', e.target.value)}
+                                placeholder="Số lô *"
+                                required
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="px-3 py-4">
+                              <input
+                                type="date"
+                                value={product.expiryDate || ''}
+                                onChange={(e) => handleLotInfoChange(product.id, 'expiryDate', e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="px-3 py-4">
+                              <input
+                                type="date"
+                                value={product.manufacturingDate || ''}
+                                onChange={(e) => handleLotInfoChange(product.id, 'manufacturingDate', e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="px-3 py-4">
+                              <input
+                                type="text"
+                                value={product.supplierName || ''}
+                                onChange={(e) => handleLotInfoChange(product.id, 'supplierName', e.target.value)}
+                                placeholder="Tên NCC"
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
               <div className="mt-6 flex justify-between">
