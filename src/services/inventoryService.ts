@@ -216,7 +216,19 @@ export const InventoryService = {
     return await res.json().catch(() => ({}))
   },
 
-  async addDocumentLine(documentId: number, line: { productUnitId: number; quantity: number }): Promise<any> {
+  // Add one document line; supports lot metadata for INBOUND
+  async addDocumentLine(
+    documentId: number,
+    line: {
+      productUnitId: number
+      quantity: number
+      lotNumber?: string
+      expiryDate?: string
+      manufacturingDate?: string
+      supplierName?: string
+      supplierBatchNumber?: string
+    }
+  ): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/inventory/documents/${documentId}/lines`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(line) })
     if (!res.ok) throw new Error('Failed to add document line')
     return await res.json().catch(() => ({}))
