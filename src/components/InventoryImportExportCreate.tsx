@@ -337,26 +337,34 @@ const InventoryImportExportCreate = () => {
 
       // Xử lý khác nhau cho nhập kho và xuất kho
       if (slipType === 'IMPORT') {
-        // Nhập kho: Sử dụng API processInboundWithLot cho từng sản phẩm
-        const transactions = selectedProducts.map(p => ({
-          productUnitId: p.id,
+        // Nhập kho: CHỈ tạo phiếu nhập, CHƯA nhập kho. Nhập kho sẽ thực hiện khi duyệt (approve)
+        const documentData = {
+          type: 'INBOUND' as const,
           warehouseId: selectedWarehouse!,
           stockLocationId: stockLocationId,
-          quantity: p.actualQuantity,
-          note: p.note || notes,
           referenceNumber: slipName,
-          transactionDate: slipDate,
-          transactionType: 'IMPORT' as const,
-          lotNumber: p.lotNumber,
-          expiryDate: p.expiryDate,
-          manufacturingDate: p.manufacturingDate,
-          supplierName: p.supplierName,
-          supplierBatchNumber: p.supplierBatchNumber
-        }))
+          note: notes
+        }
 
-        console.log('🏷️ Processing inbound transactions with lots:', transactions)
-        await InventoryService.processMultipleInboundWithLots(transactions)
-        alert('Tạo phiếu nhập kho theo lô thành công!')
+        console.log('Creating inbound document (pending):', documentData)
+        const document = await InventoryService.createDocument(documentData)
+        console.log('Inbound document created:', document)
+
+        // Thêm từng dòng kèm thông tin lô theo đặc tả BE
+        for (const p of selectedProducts) {
+          const line = {
+            productUnitId: p.id,
+            quantity: p.actualQuantity,
+            lotNumber: p.lotNumber,
+            expiryDate: p.expiryDate,
+            manufacturingDate: p.manufacturingDate,
+            supplierName: p.supplierName,
+            supplierBatchNumber: p.supplierBatchNumber,
+          }
+          console.log('Adding inbound document line (pending):', line)
+          await InventoryService.addDocumentLine(document.id, line)
+        }
+        alert('Tạo phiếu nhập kho thành công! Phiếu đang chờ duyệt.')
       } else {
         // Xuất kho: Giữ nguyên logic cũ
         const documentData = {
@@ -419,20 +427,20 @@ const InventoryImportExportCreate = () => {
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex items-center">
-            <div className={`flex items-center ${currentStep >= 1 ? 'text-blue-600' : 'text-gray-400'}`}>
+            <div className={`flex items-center ${currentStep >= 1 ? 'text-green-600' : 'text-gray-400'}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
+                currentStep >= 1 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'
               }`}>
                 1
               </div>
               <span className="ml-2 text-sm font-medium">Thông tin phiếu & Chọn sản phẩm</span>
             </div>
             <div className="flex-1 h-0.5 bg-gray-200 mx-4">
-              <div className={`h-full ${currentStep >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+              <div className={`h-full ${currentStep >= 2 ? 'bg-green-600' : 'bg-gray-200'}`}></div>
             </div>
-            <div className={`flex items-center ${currentStep >= 2 ? 'text-blue-600' : 'text-gray-400'}`}>
+            <div className={`flex items-center ${currentStep >= 2 ? 'text-green-600' : 'text-gray-400'}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                currentStep >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
+                currentStep >= 2 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'
               }`}>
                 2
               </div>
@@ -462,7 +470,7 @@ const InventoryImportExportCreate = () => {
                         setShowAllProducts(false)
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
                     <option value="IMPORT">Nhập kho</option>
                     <option value="EXPORT">Xuất kho</option>
@@ -479,7 +487,7 @@ const InventoryImportExportCreate = () => {
                     value={slipName}
                     onChange={(e) => setSlipName(e.target.value)}
                     placeholder="Nhập tên phiếu"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
 
@@ -491,7 +499,7 @@ const InventoryImportExportCreate = () => {
                     type="datetime-local"
                     value={slipDate}
                     onChange={(e) => setSlipDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
 
@@ -502,7 +510,7 @@ const InventoryImportExportCreate = () => {
                   <select
                     value={selectedWarehouse || ''}
                     onChange={(e) => setSelectedWarehouse(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
                     <option value="">Chọn kho</option>
                     {warehouses.map(warehouse => (
@@ -523,7 +531,7 @@ const InventoryImportExportCreate = () => {
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                   placeholder="Nhập ghi chú..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
 
@@ -560,7 +568,7 @@ const InventoryImportExportCreate = () => {
                               const checked = e.target.checked
                               setProducts(prev => prev.map(p => ({ ...p, selected: checked })))
                             }}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                           />
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -586,7 +594,7 @@ const InventoryImportExportCreate = () => {
                                   p.id === product.id ? { ...p, selected: e.target.checked } : p
                                 ))
                               }}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                             />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -623,7 +631,7 @@ const InventoryImportExportCreate = () => {
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={handleNext}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   Tiếp theo →
                 </button>
@@ -693,7 +701,7 @@ const InventoryImportExportCreate = () => {
                                 p.id === product.id ? { ...p, actualQuantity: Number(e.target.value) } : p
                               ))
                             }}
-                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                           />
                         </td>
                         <td className="px-3 py-4">
@@ -706,7 +714,7 @@ const InventoryImportExportCreate = () => {
                               ))
                             }}
                             placeholder="Ghi chú..."
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                           />
                         </td>
                         {/* Các ô thông tin lô - chỉ hiện khi nhập kho */}
@@ -719,7 +727,7 @@ const InventoryImportExportCreate = () => {
                                 onChange={(e) => handleLotInfoChange(product.id, 'lotNumber', e.target.value)}
                                 placeholder="Số lô *"
                                 required
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                               />
                             </td>
                             <td className="px-3 py-4">
@@ -727,7 +735,7 @@ const InventoryImportExportCreate = () => {
                                 type="date"
                                 value={product.expiryDate || ''}
                                 onChange={(e) => handleLotInfoChange(product.id, 'expiryDate', e.target.value)}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                               />
                             </td>
                             <td className="px-3 py-4">
@@ -735,7 +743,7 @@ const InventoryImportExportCreate = () => {
                                 type="date"
                                 value={product.manufacturingDate || ''}
                                 onChange={(e) => handleLotInfoChange(product.id, 'manufacturingDate', e.target.value)}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                               />
                             </td>
                             <td className="px-3 py-4">
@@ -744,7 +752,7 @@ const InventoryImportExportCreate = () => {
                                 value={product.supplierName || ''}
                                 onChange={(e) => handleLotInfoChange(product.id, 'supplierName', e.target.value)}
                                 placeholder="Tên NCC"
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                               />
                             </td>
                           </>

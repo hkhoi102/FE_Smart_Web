@@ -212,21 +212,21 @@ const InventoryCheckCreate = () => {
           <div className="flex items-center justify-center">
             <div className="flex items-center space-x-8">
               {/* Step 1 */}
-              <div className={`flex items-center ${currentStep >= 1 ? 'text-blue-600' : 'text-gray-400'}`}>
+              <div className={`flex items-center ${currentStep >= 1 ? 'text-green-600' : 'text-gray-400'}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400'
+                  currentStep >= 1 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400'
                 }`}>
                   1
                 </div>
                 <span className="ml-2 text-sm font-medium">Thông tin phiếu & Chọn sản phẩm</span>
               </div>
 
-              <div className={`w-16 h-0.5 ${currentStep >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+              <div className={`w-16 h-0.5 ${currentStep >= 2 ? 'bg-green-600' : 'bg-gray-200'}`}></div>
 
               {/* Step 2 */}
-              <div className={`flex items-center ${currentStep >= 2 ? 'text-blue-600' : 'text-gray-400'}`}>
+              <div className={`flex items-center ${currentStep >= 2 ? 'text-green-600' : 'text-gray-400'}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  currentStep >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400'
+                  currentStep >= 2 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400'
                 }`}>
                   2
                 </div>
@@ -252,7 +252,7 @@ const InventoryCheckCreate = () => {
                     type="text"
                     value={formData.check_name}
                     onChange={(e) => setFormData(prev => ({ ...prev, check_name: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     placeholder="Nhập tên phiếu kiểm kê"
                     required
                   />
@@ -266,7 +266,7 @@ const InventoryCheckCreate = () => {
                     type="datetime-local"
                     value={formData.check_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, check_date: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     required
                   />
                 </div>
@@ -280,7 +280,7 @@ const InventoryCheckCreate = () => {
                   <select
                     value={formData.warehouse_id}
                     onChange={(e) => handleWarehouseChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     required
                   >
                     <option value="">Chọn kho</option>
@@ -300,7 +300,7 @@ const InventoryCheckCreate = () => {
                 <textarea
                   value={formData.note}
                   onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   placeholder="Nhập ghi chú cho phiếu kiểm kê"
                   rows={3}
                   required
@@ -318,7 +318,7 @@ const InventoryCheckCreate = () => {
                   <div className="flex items-center space-x-4">
                     <button
                       onClick={handleSelectAll}
-                      className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
+                      className="px-4 py-2 text-sm font-medium text-green-600 bg-green-50 border border-green-200 rounded-md hover:bg-green-100"
                     >
                       {productUnits.every(p => p.selected) ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
                     </button>
@@ -335,7 +335,7 @@ const InventoryCheckCreate = () => {
                     placeholder="Tìm kiếm sản phẩm (tùy chọn)..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   />
                 </div>
 
@@ -349,7 +349,7 @@ const InventoryCheckCreate = () => {
                             type="checkbox"
                             checked={productUnits.length > 0 && productUnits.every(p => p.selected)}
                             onChange={handleSelectAll}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                           />
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -371,7 +371,7 @@ const InventoryCheckCreate = () => {
                               type="checkbox"
                               checked={product.selected}
                               onChange={() => handleProductToggle(product.id)}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                             />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -394,7 +394,7 @@ const InventoryCheckCreate = () => {
             <div className="flex justify-end">
               <button
                 onClick={handleStep1Next}
-                className="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                className="px-6 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700"
               >
                 Tiếp theo →
               </button>
@@ -455,7 +455,7 @@ const InventoryCheckCreate = () => {
                           type="number"
                           value={product.actualQuantity || ''}
                           onChange={(e) => handleActualQuantityChange(product.id, e.target.value)}
-                          className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                           min="0"
                           required
                         />
@@ -475,7 +475,7 @@ const InventoryCheckCreate = () => {
                           type="text"
                           value={product.note}
                           onChange={(e) => handleNoteChange(product.id, e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                           placeholder="Ghi chú kiểm kê"
                         />
                       </td>
