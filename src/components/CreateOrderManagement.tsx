@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 import { OrderApi } from '../services/orderService'
 import { ProductService } from '../services/productService'
 import Modal from './Modal'
@@ -39,10 +40,15 @@ interface OrderItem {
 }
 
 const CreateOrderManagement: React.FC = () => {
+  const { user } = useAuth()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<ProductUnit[]>([])
   const [promotions, setPromotions] = useState<Promotion[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('')
+  const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([])
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false)
+  const customerSearchDebounceRef = React.useRef<number | undefined>(undefined)
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'BANK_TRANSFER'>('COD')
@@ -85,6 +91,34 @@ const CreateOrderManagement: React.FC = () => {
   useEffect(() => {
     fetchInitialData()
   }, [])
+
+  // Debounced local search for customer suggestions
+  useEffect(() => {
+    if (customerSearchDebounceRef.current) {
+      window.clearTimeout(customerSearchDebounceRef.current)
+    }
+    const term = customerSearchTerm.trim().toLowerCase()
+    if (!term) {
+      setCustomerSuggestions([])
+      setShowCustomerSuggestions(false)
+      return
+    }
+    customerSearchDebounceRef.current = window.setTimeout(() => {
+      const results = customers.filter(c =>
+        (c.fullName || '').toLowerCase().includes(term) ||
+        (c.phoneNumber || '').toLowerCase().includes(term) ||
+        (c.email || '').toLowerCase().includes(term) ||
+        (c.address || '').toLowerCase().includes(term)
+      ).slice(0, 8)
+      setCustomerSuggestions(results)
+      setShowCustomerSuggestions(results.length > 0)
+    }, 300)
+    return () => {
+      if (customerSearchDebounceRef.current) {
+        window.clearTimeout(customerSearchDebounceRef.current)
+      }
+    }
+  }, [customerSearchTerm, customers])
 
   // Focus barcode input only on initial mount in POS mode
   useEffect(() => {
@@ -1301,6 +1335,14 @@ const CreateOrderManagement: React.FC = () => {
   }
 
   const { subtotal, discountAmount, total } = calculateTotals()
+  const computedSubtotal = orderPreview?.data?.totalOriginalAmount ?? subtotal
+  const computedDiscount = orderPreview?.data?.totalDiscountAmount ?? discountAmount ?? 0
+  const shippingFee = orderPreview?.data?.shippingFee ?? 0
+  const vatAmount = orderPreview?.data?.vatAmount ?? 0
+  const finalTotal = orderPreview?.data?.totalFinalAmount ?? (computedSubtotal - computedDiscount + shippingFee + vatAmount)
+  const storeName = import.meta.env.VITE_STORE_NAME || '71 MARKET'
+  const storeAddress = import.meta.env.VITE_STORE_ADDRESS || '—'
+  const storeTaxId = import.meta.env.VITE_STORE_TAX_ID || ''
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -1339,16 +1381,16 @@ const CreateOrderManagement: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className="bg-white shadow rounded-lg p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Bán hàng tại quầy</h1>
-            <p className="text-gray-600">Hệ thống bán hàng POS - Point of Sale</p>
+            <h1 className="text-xl font-semibold text-gray-900 mb-1">Bán hàng tại quầy</h1>
+            <p className="text-sm text-gray-600">Hệ thống bán hàng POS - Point of Sale</p>
           </div>
           <div className="flex items-center space-x-4">
             <button
               onClick={() => setIsPOSMode(!isPOSMode)}
-              className={`px-4 py-2 rounded-lg font-medium ${
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${
                 isPOSMode
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-700'
@@ -1358,7 +1400,7 @@ const CreateOrderManagement: React.FC = () => {
             </button>
             <button
               onClick={handleClearCart}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+              className="px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium"
             >
               Xóa giỏ hàng
             </button>
@@ -1401,9 +1443,11 @@ const CreateOrderManagement: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
         {/* Left Column - Order Details */}
-        <div className="lg:col-span-2 space-y-6 relative">
+        <div className="lg:col-span-6 space-y-6 relative">
+          {/* Actions + Customer Info side-by-side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* POS Quick Actions */}
           {isPOSMode && (
             <div className="bg-white shadow rounded-lg p-6">
@@ -1421,12 +1465,12 @@ const CreateOrderManagement: React.FC = () => {
                     value={barcodeInput}
                     onChange={(e) => setBarcodeInput(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleBarcodeScan(barcodeInput)}
-                    placeholder="Quét mã vạch hoặc nhập tên sản phẩm..."
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Quét mã vạch"
+                    className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                   />
                   <button
                     onClick={startCameraScanner}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
                   >
                     Quét mã vạch
                   </button>
@@ -1440,8 +1484,8 @@ const CreateOrderManagement: React.FC = () => {
                   type="text"
                   value={quickSearch}
                   onChange={(e) => setQuickSearch(e.target.value)}
-                  placeholder="Tìm kiếm sản phẩm nhanh..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Tìm kiếm sản phẩm..."
+                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
@@ -1473,63 +1517,54 @@ const CreateOrderManagement: React.FC = () => {
             </div>
           )}
           {/* Customer Selection */}
-          <div className="bg-white shadow rounded-lg p-6">
+          <div className="bg-white shadow rounded-lg p-6 relative">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông tin khách hàng</h2>
 
-            {isPOSMode ? (
-              // POS Mode: Walk-in customer only
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                {/* <div className="flex items-center">
-                  <div className="text-blue-500 text-2xl mr-3">🛒</div>
-                  <div>
-                    <h3 className="text-lg font-medium text-blue-800">Khách lẻ - Bán hàng tại quầy</h3>
-                    <p className="text-sm text-blue-600">Khách hàng mua trực tiếp tại cửa hàng, không cần thông tin cá nhân</p>
-                  </div>
-                </div> */}
-              </div>
-            ) : (
-              // Regular Mode: Customer selection
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Chọn khách hàng *
-                  </label>
-                  <select
-                    value={selectedCustomer?.id || ''}
-                    onChange={(e) => {
-                      const customerId = parseInt(e.target.value)
-                      const customer = customers.find(c => c.id === customerId)
-                      setSelectedCustomer(customer || null)
-                      if (customer) {
-                        setShippingAddress(customer.address)
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Chọn khách hàng</option>
-                    {customers.map(customer => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.fullName} - {customer.phoneNumber}
-                      </option>
+            <div className="grid grid-cols-1 gap-4">
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tìm khách hàng *
+                </label>
+                <input
+                  type="text"
+                  value={customerSearchTerm}
+                  onChange={(e) => { setCustomerSearchTerm(e.target.value); setShowCustomerSuggestions(true) }}
+                  onFocus={() => setShowCustomerSuggestions(customerSuggestions.length > 0)}
+                  onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 150)}
+                  placeholder="Nhập tên/SĐT/email/địa chỉ..."
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+                {showCustomerSuggestions && customerSuggestions.length > 0 && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
+                    {customerSuggestions.map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                        onClick={() => {
+                          setSelectedCustomer(c)
+                          setCustomerSearchTerm(`${c.fullName}${c.phoneNumber ? ` - ${c.phoneNumber}` : ''}`)
+                          setShowCustomerSuggestions(false)
+                          setShippingAddress(c.address)
+                        }}
+                      >
+                        <div className="text-sm text-gray-900">{c.fullName} {c.phoneNumber ? `- ${c.phoneNumber}` : ''}</div>
+                        <div className="text-xs text-gray-500 truncate">{c.email || ''}{c.email && c.address ? ' • ' : ''}{c.address || ''}</div>
+                      </button>
                     ))}
-                  </select>
-                </div>
-
-                {selectedCustomer && (
-                  <div className="space-y-2">
-                    <div className="text-sm">
-                      <span className="font-medium">Tên:</span> {selectedCustomer.fullName}
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-medium">SĐT:</span> {selectedCustomer.phoneNumber}
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-medium">Email:</span> {selectedCustomer.email}
-                    </div>
                   </div>
                 )}
               </div>
-            )}
+
+              {selectedCustomer && (
+                <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="text-sm"><span className="font-medium">Họ và tên:</span> {selectedCustomer.fullName}</div>
+                  <div className="text-sm"><span className="font-medium">Địa chỉ:</span> {selectedCustomer.address || '—'}</div>
+                  <div className="text-sm"><span className="font-medium">Số điện thoại:</span> {selectedCustomer.phoneNumber || '—'}</div>
+                  <div className="text-sm"><span className="font-medium">Email:</span> {selectedCustomer.email || '—'}</div>
+                </div>
+              )}
+            </div>
 
             {!isPOSMode && (
               <div className="mt-4">
@@ -1545,6 +1580,7 @@ const CreateOrderManagement: React.FC = () => {
                 />
               </div>
             )}
+          </div>
           </div>
 
           {/* Products */}
@@ -1761,7 +1797,7 @@ const CreateOrderManagement: React.FC = () => {
         </div>
 
         {/* Right Column - Order Summary */}
-        <div className="space-y-6">
+        <div className="lg:col-span-4 space-y-6">
 
           {/* Order Summary */}
           <div className="bg-white shadow rounded-lg p-6">
@@ -1889,7 +1925,7 @@ const CreateOrderManagement: React.FC = () => {
               <button
                 onClick={isPOSMode ? handleContinueToPayment : handleCreateOrder}
                 disabled={loading || (!isPOSMode && !selectedCustomer) || orderItems.length === 0 || (isPOSMode && currentOrder)}
-                className="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-lg"
+                className="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base block mx-auto"
               >
                 {loading ? 'Đang xử lý...' :
                  isPOSMode ? (currentOrder ? 'Đang xử lý đơn hàng...' : 'Tiếp tục') :
@@ -2190,8 +2226,8 @@ const CreateOrderManagement: React.FC = () => {
 
       {/* Confirm Complete Modal */}
       {showCompleteConfirmModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 style: !mt-0">
+          <div className="bg-white rounded-lg p-8 max-w-4xl w-full md:w-[900px] lg:w-[1000px] mx-2 md:mx-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Xác nhận hoàn thành đơn hàng</h3>
               <button onClick={() => setShowCompleteConfirmModal(false)} className="text-gray-400 hover:text-gray-600">
@@ -2206,7 +2242,25 @@ const CreateOrderManagement: React.FC = () => {
                   <div><span className="text-gray-600">Mã đơn:</span> <span className="font-medium">#{orderSummaryForConfirm.id}</span></div>
                   <div><span className="text-gray-600">Ngày tạo:</span> {new Date(orderSummaryForConfirm.createdAt).toLocaleString('vi-VN')}</div>
                   <div><span className="text-gray-600">Phương thức:</span> {orderSummaryForConfirm.paymentMethod === 'COD' ? 'Tiền mặt' : 'Chuyển khoản'}</div>
-                  <div><span className="text-gray-600">Tổng tiền:</span> <span className="font-semibold text-blue-600">{formatCurrency(orderSummaryForConfirm.totalAmount || 0)}</span></div>
+                  <div><span className="text-gray-600">Tổng tiền:</span> <span className="font-semibold text-blue-600">{formatCurrency(finalTotal)}</span></div>
+                </div>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-gray-600 font-medium mb-1">Thông tin khách hàng</div>
+                    <div className="text-sm text-gray-800">Tên: {selectedCustomer?.fullName || orderSummaryForConfirm.customerName || 'Khách lẻ'}</div>
+                    {(selectedCustomer?.phoneNumber || orderSummaryForConfirm.customerPhone) && (
+                      <div className="text-sm text-gray-800">SĐT: {selectedCustomer?.phoneNumber || orderSummaryForConfirm.customerPhone}</div>
+                    )}
+                    {(selectedCustomer?.address || orderSummaryForConfirm.customerAddress) && (
+                      <div className="text-sm text-gray-800">Địa chỉ: {selectedCustomer?.address || orderSummaryForConfirm.customerAddress}</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-gray-600 font-medium mb-1">Thông tin cửa hàng: {storeName}</div>
+                    {storeAddress && <div className="text-sm text-gray-800">{storeAddress}</div>}
+                    {storeTaxId && <div className="text-sm text-gray-800">MST: {storeTaxId}</div>}
+                    {user?.fullName && <div className="text-sm text-gray-800 mt-1">Người lập đơn: {user.fullName}</div>}
+                  </div>
                 </div>
                 <div className="mt-2">
                   <div className="font-medium text-gray-800 mb-2">Chi tiết sản phẩm</div>
@@ -2233,6 +2287,34 @@ const CreateOrderManagement: React.FC = () => {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+                <div className="mt-3 p-3 rounded-md border bg-gray-50">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Tổng cộng:</span>
+                    <span className="text-gray-800">{formatCurrency(computedSubtotal)}</span>
+                  </div>
+                  {computedDiscount > 0 && (
+                    <div className="flex justify-between text-sm mb-1 text-green-700">
+                      <span>Chiết khấu/Khuyến mãi:</span>
+                      <span>-{formatCurrency(computedDiscount)}</span>
+                    </div>
+                  )}
+                  {vatAmount > 0 && (
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-600">Thuế VAT:</span>
+                      <span className="text-gray-800">{formatCurrency(vatAmount)}</span>
+                    </div>
+                  )}
+                  {shippingFee > 0 && (
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-600">Phí vận chuyển:</span>
+                      <span className="text-gray-800">{formatCurrency(shippingFee)}</span>
+                    </div>
+                  )}
+                  <div className="border-t mt-2 pt-2 flex justify-between text-base font-semibold">
+                    <span>Thành tiền phải trả:</span>
+                    <span className="text-blue-600">{formatCurrency(finalTotal)}</span>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ProductService } from '@/services/productService'
 
@@ -16,6 +16,9 @@ const PriceHeaderDetail = () => {
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string>('')
+  const [suggestions, setSuggestions] = useState<Array<{ id: number; name: string; code?: string }>>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const searchDebounceRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     // Load basic header info from list to show name/desc
@@ -46,9 +49,42 @@ const PriceHeaderDetail = () => {
     }
   }
 
+  // Debounced product search for suggestions by name/code
+  useEffect(() => {
+    // Clear previous timer
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current)
+    }
+
+    const term = maSP.trim()
+    if (!term) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    searchDebounceRef.current = window.setTimeout(async () => {
+      try {
+        const res = await ProductService.getProducts(1, 8, term)
+        const items = (res?.products || []).map(p => ({ id: p.id, name: p.name, code: p.code }))
+        setSuggestions(items)
+        setShowSuggestions(items.length > 0)
+      } catch {
+        setSuggestions([])
+        setShowSuggestions(false)
+      }
+    }, 300)
+
+    return () => {
+      if (searchDebounceRef.current) {
+        window.clearTimeout(searchDebounceRef.current)
+      }
+    }
+  }, [maSP])
+
   const addItem = () => {
     if (!maSP.trim() || !selectedUnitId || !price) return
-    const p = parseFloat(price)
+    const p = parseFloat(String(price).replace(/\./g, ''))
     if (isNaN(p) || p <= 0) return
     const unitName = unitOptions.find(u => u.id === Number(selectedUnitId))?.name || `Unit #${selectedUnitId}`
     setItems(prev => [...prev, { productCode: maSP.trim(), productName: foundProductName || maSP.trim(), unitId: Number(selectedUnitId), unitName, price: p }])
@@ -62,7 +98,7 @@ const PriceHeaderDetail = () => {
     try {
       const payload = (items.length > 0
         ? items.map(it => ({ productUnitId: it.unitId, price: it.price, productCode: it.productCode }))
-        : [{ productUnitId: Number(selectedUnitId), price: Number(price), productCode: maSP.trim() }]
+        : [{ productUnitId: Number(selectedUnitId), price: Number(String(price).replace(/\./g, '')), productCode: maSP.trim() }]
       )
       await ProductService.bulkAddPricesToHeader(Number(headerId), payload)
       setItems([])
@@ -116,60 +152,72 @@ const PriceHeaderDetail = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Mã sản phẩm (maSP)</label>
-            <div className="flex gap-2">
+            <div className="relative">
               <input
                 type="text"
                 value={maSP}
-                onChange={(e) => setMaSP(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                onChange={(e) => { setMaSP(e.target.value); setShowSuggestions(true) }}
+                onFocus={() => setShowSuggestions(suggestions.length > 0)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 placeholder="VD: SP-0001"
               />
-              <button
-                type="button"
-                onClick={() => maSP.trim() && loadUnitsByCode(maSP.trim())}
-                className="px-3 py-2 rounded-md text-white bg-gray-700 hover:bg-gray-800"
-              >Tìm</button>
-            </div>
-            {foundProductName && (
-              <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-green-200 bg-green-50 text-green-800">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-                <span className="text-sm">Sản phẩm:</span>
-                <span className="font-semibold text-base">{foundProductName}</span>
-
-              </div>
-            )}
-          </div>
-          {unitOptions.length > 0 && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị</label>
-                <select
-                  value={selectedUnitId}
-                  onChange={(e) => setSelectedUnitId(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="">-- Chọn đơn vị --</option>
-                  {unitOptions.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
+              {/* Suggestions dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
+                  {suggestions.map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                      onClick={async () => {
+                        const code = s.code || String(s.id)
+                        setMaSP(code)
+                        setShowSuggestions(false)
+                        await loadUnitsByCode(code)
+                      }}
+                    >
+                      <div className="text-sm text-gray-900">{s.name}</div>
+                      <div className="text-xs text-gray-500">{s.code ? `Mã: ${s.code}` : `ID: ${s.id}`}</div>
+                    </button>
                   ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Giá (VND)</label>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    placeholder="Nhập giá"
-                  />
-                  <button type="button" onClick={addItem} className="px-3 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">Thêm</button>
                 </div>
-              </div>
-            </>
-          )}
+              )}
+              {/* Removed explicit search button; selection from suggestions auto-loads units */}
+            </div>
+            {/* Removed product info chip */}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị</label>
+            <select
+              value={selectedUnitId}
+              onChange={(e) => setSelectedUnitId(e.target.value ? Number(e.target.value) : '')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            >
+              <option value="">Chọn đơn vị</option>
+              {unitOptions.map(u => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Giá (VND)</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={price}
+                onChange={(e) => {
+                  const digitsOnly = e.target.value.replace(/\D/g, '')
+                  const withDots = digitsOnly.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+                  setPrice(withDots)
+                }}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                placeholder="Nhập giá"
+              />
+              <button type="button" onClick={addItem} className="px-3 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">Thêm</button>
+            </div>
+          </div>
         </div>
 
         {items.length > 0 && (

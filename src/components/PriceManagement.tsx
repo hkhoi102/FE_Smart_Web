@@ -98,18 +98,17 @@ const PriceManagement = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Quản lý giá</h2>
-        <button onClick={openCreateModal} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">Tạo bảng giá</button>
-      </div>
-
-      <div className="flex justify-between items-center">
-        <div className="flex-1 max-w-md">
-          <input
-            type="text"
-            placeholder="Tìm theo tên hoặc mô tả bảng giá..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          />
+        <div className="flex items-center gap-3">
+          <div className="hidden md:block">
+            <input
+              type="text"
+              placeholder="Tìm theo tên hoặc mô tả bảng giá..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            />
+          </div>
+          <button onClick={openCreateModal} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">Tạo bảng giá</button>
         </div>
       </div>
 

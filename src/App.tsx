@@ -52,6 +52,14 @@ function App() {
                 }
               />
               <Route
+                path="/admin/:tab"
+                element={
+                  <ProtectedRoute>
+                    <Admin />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/admin/prices/:headerId"
                 element={
                   <ProtectedRoute>
