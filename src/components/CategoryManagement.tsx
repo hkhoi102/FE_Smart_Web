@@ -198,12 +198,21 @@ const CategoryManagement = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Quản lý danh mục sản phẩm</h2>
-        <button
-          onClick={handleAddCategory}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-        >
-          Thêm danh mục
-        </button>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Tìm kiếm danh mục..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="hidden md:block w-64 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          />
+          <button
+            onClick={handleAddCategory}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+          >
+            Thêm danh mục
+          </button>
+        </div>
       </div>
 
       {/* Error Display */}
@@ -213,32 +222,21 @@ const CategoryManagement = () => {
         </div>
       )}
 
-      {/* Search */}
-      <div className="flex justify-between items-center space-x-4">
-        <div className="flex-1 max-w-md">
-          <input
-            type="text"
-            placeholder="Tìm kiếm danh mục..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          />
-        </div>
-      </div>
+      {/* Search moved to header */}
 
       {/* Categories Grid */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
+      <div>
         {loading ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
             <span className="ml-2 text-gray-600">Đang tải...</span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
             {paginatedCategories.map((category) => (
               <div
                 key={category.id}
-                className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
+                className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => handleViewDetails(category)}
               >
                 <div className="flex items-start justify-between">
@@ -249,7 +247,7 @@ const CategoryManagement = () => {
                           <img
                             src={category.imageUrl}
                             alt={category.name}
-                            className="h-12 w-12 rounded-lg object-cover border border-gray-200"
+                            className="h-10 w-10 rounded-lg object-cover border border-gray-200"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement
                               target.style.display = 'none'
@@ -258,10 +256,10 @@ const CategoryManagement = () => {
                         </div>
                       )}
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        <h3 className="text-base font-semibold text-gray-900 mb-1">
                           {category.name}
                         </h3>
-                        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                        <p className="text-gray-600 text-sm mb-2 line-clamp-2">
                           {category.description || 'Không có mô tả'}
                         </p>
                         <div className="flex items-center text-xs text-gray-500">

@@ -77,13 +77,13 @@ const PromotionManagement: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className="bg-white shadow rounded-lg p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Quản lý Khuyến mãi</h1>
-            <p className="text-gray-600 mt-1">Quản lý các chương trình khuyến mãi và giảm giá</p>
+            <h1 className="text-xl font-semibold text-gray-900">Quản lý Khuyến mãi</h1>
+            <p className="text-sm text-gray-600 mt-1">Quản lý các chương trình khuyến mãi và giảm giá</p>
           </div>
-          <button onClick={() => setIsWizardOpen(true)} className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700">Tạo khuyến mãi mới</button>
+          <button onClick={() => setIsWizardOpen(true)} className="px-3 py-1.5 rounded-md text-sm text-white bg-green-600 hover:bg-green-700">Tạo khuyến mãi mới</button>
         </div>
       </div>
 

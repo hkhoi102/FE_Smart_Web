@@ -159,20 +159,20 @@ const PromotionDetail: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/admin?tab=promotions')}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={() => navigate('/admin/promotions')}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Chi tiết khuyến mãi</h1>
-                <p className="text-gray-600 mt-1">{header.name}</p>
+                <h1 className="text-xl font-semibold text-gray-900">Chi tiết khuyến mãi</h1>
+                <p className="text-sm text-gray-600 mt-0.5">{header.name}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -184,10 +184,10 @@ const PromotionDetail: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Promotion Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
@@ -196,12 +196,12 @@ const PromotionDetail: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">ID</p>
-                <p className="text-2xl font-semibold text-gray-900">{header.id}</p>
+                <p className="text-xl font-semibold text-gray-900">{header.id}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
@@ -210,12 +210,12 @@ const PromotionDetail: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Ngày bắt đầu</p>
-                <p className="text-lg font-semibold text-gray-900">{formatDate(header.start_date)}</p>
+                <p className="text-base font-semibold text-gray-900">{formatDate(header.start_date)}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
@@ -224,12 +224,12 @@ const PromotionDetail: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Ngày kết thúc</p>
-                <p className="text-lg font-semibold text-gray-900">{formatDate(header.end_date)}</p>
+                <p className="text-base font-semibold text-gray-900">{formatDate(header.end_date)}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
@@ -238,7 +238,7 @@ const PromotionDetail: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Số dòng khuyến mãi</p>
-                <p className="text-2xl font-semibold text-gray-900">{lines.length}</p>
+                <p className="text-xl font-semibold text-gray-900">{lines.length}</p>
               </div>
             </div>
           </div>

@@ -502,7 +502,7 @@ const OrderListManagement: React.FC = () => {
               placeholder="ID, khách hàng, tổng tiền..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="block w-full pl-10 pr-2 py-2 text-sm border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
           </div>
         </div>
@@ -516,7 +516,7 @@ const OrderListManagement: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="block w-full px-4 py-2.5 pr-8 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
+                className="block w-full px-3 py-2 text-sm pr-8 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
               >
                 <option value="ALL">Tất cả</option>
                 <option value="COMPLETED">Hoàn thành</option>
@@ -537,7 +537,7 @@ const OrderListManagement: React.FC = () => {
               <select
                 value={paymentStatusFilter}
                 onChange={(e) => setPaymentStatusFilter(e.target.value as any)}
-                className="block w-full px-4 py-2.5 pr-8 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
+                className="block w-full px-3 py-2 text-sm pr-8 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
               >
                 <option value="ALL">Tất cả</option>
                 <option value="PAID">Đã thanh toán</option>
@@ -558,7 +558,7 @@ const OrderListManagement: React.FC = () => {
               <select
                 value={paymentMethodFilter}
                 onChange={(e) => setPaymentMethodFilter(e.target.value as any)}
-                className="block w-full px-4 py-2.5 pr-8 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
+                className="block w-full px-3 py-2 text-sm pr-8 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
               >
                 <option value="ALL">Tất cả</option>
                 <option value="COD">COD</option>
@@ -581,7 +581,7 @@ const OrderListManagement: React.FC = () => {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="block w-full px-4 py-2.5 pr-8 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
+                  className="block w-full px-3 py-2 text-sm pr-8 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
                 >
                   <option value="created_at">Ngày tạo</option>
                   <option value="id">ID</option>
@@ -594,21 +594,7 @@ const OrderListManagement: React.FC = () => {
                   </svg>
                 </div>
               </div>
-              <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="px-3 py-2.5 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors"
-                title={sortOrder === 'asc' ? 'Tăng dần' : 'Giảm dần'}
-              >
-                {sortOrder === 'asc' ? (
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                )}
-              </button>
+              {/* Removed sort order toggle button per request */}
             </div>
           </div>
         </div>
@@ -627,7 +613,7 @@ const OrderListManagement: React.FC = () => {
                 type="date"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                className="block w-full pl-10 pr-2 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               />
             </div>
           </div>
@@ -644,7 +630,7 @@ const OrderListManagement: React.FC = () => {
                 type="date"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                className="block w-full pl-10 pr-2 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               />
             </div>
           </div>

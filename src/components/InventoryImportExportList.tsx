@@ -179,23 +179,8 @@ const InventoryImportExportList = () => {
             <h1 className="text-2xl font-bold text-gray-900">Danh sách phiếu nhập xuất</h1>
             <p className="text-gray-600">Quản lý các phiếu nhập xuất hàng</p>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => navigate('/admin?tab=inventory-import-export')}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              Tạo phiếu mới
-            </button>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow mb-6 p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Lọc theo kho
-              </label>
+          <div className="flex items-center gap-3">
+            <div className="hidden md:block">
               <select
                 value={selectedWarehouse || ''}
                 onChange={(e) => setSelectedWarehouse(e.target.value ? Number(e.target.value) : undefined)}
@@ -209,8 +194,16 @@ const InventoryImportExportList = () => {
                 ))}
               </select>
             </div>
+            <button
+              onClick={() => navigate('/admin?tab=inventory-import-export')}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              Tạo phiếu mới
+            </button>
           </div>
         </div>
+
+        {/* Filters moved into header */}
 
         {/* Documents Table */}
         <div className="bg-white rounded-lg shadow">

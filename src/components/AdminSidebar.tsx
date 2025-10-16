@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type TabType = 'overview' | 'management' | 'products' | 'categories' | 'units' | 'prices' | 'inventory' | 'inventory-management' | 'inventory-import-export' | 'inventory-import-export-list' | 'inventory-check-create' | 'inventory-check' | 'warehouses' | 'warehouse-list' | 'warehouse-history' | 'accounts' | 'promotions' | 'orders' | 'order-processing' | 'order-list' | 'return-processing' | 'create-order'
 
@@ -17,6 +17,21 @@ interface MenuItem {
 const AdminSidebar = ({ currentTab, onTabChange }: AdminSidebarProps) => {
   const [expandedItems, setExpandedItems] = useState<string[]>(['management', 'warehouses', 'orders'])
   const [isCollapsed, setIsCollapsed] = useState(false)
+
+  // Auto-collapse on small screens, expand on hover, collapse on leave
+  useEffect(() => {
+    const handleInit = () => {
+      if (window.innerWidth < 1280) {
+        setIsCollapsed(true)
+      }
+    }
+    handleInit()
+    const onResize = () => {
+      if (window.innerWidth < 1280) setIsCollapsed(true)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const menuItems: MenuItem[] = [
     {
@@ -124,6 +139,8 @@ const AdminSidebar = ({ currentTab, onTabChange }: AdminSidebarProps) => {
     } else {
       onTabChange(itemId as TabType)
     }
+    // Auto-hide after navigation on small screens
+    if (window.innerWidth < 1280) setIsCollapsed(true)
   }
 
   const toggleSidebar = () => {
@@ -202,9 +219,13 @@ const AdminSidebar = ({ currentTab, onTabChange }: AdminSidebarProps) => {
   console.log('Rendering sidebar, isCollapsed:', isCollapsed)
 
   return (
-    <div className={`${isCollapsed ? 'w-16' : 'w-96'} bg-white border-r border-green-200 h-screen overflow-y-auto sticky top-0 transition-all duration-300 ease-in-out flex-shrink-0`}>
+    <div
+      className={`${isCollapsed ? 'w-16' : 'w-96'} bg-white border-r border-gray-200 h-screen overflow-y-auto sticky top-0 transition-all duration-300 ease-in-out flex-shrink-0`}
+      onMouseEnter={() => setIsCollapsed(false)}
+      onMouseLeave={() => setIsCollapsed(true)}
+    >
       {/* Logo */}
-      <div className={`flex items-center ${isCollapsed ? 'px-2 py-6 justify-center' : 'px-4 py-6'} border-b border-gray-200`}>
+      <div className={`flex items-center ${isCollapsed ? 'px-2 py-2 justify-center' : 'px-4 py-2'} border-b border-gray-200`}>
         <div className="flex items-center">
           <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
             <span className="text-white font-bold text-sm">VL</span>
@@ -213,32 +234,10 @@ const AdminSidebar = ({ currentTab, onTabChange }: AdminSidebarProps) => {
             <span className="text-xl font-bold text-green-900">71 MARKET</span>
           )}
         </div>
-        {!isCollapsed && (
-          <button
-            onClick={toggleSidebar}
-            className="ml-auto p-1 rounded-md hover:bg-gray-100"
-          >
-          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-        )}
+        {/* Toggle button removed */}
       </div>
 
-      {/* Collapsed Menu Toggle Button */}
-      {isCollapsed && (
-        <div className="flex justify-center py-2 border-b border-gray-200">
-          <button
-            onClick={toggleSidebar}
-            className="p-2 rounded-md hover:bg-gray-100"
-            title="Mở menu"
-          >
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </div>
-      )}
+      {/* Collapsed Menu Toggle Button removed per request */}
 
       {/* Menu */}
       <nav className={`${isCollapsed ? 'px-2 py-4' : 'px-4 py-4'} space-y-2`}>

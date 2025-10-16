@@ -87,12 +87,26 @@ const UnitManagement = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Quản lý đơn vị tính</h2>
-        <button
-          onClick={handleAddUnit}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-        >
-          Thêm đơn vị tính
-        </button>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Tìm kiếm đơn vị tính..."
+            onChange={(e) => {
+              const term = e.target.value.toLowerCase()
+              setUnits(prev => prev.slice().sort((a,b)=>a.id-b.id).filter(u =>
+                (u.name || '').toLowerCase().includes(term) ||
+                (u.description || '').toLowerCase().includes(term)
+              ))
+            }}
+            className="hidden md:block w-56 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          />
+          <button
+            onClick={handleAddUnit}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+          >
+            Thêm đơn vị tính
+          </button>
+        </div>
       </div>
 
       {/* Units Grid */}
