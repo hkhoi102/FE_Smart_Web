@@ -82,6 +82,9 @@ export interface PromotionDetailDto {
   maxDiscount?: number
   conditionQuantity?: number
   freeQuantity?: number
+  // New fields to support BUY_X_GET_Y detail payload
+  giftProductUnitId?: number
+  conditionProductUnitId?: number
   active: boolean
 }
 

@@ -83,11 +83,11 @@ const InventoryImportExportList = () => {
       case 'pending':
         return 'Chờ duyệt'
       case 'draft':
-        return 'Nháp'
+        return 'Chờ xác nhận'
       case 'rejected':
         return 'Từ chối'
       case 'cancelled':
-        return 'Hủy'
+        return 'Đã hủy'
       default:
         return status
     }

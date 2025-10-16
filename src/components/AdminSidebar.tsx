@@ -206,11 +206,11 @@ const AdminSidebar = ({ currentTab, onTabChange }: AdminSidebarProps) => {
       {/* Logo */}
       <div className={`flex items-center ${isCollapsed ? 'px-2 py-6 justify-center' : 'px-4 py-6'} border-b border-gray-200`}>
         <div className="flex items-center">
-          <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center mr-3">
-            <span className="text-white font-bold text-sm">K</span>
+          <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
+            <span className="text-white font-bold text-sm">VL</span>
           </div>
           {!isCollapsed && (
-            <span className="text-xl font-bold text-gray-900">KeroUI</span>
+            <span className="text-xl font-bold text-green-900">71 MARKET</span>
           )}
         </div>
         {!isCollapsed && (

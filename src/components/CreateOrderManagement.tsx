@@ -1273,10 +1273,10 @@ const CreateOrderManagement: React.FC = () => {
         // Xử lý thanh toán chuyển khoản
         if (paymentMethod === 'BANK_TRANSFER') {
           setSuccess(`Đơn hàng #${result.id} đã tạo! Vui lòng quét QR để thanh toán.`)
-          await handleBankTransferPayment(result.id, result.totalAmount)
+          await handleBankTransferPayment(result.id, total)
         } else {
-          // Thanh toán tiền mặt - tự động chuyển trạng thái
-          setSuccess(`Đơn hàng #${result.id} đã tạo! Đang tự động xuất kho và hoàn thành...`)
+          // Thanh toán tiền mặt - không hiển thị thông báo trạng thái dài
+          setSuccess(`Đơn hàng #${result.id} đã tạo!`)
           await handleCashPaymentWorkflow(result.id, true)
         }
       } else {
@@ -1883,73 +1883,7 @@ const CreateOrderManagement: React.FC = () => {
               </div>
             )}
 
-            {/* POS Order Status Management */}
-            {isPOSMode && currentOrder && !paymentInfo && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h3 className="text-lg font-medium text-green-800 mb-3">
-                  Đơn hàng #{currentOrder.id} - Tự động xử lý
-                </h3>
-
-                <div className="flex items-center space-x-4 mb-4">
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${
-                      orderStatus === 'PENDING' ? 'bg-yellow-500' :
-                      orderStatus === 'CONFIRMED' ? 'bg-orange-500' :
-                      orderStatus === 'DELIVERING' ? 'bg-blue-500' :
-                      orderStatus === 'COMPLETED' ? 'bg-green-500' : 'bg-gray-300'
-                    }`}></div>
-                    <span className="text-sm font-medium">
-                      {orderStatus === 'PENDING' ? 'Đang tạo đơn hàng...' :
-                       orderStatus === 'CONFIRMED' ? 'Đã xác nhận đơn hàng...' :
-                       orderStatus === 'DELIVERING' ? 'Đang xuất kho...' :
-                       orderStatus === 'COMPLETED' ? 'Hoàn thành!' : 'Không xác định'}
-                    </span>
-                  </div>
-
-                  {orderStatus === 'PENDING' && (
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                    </div>
-                  )}
-
-                  {orderStatus === 'CONFIRMED' && (
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                    </div>
-                  )}
-
-                  {orderStatus === 'DELIVERING' && (
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-sm text-green-700 mb-3">
-                  {orderStatus === 'PENDING' && 'Đang tạo đơn hàng...'}
-                  {orderStatus === 'CONFIRMED' && 'Đã xác nhận đơn hàng, chuẩn bị xuất kho...'}
-                  {orderStatus === 'DELIVERING' && 'Đang xuất kho và hoàn thành đơn hàng...'}
-                  {orderStatus === 'COMPLETED' && 'Đơn hàng đã hoàn thành! Giao dịch thành công.'}
-                </div>
-
-                {orderStatus === 'COMPLETED' && (
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={handleClearCart}
-                      className="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 font-medium"
-                    >
-                      Tạo đơn hàng mới
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* POS Order Status Management - removed per request */}
 
             <div className="mt-6">
               <button
@@ -1983,9 +1917,9 @@ const CreateOrderManagement: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="text-sm text-gray-600 mb-4">
-                Tổng tiền: <span className="font-semibold text-lg text-green-600">{formatCurrency(total)}</span>
-              </div>
+              {/* <div className="text-sm text-gray-600 mb-4">
+                Tổng tiền: <span className="font-semibold text-lg text-green-600">{formatCurrency(totalAmount)}</span>
+              </div> */}
 
               <div className="space-y-3">
                 <div className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">

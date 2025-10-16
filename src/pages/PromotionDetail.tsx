@@ -24,7 +24,7 @@ const PromotionDetail: React.FC = () => {
   const loadPromotionDetails = async (promotionId: number) => {
     try {
       setLoading(true)
-      
+
       // Load header
       const headerData = await PromotionServiceApi.getHeaderById(promotionId)
       setHeader({
@@ -33,7 +33,7 @@ const PromotionDetail: React.FC = () => {
         start_date: headerData.startDate,
         end_date: headerData.endDate,
         active: headerData.active,
-        created_at: headerData.createdAt
+        created_at: (headerData as any).createdAt
       })
 
       // Load lines
@@ -122,8 +122,8 @@ const PromotionDetail: React.FC = () => {
     try {
       const ds = await PromotionServiceApi.getDetailsAll(line.id)
       setLineDetails(Array.isArray(ds) ? ds : [])
-    } catch { 
-      setLineDetails([]) 
+    } catch {
+      setLineDetails([])
     }
     setLineEditOpen(true)
   }
@@ -298,7 +298,7 @@ const PromotionDetail: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button 
+                      <button
                         onClick={() => openLineEditor(line)}
                         className="text-blue-600 hover:text-blue-900"
                       >
@@ -346,6 +346,7 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
   const [saving, setSaving] = useState(false)
   const [giftNameByUnitId, setGiftNameByUnitId] = useState<Record<number, string>>({})
   const [giftUnitOptions, setGiftUnitOptions] = useState<Array<{ id: number; label: string }>>([])
+  const [conditionUnitOptions, setConditionUnitOptions] = useState<Array<{ id: number; label: string }>>([])
 
   const viType = (t?: string) => {
     switch (String(t || '').toUpperCase()) {
@@ -364,7 +365,7 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
     }
   }
 
-  const addDetail = () => onChange([...(details || []), { id: 0, promotionLineId: line.id, discountPercent: '', discountAmount: '', minAmount: '', maxDiscount: '', conditionQuantity: '', freeQuantity: '', giftProductUnitId: '', active: true }])
+  const addDetail = () => onChange([...(details || []), { id: 0, promotionLineId: line.id, discountPercent: '', discountAmount: '', minAmount: '', maxDiscount: '', conditionQuantity: '', freeQuantity: '', giftProductUnitId: '', conditionProductUnitId: '', active: true }])
   const removeDetail = (idx: number) => onChange(details.filter((_, i) => i !== idx))
 
   const save = async () => {
@@ -385,6 +386,7 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
           body.conditionQuantity = d.conditionQuantity ? Number(d.conditionQuantity) : undefined
           body.freeQuantity = d.freeQuantity ? Number(d.freeQuantity) : undefined
           body.giftProductUnitId = d.giftProductUnitId ? Number(d.giftProductUnitId) : undefined
+          body.conditionProductUnitId = d.conditionProductUnitId ? Number(d.conditionProductUnitId) : undefined
         }
         if (d.id && d.id !== 0) await PromotionServiceApi.updateDetail(d.id, body)
         else await PromotionServiceApi.createDetail(body)
@@ -404,7 +406,7 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
     } catch {}
   }
 
-  // Load selectable gift product units
+  // Load selectable gift and condition product units
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -419,8 +421,10 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
           })
         })
         setGiftUnitOptions(opts)
+        setConditionUnitOptions(opts)
       } catch {
         setGiftUnitOptions([])
+        setConditionUnitOptions([])
       }
     })()
     return () => { cancelled = true }
@@ -479,13 +483,30 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                 )}
                 {t === 'BUY_X_GET_Y' && (
                   <>
-                    <div className="col-span-12 md:col-span-3">
+                    <div className="col-span-12 md:col-span-3 relative">
+                      <div className="text-sm text-gray-700 mb-1">Sản phẩm điều kiện (Mua X)</div>
+                      <input
+                        placeholder="Nhập tên sản phẩm điều kiện..."
+                        className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={(d.conditionQuery ?? '')}
+                        onChange={(e)=>{
+                          const q = e.target.value
+                          onChange(details.map((x,i)=> i===idx?{...x, conditionQuery:q, showSuggestCondition:true}:x))
+                        }}
+                      />
+                      {((d.conditionQuery || '').trim().length > 0) && d.showSuggestCondition && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
+                          {conditionUnitOptions.filter(o => o.label.toLowerCase().includes(String(d.conditionQuery).toLowerCase())).slice(0,8).map(opt => (
+                            <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>{
+                              onChange(details.map((x,i)=> i===idx?{...x, conditionProductUnitId: opt.id, conditionQuery: opt.label, showSuggestCondition:false}:x))
+                            }}>{opt.label}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="col-span-12 md:col-span-2">
                       <div className="text-sm text-gray-700 mb-1">Số lượng mua (X)</div>
                       <input placeholder="SL X" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.conditionQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, conditionQuantity:e.target.value}:x))} />
-                    </div>
-                    <div className="col-span-12 md:col-span-3">
-                      <div className="text-sm text-gray-700 mb-1">Số lượng tặng (Y)</div>
-                      <input placeholder="SL Y" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.freeQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, freeQuantity:e.target.value}:x))} />
                     </div>
                     <div className="col-span-12 md:col-span-4 relative">
                       <div className="text-sm text-gray-700 mb-1">Đơn vị quà tặng</div>
@@ -509,8 +530,12 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                         </div>
                       )}
                     </div>
-                    <div className="col-span-12 md:col-span-2 flex items-end">
-                      <button className="ml-auto px-3 py-2 text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
+                    <div className="col-span-12 md:col-span-2">
+                      <div className="text-sm text-gray-700 mb-1">Số lượng tặng (Y)</div>
+                      <input placeholder="SL Y" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.freeQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, freeQuantity:e.target.value}:x))} />
+                    </div>
+                    <div className="col-span-12 md:col-span-1 flex items-end justify-end">
+                      <button className="px-3 py-2 text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
                     </div>
                   </>
                 )}
