@@ -9,7 +9,7 @@ const PriceHeaderDetail = () => {
   const navigate = useNavigate()
   const [header, setHeader] = useState<{ id: number; name: string; description?: string; timeStart?: string; timeEnd?: string } | null>(null)
   const [maSP, setMaSP] = useState('')
-  const [unitOptions, setUnitOptions] = useState<Array<{ id: number; name: string }>>([])
+  const [unitOptions, setUnitOptions] = useState<Array<{ id: number; name: string; code?: string }>>([])
   const [foundProductName, setFoundProductName] = useState<string>('')
   const [selectedUnitId, setSelectedUnitId] = useState<number | ''>('')
   const [price, setPrice] = useState('')
@@ -32,10 +32,19 @@ const PriceHeaderDetail = () => {
     try {
       setUnitOptions([])
       setSelectedUnitId('')
-      const prod = await ProductService.getProductByProductCode(code)
+      // Ưu tiên tìm theo mã ĐƠN VỊ (maSP thuộc đơn vị)
+      let prod = await ProductService.getProductByUnitCode(code)
+      if (!prod) {
+        // fallback: một số mã cũ lưu ở cấp sản phẩm
+        prod = await ProductService.getProductByProductCode(code)
+      }
       if (prod && Array.isArray(prod.productUnits)) {
         setFoundProductName(prod.name || '')
-        setUnitOptions(prod.productUnits.map((u: any) => ({ id: u.id, name: u.unitName })))
+        const opts = prod.productUnits.map((u: any) => ({ id: u.id, name: u.unitName, code: (u as any).code }))
+        setUnitOptions(opts)
+        // Auto-chọn đơn vị trùng mã (ưu tiên), nếu không có thì chọn đơn vị đầu tiên
+        const matched = opts.find(u => (u.code || '').toLowerCase() === code.toLowerCase())
+        setSelectedUnitId(matched ? matched.id : (opts[0]?.id || ''))
       } else {
         setFoundProductName('')
         setMessage('Không tìm thấy sản phẩm theo mã')
@@ -143,16 +152,9 @@ const PriceHeaderDetail = () => {
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị</label>
-                <select
-                  value={selectedUnitId}
-                  onChange={(e) => setSelectedUnitId(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="">-- Chọn đơn vị --</option>
-                  {unitOptions.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
+                <div className="px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-800">
+                  {unitOptions.find(u => u.id === Number(selectedUnitId))?.name || '—'}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Giá (VND)</label>

@@ -12,7 +12,7 @@ interface ProductTableProps {
 const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: ProductTableProps) => {
 
   const formatPrice = (price?: number) => {
-    if (price === undefined || price === null) return '—'
+    if (price === undefined || price === null) return 'Chưa có'
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
   }
 
@@ -73,7 +73,7 @@ const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: 
                   {index + 1}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {product.code || `#${product.id}`}
+                  {unit?.code || 'Chưa có'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">

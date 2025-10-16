@@ -7,6 +7,7 @@ export interface ProductUnit {
   unitName: string
   conversionFactor: number
   isDefault: boolean
+  code?: string
   currentPrice?: number
   convertedPrice?: number
   quantity?: number
@@ -58,7 +59,7 @@ export interface ProductResponse {
 
 export interface CreateProductRequest {
   name: string
-  code: string
+  code?: string
   description: string
   imageUrl?: string
   expirationDate?: string
@@ -139,6 +140,7 @@ export class ProductService {
       unitName: u.unitName,
       conversionFactor: u.conversionFactor ?? u.conversionRate ?? 1,
       isDefault: u.isDefault,
+      code: u.code,
       currentPrice: typeof u.currentPrice === 'number' ? u.currentPrice : undefined,
       convertedPrice: typeof u.convertedPrice === 'number' ? u.convertedPrice : undefined,
       quantity: typeof u.quantity === 'number' ? u.quantity : undefined,
@@ -290,6 +292,48 @@ export class ProductService {
       unitName: u.unitName,
       conversionFactor: u.conversionFactor ?? u.conversionRate ?? 1,
       isDefault: !!u.isDefault,
+      code: u.code,
+      currentPrice: typeof u.currentPrice === 'number' ? u.currentPrice : undefined,
+      convertedPrice: typeof u.convertedPrice === 'number' ? u.convertedPrice : undefined,
+      quantity: typeof u.quantity === 'number' ? u.quantity : undefined,
+      availableQuantity: typeof u.availableQuantity === 'number' ? u.availableQuantity : undefined,
+    })
+    const prod: Product = {
+      id: data.id,
+      name: data.name,
+      code: data.code,
+      description: data.description ?? '',
+      imageUrl: this.toAbsoluteUrl(data.imageUrl ?? data.image_url) ?? null,
+      expirationDate: data.expirationDate ?? null,
+      categoryId: data.categoryId,
+      categoryName: data.categoryName,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+      active: data.active,
+      defaultUnitId: data.defaultUnitId ?? null,
+      productUnits: Array.isArray(data.productUnits) ? data.productUnits.map(mapUnit) : [],
+      barcodes: data.barcodes ?? null,
+    }
+    return prod
+  }
+
+  // Get product by UNIT code (maSP thuộc đơn vị)
+  static async getProductByUnitCode(code: string): Promise<Product | null> {
+    const res = await fetch(`${API_BASE_URL}/products/by-unit-code/${encodeURIComponent(code)}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) return null
+    const result = await res.json().catch(() => null)
+    const data = (result?.data ?? result)
+    if (!data) return null
+    const mapUnit = (u: any): ProductUnit => ({
+      id: u.id,
+      unitId: u.unitId,
+      unitName: u.unitName,
+      conversionFactor: u.conversionFactor ?? u.conversionRate ?? 1,
+      isDefault: !!u.isDefault,
+      code: u.code,
       currentPrice: typeof u.currentPrice === 'number' ? u.currentPrice : undefined,
       convertedPrice: typeof u.convertedPrice === 'number' ? u.convertedPrice : undefined,
       quantity: typeof u.quantity === 'number' ? u.quantity : undefined,
@@ -549,6 +593,18 @@ export class ProductService {
       }),
     })
     if (!res.ok) throw new Error(`Failed to update product unit: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    return result.data ?? result
+  }
+
+  // Update code (MaSP) for a product unit
+  static async updateProductUnitCode(productUnitId: number, code: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/units/${productUnitId}/code`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ code })
+    })
+    if (!res.ok) throw new Error(`Failed to update unit code: ${res.status} ${res.statusText}`)
     const result = await res.json().catch(() => ({}))
     return result.data ?? result
   }

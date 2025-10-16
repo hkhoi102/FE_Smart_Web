@@ -19,6 +19,7 @@ const ProductFormWithUnitsAndPrices = ({
 }: ProductFormWithUnitsAndPricesProps) => {
   const [formData, setFormData] = useState({
     name: '',
+    // code removed from product level; code is managed per unit
     code: '',
     description: '',
     category_id: 1,
@@ -34,6 +35,7 @@ const ProductFormWithUnitsAndPrices = ({
     unitName: string;
     conversionFactor: number;
     isDefault: boolean;
+    productCode?: string; // MaSP for this unit
     barcodeCode: string;
     barcodeType: string;
     prices: Array<{
@@ -89,7 +91,7 @@ const ProductFormWithUnitsAndPrices = ({
     if (product) {
       setFormData({
         name: product.name,
-        code: (product as any).code || (product as any).productCode || '',
+        code: '',
         description: product.description,
         category_id: (product as any).categoryId || (product as any).category_id,
         image_url: (product as any).imageUrl || (product as any).image_url || '',
@@ -97,19 +99,6 @@ const ProductFormWithUnitsAndPrices = ({
         active: (product as any).active ? 1 : 0,
       })
       setImagePreview((product as any).imageUrl || (product as any).image_url || '')
-
-      // Nếu thiếu mã sản phẩm trong dữ liệu danh sách, tải lại chi tiết để lấy code chính xác
-      if (!(product as any).code && product.id) {
-        ;(async () => {
-          try {
-            const full = await ProductService.getProductById(product.id!)
-            const codeVal = (full as any)?.code || (full as any)?.productCode || ''
-            if (codeVal) {
-              setFormData(prev => ({ ...prev, code: codeVal }))
-            }
-          } catch {}
-        })()
-      }
 
       // Load product units
       // Show all units including "Lon" (id=1) when editing
@@ -122,6 +111,7 @@ const ProductFormWithUnitsAndPrices = ({
         unitName: u.unitName,
         conversionFactor: u.conversionFactor,
         isDefault: !!u.isDefault,
+        productCode: (u as any).code || (u as any).productCode || '',
         barcodeCode: '',
         barcodeType: 'EAN13',
         prices: [] as Array<{ price: number; validFrom: string; validTo: string; isNew?: boolean }>
@@ -243,6 +233,7 @@ const ProductFormWithUnitsAndPrices = ({
       unitName: selectedUnit.name,
       conversionFactor: newUnitCF,
       isDefault: shouldBeDefault,
+      productCode: '',
       barcodeCode: '',
       barcodeType: 'EAN13',
       prices: [] // Không thêm giá khi tạo đơn vị mới
@@ -270,6 +261,12 @@ const ProductFormWithUnitsAndPrices = ({
   const updateUnitBarcode = (unitId: number, barcodeCode: string, barcodeType: string) => {
     setProductUnits(prev => prev.map(u =>
       u.id === unitId ? { ...u, barcodeCode, barcodeType } : u
+    ))
+  }
+
+  const updateUnitCode = (unitId: number, productCode: string) => {
+    setProductUnits(prev => prev.map(u =>
+      u.id === unitId ? { ...u, productCode } : u
     ))
   }
 
@@ -520,17 +517,12 @@ const ProductFormWithUnitsAndPrices = ({
       return
     }
 
-    // Bắt buộc nhập mã sản phẩm
-    if (!formData.code || !formData.code.trim()) {
-      alert('Vui lòng nhập mã sản phẩm (code)')
-      return
-    }
+    // Không yêu cầu mã sản phẩm ở cấp sản phẩm nữa; sẽ nhập theo đơn vị
 
     // Không ràng buộc giá trong modal Sản phẩm; phần giá xử lý ở trang Giá
 
     const productData = {
       name: formData.name,
-      code: (formData.code || '').trim(),
       description: formData.description,
       expirationDate: formData.expiration_date || undefined,
       categoryId: formData.category_id,
@@ -555,14 +547,14 @@ const ProductFormWithUnitsAndPrices = ({
           }
         } catch (err) {
           // fallback to regular creation
-          createdProduct = await ProductService.createProduct(productData)
+          createdProduct = await ProductService.createProduct(productData as any)
         }
       } else {
         // Regular creation without image
         if (product && product.id) {
-          createdProduct = await ProductService.updateProduct(product.id, productData)
+          createdProduct = await ProductService.updateProduct(product.id, productData as any)
         } else {
-          createdProduct = await ProductService.createProduct(productData)
+          createdProduct = await ProductService.createProduct(productData as any)
         }
       }
 
@@ -607,6 +599,14 @@ const ProductFormWithUnitsAndPrices = ({
             }
 
             if (productUnitId) {
+              // Update MaSP for unit if provided
+              try {
+                if (unit.productCode && unit.productCode.trim()) {
+                  await ProductService.updateProductUnitCode(productUnitId, unit.productCode.trim())
+                }
+              } catch (codeErr) {
+                console.warn('Failed to set unit code:', codeErr)
+              }
               // Upsert barcode: delete existing then add if provided
               try {
                 const { BarcodeService } = await import('@/services/barcodeService')
@@ -852,20 +852,7 @@ const ProductFormWithUnitsAndPrices = ({
           </div>
 
           {/* Mã sản phẩm (MaSP) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mã sản phẩm *
-            </label>
-            <input
-              type="text"
-              name="code"
-              value={formData.code}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              placeholder="Nhập mã sản phẩm (ví dụ: S24-256-BLACK)"
-              required
-            />
-          </div>
+          {/* Product code removed from product-level form */}
 
           {/* Mô tả */}
           <div className="md:col-span-2">
@@ -1060,8 +1047,15 @@ const ProductFormWithUnitsAndPrices = ({
                     </div>
                   </div>
 
-                  {/* Barcode editor restored */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+                  {/* Unit code (MaSP) + Barcode editor */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={unit.productCode || ''}
+                      onChange={(e) => updateUnitCode(unit.id, e.target.value)}
+                      placeholder="Mã SP của đơn vị"
+                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                    />
                     <input
                       type="text"
                       value={unit.barcodeCode}
