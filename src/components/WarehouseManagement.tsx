@@ -256,45 +256,45 @@ const WarehouseManagement = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-white p-3 rounded-lg border border-gray-200 text-sm">
           <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="p-1.5 bg-blue-100 rounded-lg">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Tổng số kho</p>
-              <p className="text-2xl font-semibold text-gray-900">{warehouses.length}</p>
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-500">Tổng số kho</p>
+              <p className="text-xl font-semibold text-gray-900">{warehouses.length}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-3 rounded-lg border border-gray-200 text-sm">
           <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="p-1.5 bg-green-100 rounded-lg">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Kho hoạt động</p>
-              <p className="text-2xl font-semibold text-gray-900">{activeWarehouses}</p>
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-500">Kho hoạt động</p>
+              <p className="text-xl font-semibold text-gray-900">{activeWarehouses}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-3 rounded-lg border border-gray-200 text-sm">
           <div className="flex items-center">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="p-1.5 bg-red-100 rounded-lg">
+              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Kho tạm dừng</p>
-              <p className="text-2xl font-semibold text-gray-900">{inactiveWarehouses}</p>
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-500">Kho tạm dừng</p>
+              <p className="text-xl font-semibold text-gray-900">{inactiveWarehouses}</p>
             </div>
           </div>
         </div>
@@ -308,14 +308,14 @@ const WarehouseManagement = () => {
             placeholder="Tìm kiếm theo tên kho, địa chỉ hoặc số điện thoại..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           />
         </div>
         <div className="flex space-x-2">
           <select
             value={selectedWarehouse}
             onChange={(e) => setSelectedWarehouse(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           >
             <option value="all">Tất cả kho</option>
             {warehouses.map(warehouse => (
@@ -327,7 +327,7 @@ const WarehouseManagement = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           >
             <option value="all">Tất cả trạng thái</option>
             <option value="active">Hoạt động</option>
@@ -339,36 +339,36 @@ const WarehouseManagement = () => {
       {/* Warehouses Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-100 text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Tên kho
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Địa chỉ
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Số điện thoại
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Người liên hệ
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Trạng thái
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ngày tạo
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Thao tác
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-5 py-6 text-center text-gray-500 text-sm">
                     <div className="flex items-center justify-center">
                       <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -380,33 +380,32 @@ const WarehouseManagement = () => {
                 </tr>
               ) : filteredWarehouses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-5 py-6 text-center text-gray-500 text-sm">
                     Không có dữ liệu kho
                   </td>
                 </tr>
               ) : (
                 filteredWarehouses.map((warehouse) => (
                 <tr key={warehouse.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-5 py-2 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">{warehouse.name}</div>
                       {warehouse.description && (
-                        <div className="text-sm text-gray-500">{warehouse.description}</div>
+                        <div className="text-xs text-gray-500">{warehouse.description}</div>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                     {warehouse.address}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                     {warehouse.phone}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                     {warehouse.contact_person || '-'}
-                    {/* Debug: {JSON.stringify(warehouse)} */}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  <td className="px-5 py-2 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       warehouse.active
                         ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
@@ -414,30 +413,30 @@ const WarehouseManagement = () => {
                       {warehouse.active ? 'Hoạt động' : 'Tạm dừng'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(warehouse.created_at)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm font-medium">
+                    <div className="flex gap-2">
                       <button
                         onClick={() => handleEditWarehouse(warehouse)}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="px-2.5 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                       >
                         Sửa
                       </button>
                       <button
                         onClick={() => handleToggleStatus(warehouse.id)}
-                        className={`${
+                        className={`px-2.5 py-1 text-xs rounded ${
                           warehouse.active
-                            ? 'text-yellow-600 hover:text-yellow-900'
-                            : 'text-green-600 hover:text-green-900'
+                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
                         }`}
                       >
                         {warehouse.active ? 'Tạm dừng' : 'Kích hoạt'}
                       </button>
                       <button
                         onClick={() => handleDeleteWarehouse(warehouse.id)}
-                        className="text-red-600 hover:text-red-900"
+                        className="px-2.5 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
                       >
                         Xóa
                       </button>

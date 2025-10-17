@@ -512,44 +512,22 @@ const InventoryCheckManagement = () => {
           {notify.message}
         </div>
       )}
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      {/* Header with inline filters (filters sit to the left of Export button) */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-2xl font-bold text-gray-900">Kiểm kê kho</h2>
-        <div className="flex space-x-2">
-          <button
-            onClick={handleExportAllReports}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-          >
-            📊 Xuất tất cả Excel
-          </button>
-          <button
-            type="button"
-            onClick={handleAddCheck}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-          >
-            Tạo phiếu kiểm kê
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Cards removed per request */}
-
-      {/* Filters */}
-      <div className="flex justify-between items-center space-x-4">
-        <div className="flex-1 max-w-md">
+        <div className="flex items-center gap-2 ml-auto flex-wrap">
+          {/* Filters group */}
           <input
             type="text"
-            placeholder="Tìm kiếm theo ghi chú, kho hoặc người tạo..."
+            placeholder="Tìm kiếm..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="w-64 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           />
-        </div>
-        <div className="flex space-x-2">
           <select
             value={warehouseFilter}
             onChange={(e) => setWarehouseFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           >
             <option value="all">Tất cả kho</option>
             {warehouses.map(warehouse => (
@@ -561,7 +539,7 @@ const InventoryCheckManagement = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           >
             <option value="all">Tất cả trạng thái</option>
             <option value="PENDING">Chờ kiểm</option>
@@ -570,8 +548,27 @@ const InventoryCheckManagement = () => {
             <option value="COMPLETED">Hoàn thành</option>
             <option value="CANCELLED">Đã hủy</option>
           </select>
+
+          {/* Action buttons on the far right */}
+          <button
+            onClick={handleExportAllReports}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium"
+          >
+            📊 Xuất tất cả Excel
+          </button>
+          <button
+            type="button"
+            onClick={handleAddCheck}
+            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm font-medium"
+          >
+            Tạo phiếu kiểm kê
+          </button>
         </div>
       </div>
+
+      {/* Stats Cards removed per request */}
+
+      {/* Filters moved inline with header */}
 
       {/* Checks Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">

@@ -1938,10 +1938,10 @@ const CreateOrderManagement: React.FC = () => {
 
       {/* Payment Method Selection Modal */}
       {showPaymentMethodModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Chọn phương thức thanh toán</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 style: !mt-0" >
+          <div className="bg-white rounded-lg p-8 max-w-lg w-full mx-4">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">Chọn phương thức thanh toán</h3>
               <button
                 onClick={() => setShowPaymentMethodModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -1952,13 +1952,13 @@ const CreateOrderManagement: React.FC = () => {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
               {/* <div className="text-sm text-gray-600 mb-4">
                 Tổng tiền: <span className="font-semibold text-lg text-green-600">{formatCurrency(totalAmount)}</span>
               </div> */}
 
-              <div className="space-y-3">
-                <div className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+              <div className="space-y-4">
+                <div className="flex items-center p-6 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
                   <input
                     type="radio"
                     id="modal_cod"
@@ -1966,22 +1966,22 @@ const CreateOrderManagement: React.FC = () => {
                     value="COD"
                     checked={paymentMethod === 'COD'}
                     onChange={(e) => setPaymentMethod(e.target.value as 'COD' | 'BANK_TRANSFER')}
-                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    className="w-5 h-5 text-blue-600 border-gray-300 focus:ring-blue-500"
                   />
-                  <label htmlFor="modal_cod" className="ml-3 flex items-center">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <label htmlFor="modal_cod" className="ml-4 flex items-center">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-4">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                       </svg>
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-gray-900">Tiền mặt</div>
-                      <div className="text-xs text-gray-500">Thanh toán trực tiếp tại quầy</div>
+                      <div className="text-base font-medium text-gray-900">Tiền mặt</div>
+                      <div className="text-sm text-gray-500">Thanh toán trực tiếp tại quầy</div>
                     </div>
                   </label>
                 </div>
 
-                <div className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                <div className="flex items-center p-6 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
                   <input
                     type="radio"
                     id="modal_bank_transfer"
@@ -1989,17 +1989,17 @@ const CreateOrderManagement: React.FC = () => {
                     value="BANK_TRANSFER"
                     checked={paymentMethod === 'BANK_TRANSFER'}
                     onChange={(e) => setPaymentMethod(e.target.value as 'COD' | 'BANK_TRANSFER')}
-                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    className="w-5 h-5 text-blue-600 border-gray-300 focus:ring-blue-500"
                   />
-                  <label htmlFor="modal_bank_transfer" className="ml-3 flex items-center">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <label htmlFor="modal_bank_transfer" className="ml-4 flex items-center">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                       </svg>
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-gray-900">Chuyển khoản</div>
-                      <div className="text-xs text-gray-500">Thanh toán qua QR code</div>
+                      <div className="text-base font-medium text-gray-900">Chuyển khoản</div>
+                      <div className="text-sm text-gray-500">Thanh toán qua QR code</div>
                     </div>
                   </label>
                 </div>
@@ -2008,13 +2008,13 @@ const CreateOrderManagement: React.FC = () => {
               <div className="flex space-x-3 pt-4">
                 <button
                   onClick={() => setShowPaymentMethodModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
                 >
                   Hủy
                 </button>
                 <button
                   onClick={handleConfirmPaymentMethod}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                 >
                   Hoàn thành bán hàng
                 </button>
@@ -2174,7 +2174,7 @@ const CreateOrderManagement: React.FC = () => {
 
       {/* Payment Success Modal */}
       {showPaymentSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 style: !mt-0">
           <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center">
             <div className="mb-6">
               <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
@@ -2228,40 +2228,35 @@ const CreateOrderManagement: React.FC = () => {
       {showCompleteConfirmModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 style: !mt-0">
           <div className="bg-white rounded-lg p-8 max-w-4xl w-full md:w-[900px] lg:w-[1000px] mx-2 md:mx-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
+            <div className="text-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Xác nhận hoàn thành đơn hàng</h3>
-              <button onClick={() => setShowCompleteConfirmModal(false)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
             {orderSummaryForConfirm ? (
               <div className="space-y-3 text-sm">
-                <div className="grid grid-cols-2 gap-2">
-                  <div><span className="text-gray-600">Mã đơn:</span> <span className="font-medium">#{orderSummaryForConfirm.id}</span></div>
-                  <div><span className="text-gray-600">Ngày tạo:</span> {new Date(orderSummaryForConfirm.createdAt).toLocaleString('vi-VN')}</div>
-                  <div><span className="text-gray-600">Phương thức:</span> {orderSummaryForConfirm.paymentMethod === 'COD' ? 'Tiền mặt' : 'Chuyển khoản'}</div>
-                  <div><span className="text-gray-600">Tổng tiền:</span> <span className="font-semibold text-blue-600">{formatCurrency(finalTotal)}</span></div>
-                </div>
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <div>
-                    <div className="text-gray-600 font-medium mb-1">Thông tin khách hàng</div>
-                    <div className="text-sm text-gray-800">Tên: {selectedCustomer?.fullName || orderSummaryForConfirm.customerName || 'Khách lẻ'}</div>
-                    {(selectedCustomer?.phoneNumber || orderSummaryForConfirm.customerPhone) && (
-                      <div className="text-sm text-gray-800">SĐT: {selectedCustomer?.phoneNumber || orderSummaryForConfirm.customerPhone}</div>
-                    )}
-                    {(selectedCustomer?.address || orderSummaryForConfirm.customerAddress) && (
-                      <div className="text-sm text-gray-800">Địa chỉ: {selectedCustomer?.address || orderSummaryForConfirm.customerAddress}</div>
-                    )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><span className="text-gray-800 font-semibold">Mã đơn:</span> <span className="font-medium">#{orderSummaryForConfirm.id}</span></div>
+                    <div><span className="text-gray-800 font-semibold">Ngày tạo:</span> {new Date(orderSummaryForConfirm.createdAt).toLocaleString('vi-VN')}</div>
+                    <div><span className="text-gray-800 font-semibold">Phương thức:</span> {orderSummaryForConfirm.paymentMethod === 'COD' ? 'Tiền mặt' : 'Chuyển khoản'}</div>
+                    <div><span className="text-gray-800 font-semibold">Tổng tiền:</span> <span className="font-semibold text-blue-600">{formatCurrency(finalTotal)}</span></div>
                   </div>
-                  <div>
-                    <div className="text-gray-600 font-medium mb-1">Thông tin cửa hàng: {storeName}</div>
-                    {storeAddress && <div className="text-sm text-gray-800">{storeAddress}</div>}
-                    {storeTaxId && <div className="text-sm text-gray-800">MST: {storeTaxId}</div>}
-                    {user?.fullName && <div className="text-sm text-gray-800 mt-1">Người lập đơn: {user.fullName}</div>}
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div>
+                      <div className="text-gray-800 font-semibold mb-1">Thông tin khách hàng</div>
+                      <div className="text-sm text-gray-800"><span className="font-semibold">Tên:</span> {selectedCustomer?.fullName || orderSummaryForConfirm.customerName || 'Khách lẻ'}</div>
+                      {(selectedCustomer?.phoneNumber || orderSummaryForConfirm.customerPhone) && (
+                        <div className="text-sm text-gray-800"><span className="font-semibold">SĐT:</span> {selectedCustomer?.phoneNumber || orderSummaryForConfirm.customerPhone}</div>
+                      )}
+                      {(selectedCustomer?.address || orderSummaryForConfirm.customerAddress) && (
+                        <div className="text-sm text-gray-800"><span className="font-semibold">Địa chỉ:</span> {selectedCustomer?.address || orderSummaryForConfirm.customerAddress}</div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-gray-800 font-semibold mb-1">Thông tin cửa hàng: {storeName}</div>
+                      {storeAddress && <div className="text-sm text-gray-800"><span className="font-semibold">Địa chỉ:</span> {storeAddress}</div>}
+                      {storeTaxId && <div className="text-sm text-gray-800"><span className="font-semibold">MST:</span> {storeTaxId}</div>}
+                      {user?.fullName && <div className="text-sm text-gray-800 mt-1"><span className="font-semibold">Người lập đơn:</span> {user.fullName}</div>}
+                    </div>
                   </div>
-                </div>
                 <div className="mt-2">
                   <div className="font-medium text-gray-800 mb-2">Chi tiết sản phẩm</div>
                   <div className="overflow-x-auto">

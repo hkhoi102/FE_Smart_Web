@@ -683,6 +683,55 @@ export class ProductService {
     const result2 = await res.json().catch(() => ([]))
     return result2.data ?? result2
   }
+
+  // Get prices by price header ID
+  static async getPricesByHeader(priceHeaderId: number): Promise<Array<{
+    id: number;
+    productId: number;
+    productName: string;
+    productUnitId: number;
+    unitName: string;
+    productCode?: string;
+    price: number;
+    timeStart?: string;
+    timeEnd?: string;
+    createdAt?: string;
+  }>> {
+    try {
+      // Try different possible endpoint structures
+      let res = await fetch(`${API_BASE_URL}/price-headers/${priceHeaderId}/prices`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      })
+      
+      if (!res.ok) {
+        // Try alternative endpoint
+        res = await fetch(`${API_BASE_URL}/prices/header/${priceHeaderId}`, {
+          method: 'GET',
+          headers: this.getAuthHeaders(),
+        })
+      }
+      
+      if (!res.ok) {
+        // Try another alternative
+        res = await fetch(`${API_BASE_URL}/products/price-headers/${priceHeaderId}/prices`, {
+          method: 'GET',
+          headers: this.getAuthHeaders(),
+        })
+      }
+      
+      if (!res.ok) {
+        throw new Error(`Failed to fetch prices by header: ${res.status} ${res.statusText}`)
+      }
+      
+      const result = await res.json()
+      return (Array.isArray(result?.data) ? result.data : result) || []
+    } catch (error) {
+      console.error('Error fetching prices by header:', error)
+      // Return empty array as fallback
+      return []
+    }
+  }
   static async getProductPrices(productId: number): Promise<Array<{ id: number; unitId: number; unitName?: string; price: number; isDefault?: boolean; validFrom?: string; validTo?: string }>> {
     const res = await fetch(`${API_BASE_URL}/products/${productId}/prices`, {
       method: 'GET',

@@ -701,31 +701,24 @@ const Admin = () => {
 
               {/* Products Table */}
               <div className="bg-white shadow rounded-lg">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <h3 className="text-lg font-medium text-gray-900">
-                      Danh sách sản phẩm ({filteredProducts.length})
-                      {searchTerm && (
-                        <span className="text-sm text-gray-500 ml-2">
-                          (từ {pagination.total_items} sản phẩm)
-                        </span>
-                      )}
-                    </h3>
-                    <div className="flex items-center gap-3">
+                <div className="px-4 py-3 border-b border-gray-200">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <h3 className="text-base font-medium text-gray-900">Danh sách sản phẩm</h3>
+                    <div className="flex items-center gap-2">
                       <div className="hidden md:block">
                         <input
                           type="text"
                           value={searchTerm}
                           onChange={(e) => handleSearch(e.target.value)}
                           placeholder="Nhập tên sản phẩm..."
-                          className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                          className="w-56 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         />
                       </div>
                       <div className="hidden md:block">
                         <select
                           value={selectedCategory || ''}
                           onChange={(e) => handleCategoryFilter(e.target.value ? Number(e.target.value) : undefined)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         >
                           <option value="">Tất cả danh mục</option>
                           {categories.map(category => (
@@ -739,14 +732,14 @@ const Admin = () => {
                         onClick={() => setIsImportModalOpen(true)}
                         className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md text-sm font-medium"
                       >
-                        Import sản phẩm (Excel)
+                        Import sản phẩm
                       </button>
 
                       <button
                         onClick={handleAddProduct}
                         className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
                       >
-                        Thêm sản phẩm mới
+                        Thêm sản phẩm
                       </button>
                     </div>
                   </div>
