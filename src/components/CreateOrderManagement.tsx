@@ -1458,7 +1458,7 @@ const CreateOrderManagement: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Quét mã vạch / Tìm kiếm sản phẩm
                 </label>
-                <div className="flex space-x-2">
+                <div className="grid grid-cols-10 gap-2">
                   <input
                     ref={barcodeInputRef}
                     type="text"
@@ -1466,13 +1466,13 @@ const CreateOrderManagement: React.FC = () => {
                     onChange={(e) => setBarcodeInput(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleBarcodeScan(barcodeInput)}
                     placeholder="Quét mã vạch"
-                    className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="col-span-7 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                   />
                   <button
                     onClick={startCameraScanner}
-                    className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
+                    className="col-span-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 w-full"
                   >
-                    Quét mã vạch
+                    Quét
                   </button>
                 </div>
 
@@ -1485,7 +1485,7 @@ const CreateOrderManagement: React.FC = () => {
                   value={quickSearch}
                   onChange={(e) => setQuickSearch(e.target.value)}
                   placeholder="Tìm kiếm sản phẩm..."
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 

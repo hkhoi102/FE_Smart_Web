@@ -580,88 +580,88 @@ const InventoryCheckManagement = () => {
       {/* Checks Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-100 text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   ID
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ngày kiểm
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Kho
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ghi chú
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Trạng thái
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Người tạo
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Thao tác
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Hành động
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-100">
               {paginatedChecks.map((check) => (
                 <tr key={check.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-900">
                     {check.id}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(check.check_date)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                     {check.warehouse_name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-900">
                     {check.note}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(check.status)}`}>
+                  <td className="px-5 py-2 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(check.status)}`}>
                       {getStatusLabel(check.status)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                     {check.created_by}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm font-medium">
+                    <div className="flex gap-2">
                       <button
                         onClick={() => handleViewItems(check)}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="px-2.5 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                       >
                         {(check.status === 'COMPLETED' || check.status === 'CONFIRMED') ? 'Chi tiết' : 'Kiểm kê'}
                       </button>
                       <button
                         onClick={() => handleEditCheck(check)}
-                        className="text-yellow-600 hover:text-yellow-900"
+                        className="px-2.5 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200"
                       >
                         Sửa
                       </button>
                       {(check.status !== 'COMPLETED' && check.status !== 'CONFIRMED' && check.status !== 'CANCELLED') && (
                         <button
                           onClick={() => handleCancelCheck(check.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="px-2.5 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
                         >
                           Hủy phiếu
                         </button>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm font-medium">
+                    <div className="flex gap-2">
                       {check.status === 'PENDING' && (
                         <button
                           onClick={() => handleStartCheck(check.id)}
-                          className="text-green-600 hover:text-green-900"
+                          className="px-2.5 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
                         >
                           Bắt đầu
                         </button>
@@ -669,7 +669,7 @@ const InventoryCheckManagement = () => {
                       {check.status === 'IN_PROGRESS' && (
                         <button
                           onClick={() => handleCompleteCheck(check.id)}
-                          className="text-gray-800 hover:text-gray-900"
+                          className="px-2.5 py-1 text-xs bg-gray-100 text-gray-800 rounded hover:bg-gray-200"
                         >
                           Hoàn thành
                         </button>
@@ -677,7 +677,7 @@ const InventoryCheckManagement = () => {
                       {(check.status === 'CONFIRMED' || check.status === 'COMPLETED') && (
                         <button
                           onClick={() => handleExportReport(check)}
-                          className="text-purple-600 hover:text-purple-900"
+                          className="px-2.5 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
                         >
                           Xuất Excel
                         </button>

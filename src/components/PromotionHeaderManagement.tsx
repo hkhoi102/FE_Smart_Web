@@ -348,28 +348,28 @@ const PromotionHeaderManagement: React.FC = () => {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100 text-xs">
+            <table className="min-w-full divide-y divide-gray-100 text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Tên khuyến mãi
                   </th>
-                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ngày bắt đầu
                   </th>
-                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ngày kết thúc
                   </th>
-                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Trạng thái
                   </th>
-                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ngày tạo
                   </th>
-                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Thao tác
                   </th>
                 </tr>
@@ -377,10 +377,10 @@ const PromotionHeaderManagement: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-100">
                 {filteredHeaders.map((header) => (
                   <tr key={header.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
                       {header.id}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-900">
                       <button
                         onClick={() => handlePromotionNameClick(header)}
                         className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
@@ -388,37 +388,37 @@ const PromotionHeaderManagement: React.FC = () => {
                         {header.name}
                       </button>
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-500">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(header.start_date)}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-500">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(header.end_date)}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(header.active)}`}>
+                    <td className="px-5 py-2 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(header.active)}`}>
                         {getStatusLabel(header.active)}
                       </span>
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-500">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(header.created_at)}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs font-medium">
-                      <div className="flex gap-1.5">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm font-medium">
+                      <div className="flex gap-2">
                         <button
                           onClick={() => handleView(header.id)}
-                          className="px-2 py-0.5 text-[11px] bg-gray-100 text-gray-800 rounded hover:bg-gray-200"
+                          className="px-2.5 py-1 text-xs bg-gray-100 text-gray-800 rounded hover:bg-gray-200"
                         >
                           Xem
                         </button>
                         <button
                           onClick={() => handleEdit(header)}
-                          className="px-2 py-0.5 text-[11px] bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                          className="px-2.5 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                         >
                           Sửa
                         </button>
                         <button
                           onClick={() => handleToggleActive(header.id)}
-                          className={`px-2 py-0.5 text-[11px] rounded ${
+                          className={`px-2.5 py-1 text-xs rounded ${
                             header.active === 1 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'
                           }`}
                         >
