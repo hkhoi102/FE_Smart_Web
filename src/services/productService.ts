@@ -317,9 +317,9 @@ export class ProductService {
     return prod
   }
 
-  // Get product by UNIT code (maSP thuộc đơn vị)
-  static async getProductByUnitCode(code: string): Promise<Product | null> {
-    const res = await fetch(`${API_BASE_URL}/products/by-unit-code/${encodeURIComponent(code)}`, {
+  // Get product by unit code (ma don vi san pham)
+  static async getProductByUnitCode(code: string | number): Promise<Product | null> {
+    const res = await fetch(`${API_BASE_URL}/products/by-unit-code/${encodeURIComponent(String(code))}`, {
       method: 'GET',
       headers: this.getAuthHeaders(),
     })
@@ -333,7 +333,6 @@ export class ProductService {
       unitName: u.unitName,
       conversionFactor: u.conversionFactor ?? u.conversionRate ?? 1,
       isDefault: !!u.isDefault,
-      code: u.code,
       currentPrice: typeof u.currentPrice === 'number' ? u.currentPrice : undefined,
       convertedPrice: typeof u.convertedPrice === 'number' ? u.convertedPrice : undefined,
       quantity: typeof u.quantity === 'number' ? u.quantity : undefined,
@@ -357,6 +356,8 @@ export class ProductService {
     }
     return prod
   }
+
+  
 
   static async createProduct(body: CreateProductRequest): Promise<Product> {
     const res = await fetch(`${API_BASE_URL}/products`, {

@@ -74,6 +74,7 @@ const PriceHeaderDetail = () => {
 
     searchDebounceRef.current = window.setTimeout(async () => {
       try {
+        // Chỉ thực hiện fuzzy search để gợi ý; KHÔNG gọi API by-unit-code tại đây
         const res = await ProductService.getProducts(1, 8, term)
         const items = (res?.products || []).map(p => ({ id: p.id, name: p.name, code: p.code }))
         setSuggestions(items)
@@ -168,6 +169,12 @@ const PriceHeaderDetail = () => {
                 onChange={(e) => { setMaSP(e.target.value); setShowSuggestions(true) }}
                 onFocus={() => setShowSuggestions(suggestions.length > 0)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter') {
+                    const code = maSP.trim()
+                    if (code) await loadUnitsByCode(code)
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 placeholder="VD: SP-0001"
               />
@@ -180,10 +187,14 @@ const PriceHeaderDetail = () => {
                       type="button"
                       className="w-full text-left px-3 py-2 hover:bg-gray-50"
                       onClick={async () => {
-                        const code = s.code || String(s.id)
-                        setMaSP(code)
                         setShowSuggestions(false)
-                        await loadUnitsByCode(code)
+                        if (s.code) {
+                          setMaSP(s.code)
+                          await loadUnitsByCode(s.code)
+                        } else {
+                          setMessage('Sản phẩm chưa có mã đơn vị. Vui lòng chọn mục có mã.')
+                          setTimeout(() => setMessage(''), 2000)
+                        }
                       }}
                     >
                       <div className="text-sm text-gray-900">{s.name}</div>
