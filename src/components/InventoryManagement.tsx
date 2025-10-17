@@ -314,45 +314,47 @@ const InventoryManagement = () => {
         </div>
       </div>
 
-      {/* Filters - search on left, then warehouse and status */}
-      <div className="flex items-end gap-3 flex-wrap">
-        <div>
+      {/* Filters - search left, warehouse & status right */}
+      <div className="flex items-end gap-3 flex-wrap justify-between">
+        <div className="flex-shrink-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">Tìm kiếm</label>
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Tìm theo tên sản phẩm..."
-            className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-56 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Kho</label>
-          <select
-            value={selectedWarehouse}
-            onChange={(e) => setSelectedWarehouse(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            className="w-56 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">Tất cả kho</option>
-            {warehouses.map(warehouse => (
-              <option key={warehouse.id} value={warehouse.id}>
-                {warehouse.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-56 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">Tất cả</option>
-            <option value="in_stock">Còn hàng</option>
-            <option value="low_stock">Sắp hết hàng</option>
-            <option value="out_of_stock">Hết hàng</option>
-          </select>
+        <div className="flex items-end gap-3 ml-auto">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Kho</label>
+            <select
+              value={selectedWarehouse}
+              onChange={(e) => setSelectedWarehouse(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              className="w-56 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tất cả kho</option>
+              {warehouses.map(warehouse => (
+                <option key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-56 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tất cả</option>
+              <option value="in_stock">Còn hàng</option>
+              <option value="low_stock">Sắp hết hàng</option>
+              <option value="out_of_stock">Hết hàng</option>
+            </select>
+          </div>
         </div>
       </div>
 

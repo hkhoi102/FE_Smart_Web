@@ -129,7 +129,14 @@ const InventoryCheckManagement = () => {
         InventoryService.getInventoryChecks().catch(() => []),
       ])
       setWarehouses(whs)
-      setChecks(Array.isArray(checksDto) ? checksDto.map(mapCheck) : [])
+      const mapped = Array.isArray(checksDto) ? checksDto.map(mapCheck) : []
+      // Ensure warehouse_name is populated using loaded warehouses if missing
+      const idToName = new Map<number, string>(whs.map(w => [w.id, w.name]))
+      const enriched = mapped.map(c => ({
+        ...c,
+        warehouse_name: c.warehouse_name || idToName.get(c.warehouse_id) || ''
+      }))
+      setChecks(enriched)
     } catch (e) {
       console.error(e)
     }
