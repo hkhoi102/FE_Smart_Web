@@ -317,9 +317,9 @@ export class ProductService {
     return prod
   }
 
-  // Get product by UNIT code (maSP thuộc đơn vị)
-  static async getProductByUnitCode(code: string): Promise<Product | null> {
-    const res = await fetch(`${API_BASE_URL}/products/by-unit-code/${encodeURIComponent(code)}`, {
+  // Get product by unit code (ma don vi san pham)
+  static async getProductByUnitCode(code: string | number): Promise<Product | null> {
+    const res = await fetch(`${API_BASE_URL}/products/by-unit-code/${encodeURIComponent(String(code))}`, {
       method: 'GET',
       headers: this.getAuthHeaders(),
     })
@@ -333,7 +333,6 @@ export class ProductService {
       unitName: u.unitName,
       conversionFactor: u.conversionFactor ?? u.conversionRate ?? 1,
       isDefault: !!u.isDefault,
-      code: u.code,
       currentPrice: typeof u.currentPrice === 'number' ? u.currentPrice : undefined,
       convertedPrice: typeof u.convertedPrice === 'number' ? u.convertedPrice : undefined,
       quantity: typeof u.quantity === 'number' ? u.quantity : undefined,
@@ -357,6 +356,8 @@ export class ProductService {
     }
     return prod
   }
+
+  
 
   static async createProduct(body: CreateProductRequest): Promise<Product> {
     const res = await fetch(`${API_BASE_URL}/products`, {
@@ -681,6 +682,55 @@ export class ProductService {
     if (!res.ok) throw new Error(`Failed to bulk add prices: ${res.status} ${res.statusText}`)
     const result2 = await res.json().catch(() => ([]))
     return result2.data ?? result2
+  }
+
+  // Get prices by price header ID
+  static async getPricesByHeader(priceHeaderId: number): Promise<Array<{
+    id: number;
+    productId: number;
+    productName: string;
+    productUnitId: number;
+    unitName: string;
+    productCode?: string;
+    price: number;
+    timeStart?: string;
+    timeEnd?: string;
+    createdAt?: string;
+  }>> {
+    try {
+      // Try different possible endpoint structures
+      let res = await fetch(`${API_BASE_URL}/price-headers/${priceHeaderId}/prices`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      })
+      
+      if (!res.ok) {
+        // Try alternative endpoint
+        res = await fetch(`${API_BASE_URL}/prices/header/${priceHeaderId}`, {
+          method: 'GET',
+          headers: this.getAuthHeaders(),
+        })
+      }
+      
+      if (!res.ok) {
+        // Try another alternative
+        res = await fetch(`${API_BASE_URL}/products/price-headers/${priceHeaderId}/prices`, {
+          method: 'GET',
+          headers: this.getAuthHeaders(),
+        })
+      }
+      
+      if (!res.ok) {
+        throw new Error(`Failed to fetch prices by header: ${res.status} ${res.statusText}`)
+      }
+      
+      const result = await res.json()
+      return (Array.isArray(result?.data) ? result.data : result) || []
+    } catch (error) {
+      console.error('Error fetching prices by header:', error)
+      // Return empty array as fallback
+      return []
+    }
   }
   static async getProductPrices(productId: number): Promise<Array<{ id: number; unitId: number; unitName?: string; price: number; isDefault?: boolean; validFrom?: string; validTo?: string }>> {
     const res = await fetch(`${API_BASE_URL}/products/${productId}/prices`, {

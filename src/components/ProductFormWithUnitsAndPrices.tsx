@@ -834,28 +834,96 @@ const ProductFormWithUnitsAndPrices = ({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Tên sản phẩm */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tên sản phẩm *
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              placeholder="Nhập tên sản phẩm"
-              required
-            />
+        <div className="space-y-6">
+          {/* Tên sản phẩm và Ảnh sản phẩm cùng hàng */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tên sản phẩm *
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                placeholder="Nhập tên sản phẩm"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ảnh sản phẩm
+              </label>
+              {imagePreview && (
+                <img src={imagePreview} alt="preview" className="mb-2 h-20 w-20 object-cover rounded" />
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    setUploading(true)
+                    try {
+                      setImageFile(file)
+                      const reader = new FileReader()
+                      reader.onload = () => setImagePreview(String(reader.result))
+                      reader.readAsDataURL(file)
+                    } catch (err) {
+                      alert('Tải ảnh thất bại')
+                    } finally {
+                      setUploading(false)
+                    }
+                  }}
+                  className="block w-full text-sm text-gray-700"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">{uploading ? 'Đang xử lý ảnh...' : 'Chọn ảnh từ máy tính'}</p>
+            </div>
           </div>
 
-          {/* Mã sản phẩm (MaSP) */}
-          {/* Product code removed from product-level form */}
+          {/* Danh mục và Trạng thái cùng hàng */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Danh mục *
+              </label>
+              <select
+                name="category_id"
+                value={formData.category_id}
+                onChange={handleInputChange}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                required
+              >
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Trạng thái
+              </label>
+              <select
+                name="active"
+                value={formData.active}
+                onChange={handleInputChange}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value={1}>Hoạt động</option>
+                <option value={0}>Không hoạt động</option>
+              </select>
+            </div>
+          </div>
 
           {/* Mô tả */}
-          <div className="md:col-span-2">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Mô tả
             </label>
@@ -868,103 +936,33 @@ const ProductFormWithUnitsAndPrices = ({
               placeholder="Nhập mô tả sản phẩm"
             />
           </div>
-
-          {/* Danh mục */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Danh mục *
-            </label>
-            <select
-              name="category_id"
-              value={formData.category_id}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              required
-            >
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Hình ảnh */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Ảnh sản phẩm
-            </label>
-            {imagePreview && (
-              <img src={imagePreview} alt="preview" className="mb-2 h-20 w-20 object-cover rounded" />
-            )}
-            <div className="flex items-center gap-2">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  setUploading(true)
-                  try {
-                    setImageFile(file)
-                    const reader = new FileReader()
-                    reader.onload = () => setImagePreview(String(reader.result))
-                    reader.readAsDataURL(file)
-                  } catch (err) {
-                    alert('Tải ảnh thất bại')
-                  } finally {
-                    setUploading(false)
-                  }
-                }}
-                className="block w-full text-sm text-gray-700"
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-1">{uploading ? 'Đang xử lý ảnh...' : 'Chọn ảnh từ máy tính'}</p>
-          </div>
-
-          {/* Hạn sử dụng - removed per request */}
-
-          {/* Trạng thái */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Trạng thái
-            </label>
-            <select
-              name="active"
-              value={formData.active}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            >
-              <option value={1}>Hoạt động</option>
-              <option value={0}>Không hoạt động</option>
-            </select>
-          </div>
         </div>
 
         {/* Đơn vị tính */}
         <div className="border-t pt-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Đơn vị tính</h3>
-          {!product && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-sm text-blue-800">
-                💡 <strong>Lưu ý:</strong> Bạn có thể thêm nhiều đơn vị tính cho sản phẩm.
-                Đơn vị đầu tiên sẽ được đặt làm mặc định nếu không chọn đơn vị khác.
-              </p>
-            </div>
-          )}
+          <div className="mb-4">
+            <h3 className="text-lg font-medium text-gray-900 inline">
+              Đơn vị tính
+               {!product && (
+                 <span className="text-sm text-blue-600 font-normal ml-2">
+                    * <strong>Lưu ý:</strong> Đơn vị đầu tiên sẽ được đặt làm mặc định nếu không chọn đơn vị khác.
+                 </span>
+               )}
+            </h3>
+          </div>
 
           {/* Thêm đơn vị mới */}
           <div className="bg-gray-50 p-4 rounded-lg mb-4">
             <h4 className="text-sm font-medium text-gray-700 mb-3">Thêm đơn vị mới</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div>
+            <div className="grid grid-cols-10 gap-3">
+              <div className="col-span-4">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Đơn vị</label>
                 <select
                   value={newUnitId}
                   onChange={(e) => setNewUnitId(Number(e.target.value))}
                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                 >
-                  <option value="">-- Chọn đơn vị --</option>
+                  <option value="">Chọn đơn vị</option>
                   {allUnits
                     .filter(u => !productUnits.some(pu => pu.unitId === u.id))
                     .map(u => (
@@ -972,7 +970,7 @@ const ProductFormWithUnitsAndPrices = ({
                     ))}
                 </select>
               </div>
-              <div>
+              <div className="col-span-4">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Hệ số quy đổi</label>
                 <input
                   type="number"
@@ -982,8 +980,7 @@ const ProductFormWithUnitsAndPrices = ({
                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                 />
               </div>
-              {/* Barcode input removed per request */}
-              <div className="flex items-end">
+              <div className="col-span-2 flex items-end">
                 <button
                   type="button"
                   onClick={addUnit}
@@ -1015,75 +1012,80 @@ const ProductFormWithUnitsAndPrices = ({
 
           {/* Danh sách đơn vị hiện có */}
           {productUnits.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h4 className="text-sm font-medium text-gray-700">Đơn vị đã thêm</h4>
-              {productUnits.map((unit) => (
-                <div key={unit.id} className="border rounded-lg p-3 bg-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium text-sm">{unit.unitName}</span>
-                      <span className="text-xs text-gray-500">Hệ số: {unit.conversionFactor}</span>
-                      {unit.isDefault && (
-                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">Cơ bản</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!unit.isDefault && (
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                {/* Table Header */}
+                <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                  <div className="grid grid-cols-10 gap-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    <div className="col-span-2">Đơn vị</div>
+                    <div className="col-span-4">Mã SP</div>
+                    <div className="col-span-4">Barcode</div>
+                  </div>
+                </div>
+                
+                {/* Table Body */}
+                <div className="divide-y divide-gray-200">
+                  {productUnits.map((unit) => (
+                    <div key={unit.id} className="px-3 py-2 hover:bg-gray-50 transition-colors">
+                      <div className="grid grid-cols-10 gap-2 items-center">
+                        {/* Đơn vị + Hệ số + Badge */}
+                        <div className="col-span-2">
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium text-xs text-gray-900">{unit.unitName}</span>
+                            {unit.isDefault && (
+                              <span className="px-1.5 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">Cơ bản</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">Hệ số: {unit.conversionFactor}</div>
+                        </div>
+                        
+                        {/* Mã SP */}
+                        <div className="col-span-4">
+                          <input
+                            type="text"
+                            value={unit.productCode || ''}
+                            onChange={(e) => updateUnitCode(unit.id, e.target.value)}
+                            placeholder="Nhập mã SP"
+                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                          />
+                        </div>
+                        
+                        {/* Barcode */}
+                        <div className="col-span-4">
+                          <input
+                            type="text"
+                            value={unit.barcodeCode}
+                            onChange={(e) => updateUnitBarcode(unit.id, e.target.value, unit.barcodeType)}
+                            placeholder="Nhập barcode"
+                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-gray-100">
+                        {!unit.isDefault && (
+                          <button
+                            type="button"
+                            onClick={() => setDefaultUnit(unit.id)}
+                            className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                          >
+                            Đặt cơ bản
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => setDefaultUnit(unit.id)}
-                          className="text-xs text-blue-600 hover:text-blue-800"
+                          onClick={() => removeUnit(unit.id)}
+                          className="px-2 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
                         >
-                          Đặt đơn vị cơ bản
+                          Xóa
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => removeUnit(unit.id)}
-                        className="text-xs text-red-600 hover:text-red-800"
-                      >
-                        Xóa
-                      </button>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Unit code (MaSP) + Barcode editor */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
-                    <input
-                      type="text"
-                      value={unit.productCode || ''}
-                      onChange={(e) => updateUnitCode(unit.id, e.target.value)}
-                      placeholder="Mã SP của đơn vị"
-                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                    />
-                    <input
-                      type="text"
-                      value={unit.barcodeCode}
-                      onChange={(e) => updateUnitBarcode(unit.id, e.target.value, unit.barcodeType)}
-                      placeholder="Barcode"
-                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                    />
-                    <select
-                      value={unit.barcodeType}
-                      onChange={(e) => updateUnitBarcode(unit.id, unit.barcodeCode, e.target.value)}
-                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                    >
-                      <option value="EAN13">EAN13</option>
-                      <option value="BARCODE">BARCODE</option>
-                      <option value="QR_CODE">QR_CODE</option>
-                    </select>
-                    <input
-                      type="number"
-                      min="1"
-                      value={unit.conversionFactor}
-                      onChange={(e) => updateUnitConversionFactor(unit.id, Number(e.target.value))}
-                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                    />
-                  </div>
-
-                  {/* Giá & Bảng giá: di chuyển sang trang Giá; không hiển thị trong modal thêm/sửa */}
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           )}
         </div>

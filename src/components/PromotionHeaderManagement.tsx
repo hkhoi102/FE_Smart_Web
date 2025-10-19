@@ -288,7 +288,7 @@ const PromotionHeaderManagement: React.FC = () => {
       {/* Filters */}
       <div className="bg-white shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tìm kiếm</label>
               <input
@@ -296,7 +296,7 @@ const PromotionHeaderManagement: React.FC = () => {
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
                 placeholder="Nhập tên khuyến mãi..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
             <div>
@@ -305,14 +305,14 @@ const PromotionHeaderManagement: React.FC = () => {
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value as any)}
-                  className="appearance-none w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="appearance-none w-full pl-2 pr-8 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">Tất cả</option>
                   <option value="active">Kích hoạt</option>
                   <option value="inactive">Tạm dừng</option>
                 </select>
-                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </span>
@@ -324,7 +324,7 @@ const PromotionHeaderManagement: React.FC = () => {
                 type="date"
                 value={filterStart}
                 onChange={(e) => setFilterStart(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
             <div>
@@ -333,7 +333,7 @@ const PromotionHeaderManagement: React.FC = () => {
                 type="date"
                 value={filterEnd}
                 onChange={(e) => setFilterEnd(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
           </div>
@@ -348,39 +348,39 @@ const PromotionHeaderManagement: React.FC = () => {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-100 text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Tên khuyến mãi
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ngày bắt đầu
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ngày kết thúc
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Trạng thái
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ngày tạo
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Thao tác
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {filteredHeaders.map((header) => (
                   <tr key={header.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
                       {header.id}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-900">
                       <button
                         onClick={() => handlePromotionNameClick(header)}
                         className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
@@ -388,46 +388,42 @@ const PromotionHeaderManagement: React.FC = () => {
                         {header.name}
                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(header.start_date)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(header.end_date)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(header.active)}`}>
+                    <td className="px-5 py-2 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(header.active)}`}>
                         {getStatusLabel(header.active)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(header.created_at)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
+                    <td className="px-5 py-2 whitespace-nowrap text-sm font-medium">
+                      <div className="flex gap-2">
                         <button
                           onClick={() => handleView(header.id)}
-                          className="text-gray-700 hover:text-gray-900"
+                          className="px-2.5 py-1 text-xs bg-gray-100 text-gray-800 rounded hover:bg-gray-200"
                         >
                           Xem
                         </button>
                         <button
                           onClick={() => handleEdit(header)}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="px-2.5 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                         >
                           Sửa
                         </button>
                         <button
                           onClick={() => handleToggleActive(header.id)}
-                          className={`${header.active === 1 ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
+                          className={`px-2.5 py-1 text-xs rounded ${
+                            header.active === 1 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'
+                          }`}
                         >
                           {header.active === 1 ? 'Tạm dừng' : 'Kích hoạt'}
                         </button>
-                        {/* <button
-                          onClick={() => handleDelete(header.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Xóa
-                        </button> */}
                       </div>
                     </td>
                   </tr>
@@ -946,7 +942,7 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
   }, [details])
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 style: !mt-0">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl p-8 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-semibold text-gray-900">Sửa chi tiết khuyến mãi</h3>

@@ -19,6 +19,13 @@ const PriceManagement = () => {
     items_per_page: 10
   })
   const [currentPage, setCurrentPage] = useState(1)
+  
+  // Price detail modal states
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [selectedHeader, setSelectedHeader] = useState<PriceHeader | null>(null)
+  const [priceDetails, setPriceDetails] = useState<any[]>([])
+  const [loadingDetails, setLoadingDetails] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string>('')
 
   const loadHeaders = async () => {
     try {
@@ -68,6 +75,36 @@ const PriceManagement = () => {
   }
   const closeModal = () => { setIsModalOpen(false) }
 
+  // Price detail modal functions
+  const openDetailModal = async (header: PriceHeader) => {
+    setSelectedHeader(header)
+    setIsDetailModalOpen(true)
+    setLoadingDetails(true)
+    setErrorMessage('')
+    
+    try {
+      // Load price details for this header from API
+      const details = await ProductService.getPricesByHeader(header.id)
+      setPriceDetails(details)
+      if (details.length === 0) {
+        setErrorMessage('Chưa có dữ liệu giá cho bảng giá này')
+      }
+    } catch (error) {
+      console.error('Error loading price details:', error)
+      setPriceDetails([])
+      setErrorMessage('Không thể tải dữ liệu giá. Vui lòng thử lại sau.')
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
+
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false)
+    setSelectedHeader(null)
+    setPriceDetails([])
+    setErrorMessage('')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.name.trim()) return
@@ -98,14 +135,14 @@ const PriceManagement = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Quản lý giá</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="hidden md:block">
             <input
               type="text"
-              placeholder="Tìm theo tên hoặc mô tả bảng giá..."
+              placeholder="Tìm theo tên hoặc mô tả..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              className="w-56 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
             />
           </div>
           <button onClick={openCreateModal} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">Tạo bảng giá</button>
@@ -114,31 +151,38 @@ const PriceManagement = () => {
 
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-100 text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên bảng giá</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mô tả</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hiệu lực từ</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hiệu lực đến</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên bảng giá</th>
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mô tả</th>
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hiệu lực từ</th>
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hiệu lực đến</th>
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                <th className="px-5 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-100">
               {paginatedHeaders.map(h => (
                 <tr key={h.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{h.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{h.description || '—'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateSafe(h.timeStart)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateSafe(h.timeEnd)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <button
+                      onClick={() => openDetailModal(h)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                    >
+                      {h.name}
+                    </button>
+                  </td>
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">{h.description || '—'}</td>
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">{formatDateSafe(h.timeStart)}</td>
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">{formatDateSafe(h.timeEnd)}</td>
+                  <td className="px-5 py-2 whitespace-nowrap text-sm">
                     <span className={`px-2 py-0.5 rounded-full text-xs border ${h.active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>{h.active ? 'Đang hiệu lực' : 'Ngưng' }</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm">
                     <div className="flex items-center justify-center">
                       <button
-                        className="px-3 py-1.5 rounded-md text-white bg-orange-600 hover:bg-orange-700"
+                        className="px-3 py-1.5 text-xs rounded-md text-white bg-orange-600 hover:bg-orange-700"
                         onClick={() => navigate(`/admin/prices/${h.id}`)}
                       >Thêm giá</button>
                     </div>
@@ -220,6 +264,110 @@ const PriceManagement = () => {
                   <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50">{isSubmitting ? 'Đang lưu...' : 'Tạo'}</button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Price Detail Modal */}
+      {isDetailModalOpen && selectedHeader && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={closeDetailModal} />
+
+            <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{selectedHeader.name}</h3>
+                  {selectedHeader.description && (
+                    <p className="text-sm text-gray-600 mt-1">{selectedHeader.description}</p>
+                  )}
+                </div>
+                <button 
+                  onClick={closeDetailModal} 
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                {loadingDetails ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                    <span className="ml-2 text-gray-600">Đang tải chi tiết giá...</span>
+                  </div>
+                ) : errorMessage ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <div className="text-red-500 text-sm mb-2">{errorMessage}</div>
+                      <button
+                        onClick={() => openDetailModal(selectedHeader!)}
+                        className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        Thử lại
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STT</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sản phẩm</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đơn vị</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã SP</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Giá (VND)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {priceDetails.length > 0 ? (
+                            priceDetails.map((item, index) => (
+                              <tr key={item.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{item.productName}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{item.unitName}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{item.productCode || '—'}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
+                                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(item.price)}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500">
+                                Chưa có dữ liệu giá cho bảng giá này
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50">
+                <button
+                  onClick={closeDetailModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={() => {
+                    closeDetailModal()
+                    navigate(`/admin/prices/${selectedHeader.id}`)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700"
+                >
+                  Thêm/Sửa giá
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -129,7 +129,14 @@ const InventoryCheckManagement = () => {
         InventoryService.getInventoryChecks().catch(() => []),
       ])
       setWarehouses(whs)
-      setChecks(Array.isArray(checksDto) ? checksDto.map(mapCheck) : [])
+      const mapped = Array.isArray(checksDto) ? checksDto.map(mapCheck) : []
+      // Ensure warehouse_name is populated using loaded warehouses if missing
+      const idToName = new Map<number, string>(whs.map(w => [w.id, w.name]))
+      const enriched = mapped.map(c => ({
+        ...c,
+        warehouse_name: c.warehouse_name || idToName.get(c.warehouse_id) || ''
+      }))
+      setChecks(enriched)
     } catch (e) {
       console.error(e)
     }
@@ -512,44 +519,22 @@ const InventoryCheckManagement = () => {
           {notify.message}
         </div>
       )}
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      {/* Header with inline filters (filters sit to the left of Export button) */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-2xl font-bold text-gray-900">Kiểm kê kho</h2>
-        <div className="flex space-x-2">
-          <button
-            onClick={handleExportAllReports}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-          >
-            📊 Xuất tất cả Excel
-          </button>
-          <button
-            type="button"
-            onClick={handleAddCheck}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-          >
-            Tạo phiếu kiểm kê
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Cards removed per request */}
-
-      {/* Filters */}
-      <div className="flex justify-between items-center space-x-4">
-        <div className="flex-1 max-w-md">
+        <div className="flex items-center gap-2 ml-auto flex-wrap">
+          {/* Filters group */}
           <input
             type="text"
-            placeholder="Tìm kiếm theo ghi chú, kho hoặc người tạo..."
+            placeholder="Tìm kiếm..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="w-64 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           />
-        </div>
-        <div className="flex space-x-2">
           <select
             value={warehouseFilter}
             onChange={(e) => setWarehouseFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           >
             <option value="all">Tất cả kho</option>
             {warehouses.map(warehouse => (
@@ -561,7 +546,7 @@ const InventoryCheckManagement = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           >
             <option value="all">Tất cả trạng thái</option>
             <option value="PENDING">Chờ kiểm</option>
@@ -570,94 +555,113 @@ const InventoryCheckManagement = () => {
             <option value="COMPLETED">Hoàn thành</option>
             <option value="CANCELLED">Đã hủy</option>
           </select>
+
+          {/* Action buttons on the far right */}
+          <button
+            onClick={handleExportAllReports}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium"
+          >
+            📊 Xuất tất cả Excel
+          </button>
+          <button
+            type="button"
+            onClick={handleAddCheck}
+            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm font-medium"
+          >
+            Tạo phiếu kiểm kê
+          </button>
         </div>
       </div>
+
+      {/* Stats Cards removed per request */}
+
+      {/* Filters moved inline with header */}
 
       {/* Checks Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-100 text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   ID
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ngày kiểm
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Kho
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ghi chú
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Trạng thái
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Người tạo
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Thao tác
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Hành động
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-100">
               {paginatedChecks.map((check) => (
                 <tr key={check.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-900">
                     {check.id}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(check.check_date)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                     {check.warehouse_name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-900">
                     {check.note}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(check.status)}`}>
+                  <td className="px-5 py-2 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(check.status)}`}>
                       {getStatusLabel(check.status)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm text-gray-500">
                     {check.created_by}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm font-medium">
+                    <div className="flex gap-2">
                       <button
                         onClick={() => handleViewItems(check)}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="px-2.5 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                       >
                         {(check.status === 'COMPLETED' || check.status === 'CONFIRMED') ? 'Chi tiết' : 'Kiểm kê'}
                       </button>
                       <button
                         onClick={() => handleEditCheck(check)}
-                        className="text-yellow-600 hover:text-yellow-900"
+                        className="px-2.5 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200"
                       >
                         Sửa
                       </button>
                       {(check.status !== 'COMPLETED' && check.status !== 'CONFIRMED' && check.status !== 'CANCELLED') && (
                         <button
                           onClick={() => handleCancelCheck(check.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="px-2.5 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
                         >
                           Hủy phiếu
                         </button>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                  <td className="px-5 py-2 whitespace-nowrap text-sm font-medium">
+                    <div className="flex gap-2">
                       {check.status === 'PENDING' && (
                         <button
                           onClick={() => handleStartCheck(check.id)}
-                          className="text-green-600 hover:text-green-900"
+                          className="px-2.5 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
                         >
                           Bắt đầu
                         </button>
@@ -665,7 +669,7 @@ const InventoryCheckManagement = () => {
                       {check.status === 'IN_PROGRESS' && (
                         <button
                           onClick={() => handleCompleteCheck(check.id)}
-                          className="text-gray-800 hover:text-gray-900"
+                          className="px-2.5 py-1 text-xs bg-gray-100 text-gray-800 rounded hover:bg-gray-200"
                         >
                           Hoàn thành
                         </button>
@@ -673,7 +677,7 @@ const InventoryCheckManagement = () => {
                       {(check.status === 'CONFIRMED' || check.status === 'COMPLETED') && (
                         <button
                           onClick={() => handleExportReport(check)}
-                          className="text-purple-600 hover:text-purple-900"
+                          className="px-2.5 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
                         >
                           Xuất Excel
                         </button>
