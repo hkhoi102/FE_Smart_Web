@@ -188,16 +188,11 @@ const ProductFormWithUnitsAndPrices = ({
   useEffect(() => {
     if (product && product.id && productUnits.length > 0) {
       const loadHeadersForUnits = async () => {
+        // Simplified: initialize empty headers for all units
         const newUnitPriceHeaders = new Map<number, Array<{ id: number; name: string; description?: string; timeStart?: string; timeEnd?: string }>>()
 
         for (const unit of productUnits) {
-          try {
-            const headers = await ProductService.getPriceHeaders(product.id, unit.id)
-            newUnitPriceHeaders.set(unit.id, headers || [])
-          } catch (error) {
-            console.warn(`Failed to load headers for unit ${unit.id}:`, error)
-            newUnitPriceHeaders.set(unit.id, [])
-          }
+          newUnitPriceHeaders.set(unit.id, [])
         }
 
         setUnitPriceHeaders(newUnitPriceHeaders)
@@ -1023,7 +1018,7 @@ const ProductFormWithUnitsAndPrices = ({
                     <div className="col-span-4">Barcode</div>
                   </div>
                 </div>
-                
+
                 {/* Table Body */}
                 <div className="divide-y divide-gray-200">
                   {productUnits.map((unit) => (
@@ -1039,7 +1034,7 @@ const ProductFormWithUnitsAndPrices = ({
                           </div>
                           <div className="text-xs text-gray-500">Hệ số: {unit.conversionFactor}</div>
                         </div>
-                        
+
                         {/* Mã SP */}
                         <div className="col-span-4">
                           <input
@@ -1050,7 +1045,7 @@ const ProductFormWithUnitsAndPrices = ({
                             className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
                           />
                         </div>
-                        
+
                         {/* Barcode */}
                         <div className="col-span-4">
                           <input
@@ -1062,7 +1057,7 @@ const ProductFormWithUnitsAndPrices = ({
                           />
                         </div>
                       </div>
-                      
+
                       {/* Action buttons */}
                       <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-gray-100">
                         {!unit.isDefault && (

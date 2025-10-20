@@ -60,6 +60,14 @@ function App() {
                 }
               />
               <Route
+                path="/admin/prices"
+                element={
+                  <ProtectedRoute>
+                    <Admin />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/admin/prices/:headerId"
                 element={
                   <ProtectedRoute>

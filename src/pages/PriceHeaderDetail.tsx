@@ -147,7 +147,7 @@ const PriceHeaderDetail = () => {
         </div>
         <button
           type="button"
-          onClick={() => navigate('/admin?tab=prices')}
+          onClick={() => navigate('/admin/prices')}
           className="px-3 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50"
         >← Quay về Giá</button>
 
