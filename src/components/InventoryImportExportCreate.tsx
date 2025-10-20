@@ -295,6 +295,12 @@ const InventoryImportExportCreate = () => {
         alert('Vui lòng chọn ngày')
         return
       }
+      // Kiểm tra phải chọn ít nhất một sản phẩm
+      const selectedProducts = products.filter(p => p.selected)
+      if (selectedProducts.length === 0) {
+        alert('Vui lòng chọn ít nhất một sản phẩm')
+        return
+      }
     }
     setCurrentStep(2)
   }
@@ -317,6 +323,13 @@ const InventoryImportExportCreate = () => {
         return
       }
 
+      // Validate số lượng > 0 cho tất cả sản phẩm đã chọn
+      const invalidQty = selectedProducts.filter(p => !p.actualQuantity || p.actualQuantity <= 0)
+      if (invalidQty.length > 0) {
+        alert(slipType === 'IMPORT' ? 'Số lượng nhập phải lớn hơn 0' : 'Số lượng xuất phải lớn hơn 0')
+        return
+      }
+
       // Validation cho nhập kho theo lô (bắt buộc)
       if (slipType === 'IMPORT') {
         const productsWithoutLotNumber = selectedProducts.filter(p => !p.lotNumber)
@@ -324,6 +337,18 @@ const InventoryImportExportCreate = () => {
         if (productsWithoutLotNumber.length > 0) {
           alert('Vui lòng nhập số lô cho tất cả sản phẩm đã chọn. Số lô là bắt buộc khi nhập kho.')
           return
+        }
+
+        // Kiểm tra trùng số lô trong danh sách sản phẩm đã chọn (client-side)
+        const lotNumberMap = new Map<string, number>()
+        for (const p of selectedProducts) {
+          const ln = (p.lotNumber || '').trim()
+          if (!ln) continue
+          if (lotNumberMap.has(ln)) {
+            alert('Số lô không được trùng')
+            return
+          }
+          lotNumberMap.set(ln, 1)
         }
       }
 

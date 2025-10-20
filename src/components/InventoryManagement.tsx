@@ -36,6 +36,7 @@ const InventoryManagement = () => {
     items_per_page: 10
   })
   const [currentPage, setCurrentPage] = useState(1)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null)
 
   // Function to load stock locations for all warehouses
   const loadStockLocations = async () => {
@@ -199,21 +200,46 @@ const InventoryManagement = () => {
   }
 
 
+  // Get stock status for an item
+  const getStockStatus = (quantity: number): 'in_stock' | 'low_stock' | 'out_of_stock' => {
+    if (quantity > 10) return 'in_stock'
+    if (quantity > 0) return 'low_stock'
+    return 'out_of_stock'
+  }
+
   // Filter stock balances based on search term and status
   const filteredBalances = stockBalances.filter(item => {
     const matchesSearch = searchTerm === '' ||
       item.productName?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesWarehouse = selectedWarehouse === 'all' || item.warehouseId === selectedWarehouse
-    return matchesSearch && matchesWarehouse
+    
+    // Filter by status
+    const itemStatus = getStockStatus(item.quantity || 0)
+    const matchesStatus = statusFilter === 'all' || itemStatus === statusFilter
+    
+    return matchesSearch && matchesWarehouse && matchesStatus
   })
+
+  // Sort balances by status
+  const sortedBalances = sortOrder ? [...filteredBalances].sort((a, b) => {
+    const statusOrder = { 'out_of_stock': 0, 'low_stock': 1, 'in_stock': 2 }
+    const aStatus = getStockStatus(a.quantity || 0)
+    const bStatus = getStockStatus(b.quantity || 0)
+    
+    if (sortOrder === 'asc') {
+      return statusOrder[aStatus] - statusOrder[bStatus]
+    } else {
+      return statusOrder[bStatus] - statusOrder[aStatus]
+    }
+  }) : filteredBalances
 
   // Pagination logic
   const itemsPerPage = 10
-  const totalItems = filteredBalances.length
+  const totalItems = sortedBalances.length
   const totalPages = Math.ceil(totalItems / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedBalances = filteredBalances.slice(startIndex, endIndex)
+  const paginatedBalances = sortedBalances.slice(startIndex, endIndex)
 
   // Update pagination state
   useEffect(() => {
@@ -373,8 +399,22 @@ const InventoryManagement = () => {
                 <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Tồn kho
                 </th>
-                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trạng thái
+                <th 
+                  className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : sortOrder === 'desc' ? null : 'asc')}
+                >
+                  <div className="flex items-center gap-1">
+                    Trạng thái
+                    {sortOrder && (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {sortOrder === 'asc' ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        )}
+                      </svg>
+                    )}
+                  </div>
                 </th>
               </tr>
             </thead>
