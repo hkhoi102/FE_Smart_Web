@@ -69,6 +69,30 @@ const CreateOrderManagement: React.FC = () => {
   const [pendingCompleteOrderId, setPendingCompleteOrderId] = useState<number | null>(null)
   const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false)
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false)
+  const [showPrintModal, setShowPrintModal] = useState(false)
+  const [invoiceData, setInvoiceData] = useState<any>(null)
+  const [autoCompleteOnPayment, setAutoCompleteOnPayment] = useState(false)
+
+  // Enrich order details with product/unit names from productUnitId
+  const enrichOrderDetails = async (details: Array<any>) => {
+    if (!Array.isArray(details)) return []
+    const enriched = await Promise.all(details.map(async (d: any) => {
+      // Prefer data from current cart if available
+      const oi = orderItems.find(oi => oi.productUnitId === d.productUnitId)
+      if (oi) return { ...d, productName: oi.productName, unitName: oi.unitName }
+      try {
+        const unitInfo = await ProductService.getProductUnitById(d.productUnitId)
+        return {
+          ...d,
+          productName: unitInfo?.productName || `PU#${d.productUnitId}`,
+          unitName: unitInfo?.unitName || 'Đơn vị'
+        }
+      } catch {
+        return { ...d, productName: `PU#${d.productUnitId}`, unitName: 'Đơn vị' }
+      }
+    }))
+    return enriched
+  }
 
   // Form states for adding products
   const [selectedProduct, setSelectedProduct] = useState<number | ''>('')
@@ -937,50 +961,40 @@ const CreateOrderManagement: React.FC = () => {
             setCurrentOrder(deliveringResult.data || deliveringResult)
             setSuccess('Đã xuất kho! Đơn hàng đang được giao.')
 
-            // Bước 3: DELIVERING → COMPLETED
+            // Bước 3: DELIVERING → COMPLETED (tự động) và mở in hóa đơn
             setTimeout(async () => {
               try {
-            // Trước khi chuyển COMPLETED hiển thị xác nhận hóa đơn
-            try {
-              const detail = await OrderApi.getById(orderId).catch(() => null)
-              let summary: any = detail?.data || detail || null
-              if (summary?.orderDetails && Array.isArray(summary.orderDetails)) {
-                const enriched = await Promise.all(summary.orderDetails.map(async (d: any) => {
-                  // Ưu tiên lấy tên từ giỏ hiện tại
-                  const oi = orderItems.find(oi => oi.productUnitId === d.productUnitId)
-                  if (oi) {
-                    return { ...d, productName: oi.productName, unitName: oi.unitName }
+                // Lấy chi tiết đơn để in
+                let summary: any = null
+                try {
+                  const detail = await OrderApi.getById(orderId).catch(() => null)
+                  summary = detail?.data || detail || null
+                  if (summary?.orderDetails && Array.isArray(summary.orderDetails)) {
+                    const enriched = await enrichOrderDetails(summary.orderDetails)
+                    summary = { ...summary, orderDetails: enriched }
                   }
-                  // Nếu không có trong giỏ, gọi ProductService để lấy tên
-                  try {
-                    const unitInfo = await ProductService.getProductUnitById(d.productUnitId)
-                    return { ...d, productName: unitInfo?.productName || `PU#${d.productUnitId}`, unitName: unitInfo?.unitName || 'Đơn vị' }
-                  } catch {
-                    return { ...d, productName: `PU#${d.productUnitId}`, unitName: 'Đơn vị' }
+                } catch {}
+
+                // Chuyển COMPLETED ngay
+                const completedResult = await updateOrderStatusAPI(orderId, 'COMPLETED')
+                const completed = completedResult.data || completedResult
+                setOrderStatus('COMPLETED')
+                setCurrentOrder(completed)
+                setSuccess('Đơn hàng đã hoàn thành! Giao dịch thành công.')
+
+                // Nếu COD thì cập nhật PAID
+                try {
+                  if (markPaid) {
+                    console.log('💳 Mark COD order as PAID...')
+                    await updatePaymentStatus(orderId)
                   }
-                }))
-                summary = { ...summary, orderDetails: enriched }
-              }
-              setOrderSummaryForConfirm(summary)
-            } catch {}
-            setShowCompleteConfirmModal(true)
-            // Dừng luồng tại đây; việc chuyển COMPLETED sẽ thực hiện khi người dùng bấm OK
-            return
+                } catch (e) {
+                  console.error('❌ Failed to update payment status for COD:', e)
+                }
 
-            // Nếu là COD, sau khi hoàn thành đơn, cập nhật payment-status = PAID
-            try {
-              if (markPaid) {
-                console.log('💳 Mark COD order as PAID...')
-                await updatePaymentStatus(orderId)
-              }
-            } catch (e) {
-              console.error('❌ Failed to update payment status for COD:', e)
-            }
-
-                // Reset form sau khi hoàn thành
-                setTimeout(() => {
-                  handleClearCart()
-                }, 2000)
+                // Mở modal in hóa đơn
+                setInvoiceData(summary || completed)
+                setShowPrintModal(true)
               } catch (error: any) {
                 console.error('❌ Error in step 3 (COMPLETED):', error)
                 setError('Lỗi khi hoàn thành đơn hàng: ' + error.message)
@@ -1206,8 +1220,9 @@ const CreateOrderManagement: React.FC = () => {
   }
 
   const handleConfirmPaymentMethod = () => {
+    // Skip extra OK step: auto-complete after order creation
+    setAutoCompleteOnPayment(true)
     setShowPaymentMethodModal(false)
-    // Proceed with order creation using selected payment method
     handleCreateOrder()
   }
 
@@ -1304,14 +1319,33 @@ const CreateOrderManagement: React.FC = () => {
         setCurrentOrder(result)
         setOrderStatus('PENDING')
 
-        // Xử lý thanh toán chuyển khoản
-        if (paymentMethod === 'BANK_TRANSFER') {
-          setSuccess(`Đơn hàng #${result.id} đã tạo! Vui lòng quét QR để thanh toán.`)
-          await handleBankTransferPayment(result.id, total)
+        if (autoCompleteOnPayment) {
+          try {
+            // Immediately complete the order and open print modal
+            const completedResult = await updateOrderStatusAPI(result.id, 'COMPLETED')
+            const completed = completedResult.data || completedResult
+            setOrderStatus('COMPLETED')
+            try { await updatePaymentStatus(result.id) } catch (e) { console.error('❌ Failed to mark payment PAID on complete:', e) }
+            // Ensure names are present for invoice
+            let inv = completed
+            if (inv?.orderDetails && Array.isArray(inv.orderDetails)) {
+              inv = { ...inv, orderDetails: await enrichOrderDetails(inv.orderDetails) }
+            }
+            setInvoiceData(inv)
+            setShowPrintModal(true)
+            setSuccess(`Đơn hàng #${result.id} đã hoàn thành!`)
+          } finally {
+            setAutoCompleteOnPayment(false)
+          }
         } else {
-          // Thanh toán tiền mặt - không hiển thị thông báo trạng thái dài
-          setSuccess(`Đơn hàng #${result.id} đã tạo!`)
-          await handleCashPaymentWorkflow(result.id, true)
+          // Xử lý thanh toán theo phương thức đã chọn (luồng cũ)
+          if (paymentMethod === 'BANK_TRANSFER') {
+            setSuccess(`Đơn hàng #${result.id} đã tạo! Vui lòng quét QR để thanh toán.`)
+            await handleBankTransferPayment(result.id, total)
+          } else {
+            setSuccess(`Đơn hàng #${result.id} đã tạo!`)
+            await handleCashPaymentWorkflow(result.id, true)
+          }
         }
       } else {
         setSuccess(`Đơn hàng #${result.id} đã được tạo thành công!`)
@@ -1901,7 +1935,7 @@ const CreateOrderManagement: React.FC = () => {
             {isPOSMode && currentOrder && paymentMethod === 'BANK_TRANSFER' && (
               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h3 className="text-lg font-medium text-blue-800 mb-3">
-                  💳 Thanh toán chuyển khoản - Đơn hàng #{currentOrder.id}
+                  💳 Thanh toán chuyển khoản - Đơn hàng {currentOrder?.orderCode ? `${currentOrder.orderCode}` : (currentOrder?.id ? `${currentOrder.id}` : '')}
                 </h3>
 
                 <div className="text-center">
@@ -2030,7 +2064,7 @@ const CreateOrderManagement: React.FC = () => {
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
-                💳 Thanh toán chuyển khoản - Đơn hàng #{currentOrder?.id}
+                💳 Thanh toán chuyển khoản - Đơn hàng {currentOrder?.orderCode ? `#${currentOrder.orderCode}` : (currentOrder?.id ? `#${currentOrder.id}` : '')}
               </h3>
               <button
                 onClick={async () => {
@@ -2224,134 +2258,88 @@ const CreateOrderManagement: React.FC = () => {
       )}
 
 
-      {/* Confirm Complete Modal */}
-      {showCompleteConfirmModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 style: !mt-0">
-          <div className="bg-white rounded-lg p-8 max-w-4xl w-full md:w-[900px] lg:w-[1000px] mx-2 md:mx-6 max-h-[90vh] overflow-y-auto">
-            <div className="text-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Xác nhận hoàn thành đơn hàng</h3>
-            </div>
-            {orderSummaryForConfirm ? (
-              <div className="space-y-3 text-sm">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div><span className="text-gray-800 font-semibold">Mã đơn:</span> <span className="font-medium">#{orderSummaryForConfirm.id}</span></div>
-                    <div><span className="text-gray-800 font-semibold">Ngày tạo:</span> {new Date(orderSummaryForConfirm.createdAt).toLocaleString('vi-VN')}</div>
-                    <div><span className="text-gray-800 font-semibold">Phương thức:</span> {orderSummaryForConfirm.paymentMethod === 'COD' ? 'Tiền mặt' : 'Chuyển khoản'}</div>
-                    <div><span className="text-gray-800 font-semibold">Tổng tiền:</span> <span className="font-semibold text-blue-600">{formatCurrency(finalTotal)}</span></div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div>
-                      <div className="text-gray-800 font-semibold mb-1">Thông tin khách hàng</div>
-                      <div className="text-sm text-gray-800"><span className="font-semibold">Tên:</span> {selectedCustomer?.fullName || orderSummaryForConfirm.customerName || 'Khách lẻ'}</div>
-                      {(selectedCustomer?.phoneNumber || orderSummaryForConfirm.customerPhone) && (
-                        <div className="text-sm text-gray-800"><span className="font-semibold">SĐT:</span> {selectedCustomer?.phoneNumber || orderSummaryForConfirm.customerPhone}</div>
-                      )}
-                      {(selectedCustomer?.address || orderSummaryForConfirm.customerAddress) && (
-                        <div className="text-sm text-gray-800"><span className="font-semibold">Địa chỉ:</span> {selectedCustomer?.address || orderSummaryForConfirm.customerAddress}</div>
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-gray-800 font-semibold mb-1">Thông tin cửa hàng: {storeName}</div>
-                      {storeAddress && <div className="text-sm text-gray-800"><span className="font-semibold">Địa chỉ:</span> {storeAddress}</div>}
-                      {storeTaxId && <div className="text-sm text-gray-800"><span className="font-semibold">MST:</span> {storeTaxId}</div>}
-                      {user?.fullName && <div className="text-sm text-gray-800 mt-1"><span className="font-semibold">Người lập đơn:</span> {user.fullName}</div>}
-                    </div>
-                  </div>
-                <div className="mt-2">
-                  <div className="font-medium text-gray-800 mb-2">Chi tiết sản phẩm</div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-gray-600">Sản phẩm</th>
-                          <th className="px-3 py-2 text-left text-gray-600">Đơn vị</th>
-                          <th className="px-3 py-2 text-right text-gray-600">SL</th>
-                          <th className="px-3 py-2 text-right text-gray-600">Đơn giá</th>
-                          <th className="px-3 py-2 text-right text-gray-600">Thành tiền</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-100">
-                        {(orderSummaryForConfirm.orderDetails || []).map((d: any, idx: number) => (
-                          <tr key={idx}>
-                            <td className="px-3 py-2">{d.productName || `PU#${d.productUnitId}`}</td>
-                            <td className="px-3 py-2">{d.unitName || '—'}</td>
-                            <td className="px-3 py-2 text-right">{d.quantity}</td>
-                            <td className="px-3 py-2 text-right">{formatCurrency(d.unitPrice || 0)}</td>
-                            <td className="px-3 py-2 text-right font-medium">{formatCurrency(d.subtotal || ((d.unitPrice||0)*(d.quantity||0)))}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <div className="mt-3 p-3 rounded-md border bg-gray-50">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Tổng cộng:</span>
-                    <span className="text-gray-800">{formatCurrency(computedSubtotal)}</span>
-                  </div>
-                  {computedDiscount > 0 && (
-                    <div className="flex justify-between text-sm mb-1 text-green-700">
-                      <span>Chiết khấu/Khuyến mãi:</span>
-                      <span>-{formatCurrency(computedDiscount)}</span>
-                    </div>
-                  )}
-                  {vatAmount > 0 && (
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-600">Thuế VAT:</span>
-                      <span className="text-gray-800">{formatCurrency(vatAmount)}</span>
-                    </div>
-                  )}
-                  {shippingFee > 0 && (
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-600">Phí vận chuyển:</span>
-                      <span className="text-gray-800">{formatCurrency(shippingFee)}</span>
-                    </div>
-                  )}
-                  <div className="border-t mt-2 pt-2 flex justify-between text-base font-semibold">
-                    <span>Thành tiền phải trả:</span>
-                    <span className="text-blue-600">{formatCurrency(finalTotal)}</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-600">Đang tải chi tiết đơn hàng...</div>
-            )}
-            <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowCompleteConfirmModal(false)} className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Hủy</button>
-              <button
-                onClick={async () => {
-                  try {
-                    if (!currentOrder?.id) return
-                    // Tiếp tục cập nhật COMPLETED
-                    const completedResult = await updateOrderStatusAPI(currentOrder.id, 'COMPLETED')
-                    setOrderStatus('COMPLETED')
-                    setCurrentOrder(completedResult.data || completedResult)
-                    setSuccess('Đơn hàng đã hoàn thành! Giao dịch thành công.')
-                    // Sau khi hoàn thành, cập nhật trạng thái thanh toán thành PAID
-                    try {
-                      await updatePaymentStatus(currentOrder.id)
-                    } catch (e) {
-                      console.error('❌ Failed to mark payment PAID on complete:', e)
-                    }
-                    setShowCompleteConfirmModal(false)
+      {/* Confirm Complete Modal removed per request */}
 
-                    // Reset form after a short delay to show success message
-                    setTimeout(() => {
-                      resetOrderForm()
-                    }, 2000)
-                  } catch (e: any) {
-                    setError('Lỗi khi hoàn thành đơn hàng: ' + (e?.message || ''))
-                  }
-                }}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              >
-                OK, hoàn thành
+      {/* Print Invoice Modal */}
+      {showPrintModal && invoiceData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-4 w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-3 print:hidden">
+              <h3 className="text-lg font-semibold text-gray-900">Xem trước hóa đơn</h3>
+              <button onClick={() => { setShowPrintModal(false); resetOrderForm() }} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
+
+            {/* Receipt Preview/Print Area */}
+            <div className="flex justify-center">
+              <div id="print-area" className="receipt shadow border w-[80mm] bg-white p-3 text-[12px] leading-5">
+                <div className="text-center">
+                  <div className="text-[14px] font-bold">{storeName}</div>
+                  {storeAddress && <div className="text-[12px]">{storeAddress}</div>}
+                  {storeTaxId && <div className="text-[12px]">MST: {storeTaxId}</div>}
+                  <div className="mt-1 text-[13px] font-semibold">PHIẾU THANH TOÁN</div>
+                  <div className="text-[12px]">Mã đơn: {invoiceData.orderCode ? `#${invoiceData.orderCode}` : (invoiceData.id ? `#${invoiceData.id}` : '')}</div>
+                  <div className="text-[12px]">Thời gian: {new Date(invoiceData.createdAt).toLocaleString('vi-VN')}</div>
+                </div>
+
+                <div className="mt-2 text-[12px]">
+                  <div>Khách hàng: {selectedCustomer?.fullName || invoiceData.customerName || 'Khách lẻ'}</div>
+                  {(selectedCustomer?.phoneNumber || invoiceData.customerPhone) && <div>Điện thoại: {selectedCustomer?.phoneNumber || invoiceData.customerPhone}</div>}
+                </div>
+
+                <div className="my-2 border-t border-dashed"></div>
+
+                {/* Items */}
+                <div className="space-y-1">
+                  {(invoiceData.orderDetails || []).map((d: any, idx: number) => (
+                    <div key={idx}>
+                      <div className="flex justify-between">
+                        <div className="pr-2">{d.productName || `PU#${d.productUnitId}`}</div>
+                        <div className="text-right font-medium">{formatCurrency(d.subtotal || ((d.unitPrice||0)*(d.quantity||0)))}</div>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-gray-600">
+                        <div>{d.unitName || '—'}</div>
+                        <div>{d.quantity} x {formatCurrency(d.unitPrice || 0)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="my-2 border-t border-dashed"></div>
+
+                {/* Totals */}
+                <div className="text-[12px] space-y-1">
+                  <div className="flex justify-between"><span>Tạm tính</span><span>{formatCurrency(computedSubtotal)}</span></div>
+                  {computedDiscount > 0 && (<div className="flex justify-between"><span>Giảm giá</span><span>-{formatCurrency(computedDiscount)}</span></div>)}
+                  {vatAmount > 0 && (<div className="flex justify-between"><span>Thuế VAT</span><span>{formatCurrency(vatAmount)}</span></div>)}
+                  {shippingFee > 0 && (<div className="flex justify-between"><span>Phí vận chuyển</span><span>{formatCurrency(shippingFee)}</span></div>)}
+                  <div className="flex justify-between text-[14px] font-bold"><span>TỔNG CỘNG</span><span>{formatCurrency(finalTotal)}</span></div>
+                </div>
+
+                <div className="my-2 border-t border-dashed"></div>
+                <div className="text-center text-[11px]">Cảm ơn Quý khách, hẹn gặp lại!</div>
+              </div>
+            </div>
+
+            {/* Print controls */}
+            <div className="mt-3 flex justify-end gap-3 print:hidden">
+              <button onClick={() => { setShowPrintModal(false); resetOrderForm() }} className="px-4 py-2 border rounded-md">Đóng</button>
+              <button onClick={() => window.print()} className="px-4 py-2 bg-green-600 text-white rounded-md">In hóa đơn</button>
+            </div>
+
+            {/* Print CSS */}
+            <style>{`
+              @media print {
+                body * { visibility: hidden; }
+                #print-area, #print-area * { visibility: visible; }
+                #print-area { position: absolute; left: 0; top: 0; width: 80mm; margin: 0; padding: 0; }
+              }
+              @page { size: 80mm auto; margin: 2mm; }
+            `}</style>
           </div>
         </div>
       )}
-
       {/* Add Product Modal */}
       <Modal
         isOpen={showAddProduct}
