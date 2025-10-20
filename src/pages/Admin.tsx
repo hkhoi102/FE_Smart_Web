@@ -1,7 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import React, { useEffect, useState, useMemo } from 'react'
-import { ProductService, Product, ProductCategory, CreateProductRequest, UpdateProductRequest } from '@/services/productService'
+import { ProductService, Product, ProductCategory, ProductUnit, CreateProductRequest, UpdateProductRequest } from '@/services/productService'
 import { InventoryService, WarehouseDto, StockLocationDto } from '@/services/inventoryService'
 import { Pagination, ProductTable, ProductFormWithUnitsAndPrices, Modal, UnitManagement, PriceManagement, AccountManagement, InventoryManagement, InventoryCheckManagement, WarehouseTab, PromotionManagement, OrderManagement, OrderProcessingManagement, OrderListManagement, AdminSidebar } from '@/components'
 import CreateOrderManagement from '@/components/CreateOrderManagement'
@@ -356,15 +356,56 @@ const Admin = () => {
     }
   }
 
-  const handleDeleteProduct = async (id: number) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa sản phẩm này?')) {
-      try {
-        await ProductService.deleteProduct(id)
-        loadProducts()
-      } catch (error) {
-        console.error('Error deleting product:', error)
+  const handleToggleUnitStatus = async (product: Product, unit: ProductUnit) => {
+    try {
+      if (unit.active) {
+        // Tạm dừng đơn vị
+        await ProductService.deactivateProductUnit(product.id, unit.id)
+        setProducts(prev => prev.map(p =>
+          p.id === product.id ? {
+            ...p,
+            productUnits: p.productUnits?.map(u =>
+              u.id === unit.id ? { ...u, active: false } : u
+            ) || []
+          } : p
+        ))
+      } else {
+        // Kích hoạt đơn vị
+        await ProductService.activateProductUnit(product.id, unit.id)
+        setProducts(prev => prev.map(p =>
+          p.id === product.id ? {
+            ...p,
+            productUnits: p.productUnits?.map(u =>
+              u.id === unit.id ? { ...u, active: true } : u
+            ) || []
+          } : p
+        ))
+      }
+    } catch (error) {
+      console.error('Error toggling unit status:', error)
+    }
+  }
+
+  // Đồng bộ editingProduct khi products state thay đổi
+  useEffect(() => {
+    if (editingProduct) {
+      const updatedProduct = products.find(p => p.id === editingProduct.id)
+      if (updatedProduct) {
+        setEditingProduct(updatedProduct)
       }
     }
+  }, [products, editingProduct])
+
+  // Xử lý thay đổi trạng thái đơn vị từ modal
+  const handleUnitStatusChange = (productId: number, unitId: number, active: boolean) => {
+    setProducts(prev => prev.map(p =>
+      p.id === productId ? {
+        ...p,
+        productUnits: p.productUnits?.map(u =>
+          u.id === unitId ? { ...u, active } : u
+        ) || []
+      } : p
+    ))
   }
 
   // --- Price modal helpers ---
@@ -762,7 +803,7 @@ const Admin = () => {
                       products={filteredProducts}
                       categories={categories}
                       onEdit={handleEditProduct}
-                      onDelete={handleDeleteProduct}
+                      onToggleUnitStatus={handleToggleUnitStatus}
                       onViewDetail={async (p) => {
                         try {
                           const fresh = await ProductService.getProductById(p.id)
@@ -880,6 +921,7 @@ const Admin = () => {
           onSubmit={handleSubmitProduct}
           onCancel={handleCloseModal}
           isLoading={isSubmitting}
+          onUnitStatusChange={handleUnitStatusChange}
         />
       </Modal>
 

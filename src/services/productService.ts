@@ -7,6 +7,7 @@ export interface ProductUnit {
   unitName: string
   conversionFactor: number
   isDefault: boolean
+  active?: boolean
   code?: string
   currentPrice?: number
   convertedPrice?: number
@@ -120,6 +121,7 @@ export class ProductService {
     const params = new URLSearchParams({
       page: apiPage.toString(),
       size: limit.toString(),
+      includeInactive: 'true'
     })
     if (search) params.append('search', search)
     if (categoryId) params.append('categoryId', categoryId.toString())
@@ -140,6 +142,7 @@ export class ProductService {
       unitName: u.unitName,
       conversionFactor: u.conversionFactor ?? u.conversionRate ?? 1,
       isDefault: u.isDefault,
+      active: u.active !== undefined ? u.active : true,
       code: u.code,
       currentPrice: typeof u.currentPrice === 'number' ? u.currentPrice : undefined,
       convertedPrice: typeof u.convertedPrice === 'number' ? u.convertedPrice : undefined,
@@ -626,6 +629,44 @@ export class ProductService {
       headers: this.getAuthHeaders(),
     })
     if (!res.ok) throw new Error(`Failed to delete product unit: ${res.status} ${res.statusText}`)
+  }
+
+  // Deactivate product unit
+  static async deactivateProductUnit(productId: number, productUnitId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/units/${productUnitId}/deactivate`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to deactivate product unit: ${res.status} ${res.statusText}`)
+  }
+
+  // Activate product unit
+  static async activateProductUnit(productId: number, productUnitId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/units/${productUnitId}/activate`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to activate product unit: ${res.status} ${res.statusText}`)
+  }
+
+  // Deactivate product
+  static async deactivateProduct(productId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ active: false })
+    })
+    if (!res.ok) throw new Error(`Failed to deactivate product: ${res.status} ${res.statusText}`)
+  }
+
+  // Activate product
+  static async activateProduct(productId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ active: true })
+    })
+    if (!res.ok) throw new Error(`Failed to activate product: ${res.status} ${res.statusText}`)
   }
 
   // PRICE APIs

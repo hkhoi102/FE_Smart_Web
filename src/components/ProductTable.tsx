@@ -4,12 +4,12 @@ interface ProductTableProps {
   products: Product[]
   categories: ProductCategory[]
   onEdit: (product: Product) => void
-  onDelete: (id: number) => void
+  onToggleUnitStatus: (product: Product, unit: ProductUnit) => void
   // Đã ẩn nút thêm đơn vị và tạo/xem giá theo yêu cầu
   onViewDetail?: (product: Product) => void
 }
 
-const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: ProductTableProps) => {
+const ProductTable = ({ products, categories, onEdit, onToggleUnitStatus, onViewDetail }: ProductTableProps) => {
 
   const formatPrice = (price?: number) => {
     if (price === undefined || price === null) return 'Chưa có'
@@ -68,7 +68,7 @@ const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: 
         </thead>
         <tbody className="bg-white divide-y divide-gray-100">
           {buildRows().map(({ product, unit }, index) => (
-              <tr key={`${product.id}-${unit ? unit.id : 'nou'}`} className="hover:bg-gray-50">
+              <tr key={`${product.id}-${unit ? unit.id : 'nou'}`} className={`hover:bg-gray-50 ${unit && !unit.active ? 'bg-gray-50 opacity-75' : ''}`}>
                 <td className="px-4 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
                   {index + 1}
                 </td>
@@ -93,7 +93,18 @@ const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: 
                       )}
                     </div>
                     <div className="ml-3">
-                      <div className="text-xs font-medium text-gray-900">{product.name}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs font-medium text-gray-900">{product.name}</div>
+                        {unit && (
+                          <span className={`px-1.5 py-0.5 text-[10px] rounded-full border ${
+                            unit.active
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : 'bg-gray-100 text-gray-700 border-gray-200'
+                          }`}>
+                            {unit.active ? 'Hoạt động' : 'Tạm dừng'}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-gray-500 max-w-xs truncate">{product.description}</div>
                     </div>
                   </div>
@@ -125,13 +136,19 @@ const ProductTable = ({ products, categories, onEdit, onDelete, onViewDetail }: 
                     >
                       Sửa
                     </button>
-                    <button
-                      onClick={() => onDelete(product.id)}
-                      className="px-2 py-0.5 text-[11px] bg-red-100 text-red-700 rounded hover:bg-red-200"
-                      title="Xóa sản phẩm"
-                    >
-                      Xóa
-                    </button>
+                    {unit && (
+                      <button
+                        onClick={() => onToggleUnitStatus(product, unit)}
+                        className={`px-2 py-0.5 text-[11px] rounded ${
+                          unit.active
+                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                        }`}
+                        title={unit.active ? 'Tạm dừng đơn vị' : 'Kích hoạt đơn vị'}
+                      >
+                        {unit.active ? 'Tạm dừng' : 'Kích hoạt'}
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
