@@ -610,8 +610,8 @@ const InventoryImportExportCreate = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {products.map((product) => (
-                        <tr key={product.id} className="hover:bg-gray-50">
+                      {products.map((product, index) => (
+                        <tr key={`product-${product.id}-${index}`} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <input
                               type="checkbox"
@@ -707,8 +707,8 @@ const InventoryImportExportCreate = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {products.filter(p => p.selected).map((product) => (
-                      <tr key={product.id} className="hover:bg-gray-50">
+                    {products.filter(p => p.selected).map((product, index) => (
+                      <tr key={`selected-${product.id}-${index}`} className="hover:bg-gray-50">
                         <td className="px-3 py-4">
                           <div>
                             <div className="text-sm font-medium text-gray-900 truncate">{product.productName}</div>
