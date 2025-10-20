@@ -139,6 +139,10 @@ const OrderListManagement: React.FC = () => {
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' })
   const [sortBy, setSortBy] = useState<'id' | 'created_at' | 'updated_at' | 'total_amount' | 'customer_id'>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [statusSortOrder, setStatusSortOrder] = useState<'asc' | 'desc' | null>(null)
+  const [paymentSortOrder, setPaymentSortOrder] = useState<'asc' | 'desc' | null>(null)
+  const [dateSortOrder, setDateSortOrder] = useState<'asc' | 'desc' | null>(null)
+  const [paymentMethodSortOrder, setPaymentMethodSortOrder] = useState<'asc' | 'desc' | null>(null)
   const [formData, setFormData] = useState({
     customer_id: 0,
     promotion_applied_id: '',
@@ -325,6 +329,74 @@ const OrderListManagement: React.FC = () => {
 
     return true
   }).sort((a, b) => {
+    // Payment method sorting takes priority if enabled
+    if (paymentMethodSortOrder) {
+      const aMethod = (detailMap[a.id]?.paymentMethod as any) || a.payment_method
+      const bMethod = (detailMap[b.id]?.paymentMethod as any) || b.payment_method
+      const methodPriority: Record<string, number> = {
+        'COD': 0,
+        'BANK_TRANSFER': 1,
+        'CREDIT_CARD': 2
+      }
+      const aMethodPriority = methodPriority[aMethod] || 0
+      const bMethodPriority = methodPriority[bMethod] || 0
+      
+      if (paymentMethodSortOrder === 'asc') {
+        return aMethodPriority - bMethodPriority
+      } else {
+        return bMethodPriority - aMethodPriority
+      }
+    }
+
+    // Date sorting takes priority if enabled
+    if (dateSortOrder) {
+      const aDate = new Date(a.created_at).getTime()
+      const bDate = new Date(b.created_at).getTime()
+      
+      if (dateSortOrder === 'asc') {
+        return aDate - bDate
+      } else {
+        return bDate - aDate
+      }
+    }
+
+    // Payment status sorting takes priority if enabled
+    if (paymentSortOrder) {
+      const aPaymentStatus = (detailMap[a.id]?.paymentStatus as any) || a.payment_status
+      const bPaymentStatus = (detailMap[b.id]?.paymentStatus as any) || b.payment_status
+      const paymentPriority: Record<string, number> = {
+        'UNPAID': 0,
+        'PAID': 1
+      }
+      const aPaymentPriority = paymentPriority[aPaymentStatus] || 0
+      const bPaymentPriority = paymentPriority[bPaymentStatus] || 0
+      
+      if (paymentSortOrder === 'asc') {
+        return aPaymentPriority - bPaymentPriority
+      } else {
+        return bPaymentPriority - aPaymentPriority
+      }
+    }
+
+    // Status sorting takes priority if enabled
+    if (statusSortOrder) {
+      const statusPriority: Record<string, number> = {
+        'PENDING': 0,
+        'PROCESSING': 1,
+        'COMPLETED': 2,
+        'CANCELLED': 3
+      }
+      const aStatusPriority = statusPriority[a.status] || 0
+      const bStatusPriority = statusPriority[b.status] || 0
+      
+      if (statusSortOrder === 'asc') {
+        return aStatusPriority - bStatusPriority
+      } else {
+        return bStatusPriority - aStatusPriority
+      }
+    }
+
+    // Default sorting by selected field
     let aValue: any = a[sortBy]
     let bValue: any = b[sortBy]
 
@@ -348,6 +420,10 @@ const OrderListManagement: React.FC = () => {
     setDateRange({ start: '', end: '' })
     setSortBy('created_at')
     setSortOrder('desc')
+    setStatusSortOrder(null)
+    setPaymentSortOrder(null)
+    setDateSortOrder(null)
+    setPaymentMethodSortOrder(null)
   }
 
   // Get order details for selected order
@@ -466,7 +542,7 @@ const OrderListManagement: React.FC = () => {
 
       {/* Search and Filter */}
       <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -478,134 +554,29 @@ const OrderListManagement: React.FC = () => {
               <p className="text-sm text-gray-500">Lọc và tìm kiếm đơn hàng theo nhiều tiêu chí</p>
             </div>
           </div>
-          <button
-            onClick={handleClearFilters}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Xóa bộ lọc
-          </button>
-        </div>
 
-        {/* Search Bar */}
-        <div className="mb-6">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <input
-              type="text"
-              placeholder="ID, khách hàng, tổng tiền..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-2 py-2 text-sm border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            />
-          </div>
-        </div>
-
-        {/* Filter Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {/* Status Filter */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Trạng thái</label>
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="block w-full px-3 py-2 text-sm pr-8 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
-              >
-                <option value="ALL">Tất cả</option>
-                <option value="COMPLETED">Hoàn thành</option>
-                <option value="CANCELLED">Đã hủy</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Status Filter */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Thanh toán</label>
-            <div className="relative">
-              <select
-                value={paymentStatusFilter}
-                onChange={(e) => setPaymentStatusFilter(e.target.value as any)}
-                className="block w-full px-3 py-2 text-sm pr-8 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
-              >
-                <option value="ALL">Tất cả</option>
-                <option value="PAID">Đã thanh toán</option>
-                <option value="UNPAID">Chưa thanh toán</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Method Filter */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Phương thức</label>
-            <div className="relative">
-              <select
-                value={paymentMethodFilter}
-                onChange={(e) => setPaymentMethodFilter(e.target.value as any)}
-                className="block w-full px-3 py-2 text-sm pr-8 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
-              >
-                <option value="ALL">Tất cả</option>
-                <option value="COD">COD</option>
-                <option value="BANK_TRANSFER">Chuyển khoản</option>
-                <option value="CREDIT_CARD">Thẻ tín dụng</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Sort */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Sắp xếp</label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="block w-full px-3 py-2 text-sm pr-8 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-all"
-                >
-                  <option value="created_at">Ngày tạo</option>
-                  <option value="id">ID</option>
-                  <option value="total_amount">Tổng tiền</option>
-                  <option value="customer_id">Khách hàng</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-              {/* Removed sort order toggle button per request */}
-            </div>
-          </div>
-        </div>
-
-        {/* Date Range */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Từ ngày</label>
-            <div className="relative">
+          {/* Search Bar and Date Range - Inline */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 lg:flex-none lg:max-w-3xl">
+            {/* Search Bar */}
+            <div className="relative flex-1 lg:w-64">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Tìm kiếm..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full pl-10 pr-2 py-2 text-sm border border-gray-300 rounded-md bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              />
+            </div>
+
+            {/* From Date */}
+            <div className="relative flex-1 lg:w-44">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
@@ -616,13 +587,11 @@ const OrderListManagement: React.FC = () => {
                 className="block w-full pl-10 pr-2 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Đến ngày</label>
-            <div className="relative">
+            {/* To Date */}
+            <div className="relative flex-1 lg:w-44">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
@@ -633,6 +602,17 @@ const OrderListManagement: React.FC = () => {
                 className="block w-full pl-10 pr-2 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               />
             </div>
+
+            {/* Clear Button */}
+            <button
+              onClick={handleClearFilters}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Xóa bộ lọc
+            </button>
           </div>
         </div>
 
@@ -720,8 +700,22 @@ const OrderListManagement: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ngày tạo
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => setDateSortOrder(dateSortOrder === 'asc' ? 'desc' : dateSortOrder === 'desc' ? null : 'asc')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Ngày tạo
+                      {dateSortOrder && (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {dateSortOrder === 'asc' ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          )}
+                        </svg>
+                      )}
+                    </div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Khách hàng
@@ -732,14 +726,56 @@ const OrderListManagement: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Giảm giá
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Trạng thái
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => setStatusSortOrder(statusSortOrder === 'asc' ? 'desc' : statusSortOrder === 'desc' ? null : 'asc')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Trạng thái
+                      {statusSortOrder && (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {statusSortOrder === 'asc' ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          )}
+                        </svg>
+                      )}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Thanh toán
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => setPaymentSortOrder(paymentSortOrder === 'asc' ? 'desc' : paymentSortOrder === 'desc' ? null : 'asc')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Thanh toán
+                      {paymentSortOrder && (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {paymentSortOrder === 'asc' ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          )}
+                        </svg>
+                      )}
+                    </div>
                   </th>
-                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                     Phương thức
+                   <th 
+                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                     onClick={() => setPaymentMethodSortOrder(paymentMethodSortOrder === 'asc' ? 'desc' : paymentMethodSortOrder === 'desc' ? null : 'asc')}
+                   >
+                     <div className="flex items-center gap-1">
+                       Phương thức
+                       {paymentMethodSortOrder && (
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           {paymentMethodSortOrder === 'asc' ? (
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                           ) : (
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                           )}
+                         </svg>
+                       )}
+                     </div>
                    </th>
                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                      Thao tác
