@@ -357,7 +357,7 @@ export class ProductService {
     return prod
   }
 
-  
+
 
   static async createProduct(body: CreateProductRequest): Promise<Product> {
     const res = await fetch(`${API_BASE_URL}/products`, {
@@ -640,6 +640,17 @@ export class ProductService {
     return (Array.isArray(result?.data) ? result.data : result) || []
   }
 
+  // Get price header detail by ID (header info and possibly lines)
+  static async getPriceHeaderById(id: number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/price-headers/${id}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error(`Failed to fetch price header: ${res.status} ${res.statusText}`)
+    const result = await res.json().catch(() => ({}))
+    return result?.data ?? result
+  }
+
   static async createGlobalPriceHeader(payload: { name: string; description?: string; timeStart?: string | null; timeEnd?: string | null; active?: boolean }): Promise<{ id: number; name: string }> {
     // Remove null/undefined fields
     const clean: Record<string, any> = { name: payload.name }
@@ -703,7 +714,7 @@ export class ProductService {
         method: 'GET',
         headers: this.getAuthHeaders(),
       })
-      
+
       if (!res.ok) {
         // Try alternative endpoint
         res = await fetch(`${API_BASE_URL}/prices/header/${priceHeaderId}`, {
@@ -711,7 +722,7 @@ export class ProductService {
           headers: this.getAuthHeaders(),
         })
       }
-      
+
       if (!res.ok) {
         // Try another alternative
         res = await fetch(`${API_BASE_URL}/products/price-headers/${priceHeaderId}/prices`, {
@@ -719,11 +730,11 @@ export class ProductService {
           headers: this.getAuthHeaders(),
         })
       }
-      
+
       if (!res.ok) {
         throw new Error(`Failed to fetch prices by header: ${res.status} ${res.statusText}`)
       }
-      
+
       const result = await res.json()
       return (Array.isArray(result?.data) ? result.data : result) || []
     } catch (error) {
@@ -822,16 +833,6 @@ export class ProductService {
     if (!res.ok) throw new Error(`Failed to delete price: ${res.status} ${res.statusText}`)
   }
 
-  // Price headers by product unit
-  static async getPriceHeaders(productId: number, productUnitId: number): Promise<Array<{ id: number; name: string; description?: string; timeStart?: string; timeEnd?: string; active?: boolean }>> {
-    const res = await fetch(`${API_BASE_URL}/products/${productId}/price-headers/units/${productUnitId}`, {
-      method: 'GET',
-      headers: this.getAuthHeaders(),
-    })
-    if (!res.ok) throw new Error(`Failed to fetch price headers: ${res.status} ${res.statusText}`)
-    const result = await res.json()
-    return (Array.isArray(result?.data) ? result.data : result) || []
-  }
 
   static async createPriceHeader(productId: number, productUnitId: number, payload: { name: string; description?: string | null; timeStart?: string | null; timeEnd?: string | null; active?: boolean }): Promise<{ id: number; name: string }> {
     const url = `${API_BASE_URL}/products/${productId}/price-headers/units/${productUnitId}`

@@ -19,7 +19,7 @@ const PriceManagement = () => {
     items_per_page: 10
   })
   const [currentPage, setCurrentPage] = useState(1)
-  
+
   // Price detail modal states
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedHeader, setSelectedHeader] = useState<PriceHeader | null>(null)
@@ -81,14 +81,33 @@ const PriceManagement = () => {
     setIsDetailModalOpen(true)
     setLoadingDetails(true)
     setErrorMessage('')
-    
+
     try {
-      // Load price details for this header from API
-      const details = await ProductService.getPricesByHeader(header.id)
-      setPriceDetails(details)
-      if (details.length === 0) {
-        setErrorMessage('Chưa có dữ liệu giá cho bảng giá này')
+      // Load header info first
+      const headerDetail: any = await ProductService.getPriceHeaderById(header.id)
+      if (headerDetail && (headerDetail.name || headerDetail.id)) {
+        setSelectedHeader((prev) => ({
+          id: headerDetail.id ?? prev?.id ?? header.id,
+          name: headerDetail.name ?? prev?.name ?? header.name,
+          description: headerDetail.description ?? prev?.description,
+          timeStart: headerDetail.timeStart ?? prev?.timeStart,
+          timeEnd: headerDetail.timeEnd ?? prev?.timeEnd,
+          active: headerDetail.active ?? prev?.active,
+          createdAt: headerDetail.createdAt ?? prev?.createdAt,
+        }))
       }
+
+      // Prefer lines from header detail if provided
+      const embeddedLines = headerDetail?.details || headerDetail?.items || headerDetail?.prices || []
+      let details = Array.isArray(embeddedLines) ? embeddedLines : []
+
+      if (!Array.isArray(details) || details.length === 0) {
+        // Fallback: load price details for this header from API
+        details = await ProductService.getPricesByHeader(header.id)
+      }
+
+      setPriceDetails(details || [])
+      if (!details || details.length === 0) setErrorMessage('Chưa có dữ liệu giá cho bảng giá này')
     } catch (error) {
       console.error('Error loading price details:', error)
       setPriceDetails([])
@@ -181,6 +200,10 @@ const PriceManagement = () => {
                   </td>
                   <td className="px-5 py-2 whitespace-nowrap text-sm">
                     <div className="flex items-center justify-center">
+                      <button
+                        className="px-3 py-1.5 text-xs rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 mr-2"
+                        onClick={() => openDetailModal(h)}
+                      >Chi tiết</button>
                       <button
                         className="px-3 py-1.5 text-xs rounded-md text-white bg-orange-600 hover:bg-orange-700"
                         onClick={() => navigate(`/admin/prices/${h.id}`)}
@@ -283,8 +306,8 @@ const PriceManagement = () => {
                     <p className="text-sm text-gray-600 mt-1">{selectedHeader.description}</p>
                   )}
                 </div>
-                <button 
-                  onClick={closeDetailModal} 
+                <button
+                  onClick={closeDetailModal}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,7 +343,6 @@ const PriceManagement = () => {
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STT</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sản phẩm</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đơn vị</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã SP</th>
                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Giá (VND)</th>
                           </tr>
                         </thead>
@@ -331,7 +353,6 @@ const PriceManagement = () => {
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{item.productName}</td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{item.unitName}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{item.productCode || '—'}</td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
                                   {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(item.price)}
                                 </td>
@@ -339,7 +360,7 @@ const PriceManagement = () => {
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500">
+                              <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
                                 Chưa có dữ liệu giá cho bảng giá này
                               </td>
                             </tr>

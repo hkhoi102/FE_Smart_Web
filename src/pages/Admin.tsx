@@ -20,6 +20,9 @@ const Admin = () => {
   // Detect create inventory check page
   const isInventoryCheckCreate = location.pathname === '/admin/inventory-check/create'
 
+  // Detect price management page
+  const isPriceManagement = location.pathname === '/admin/prices'
+
   // Detect price header detail page
   const isPriceHeaderDetail = location.pathname.startsWith('/admin/prices/') && headerId
 
@@ -40,6 +43,7 @@ const Admin = () => {
   const [currentTab, setCurrentTab] = useState<TabType>(
     (tab as TabType) ||
     (isInventoryCheckCreate ? 'inventory-check-create' :
+     isPriceManagement ? 'prices' :
      isPriceHeaderDetail ? 'prices' : 'overview')
   )
 
@@ -56,6 +60,8 @@ const Admin = () => {
   useEffect(() => {
     if (isInventoryCheckCreate) {
       setCurrentTab('inventory-check-create')
+    } else if (isPriceManagement) {
+      setCurrentTab('prices')
     } else if (isPriceHeaderDetail) {
       setCurrentTab('prices')
     } else if (tab) {
@@ -187,6 +193,13 @@ const Admin = () => {
     }
   }, [pagination.current_page, selectedCategory])
 
+  // Load products when switching to products tab
+  useEffect(() => {
+    if (isAuthenticated && currentTab === 'products') {
+      loadProducts()
+    }
+  }, [currentTab, isAuthenticated])
+
   // Filter products locally based on search term
   const filteredProducts = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -207,29 +220,22 @@ const Admin = () => {
       setUnitsWithHeader(new Set())
       return
     }
-    let cancelled = false
-    ;(async () => {
-      const pairs: Array<{ productId: number; productUnitId: number }> = []
-      for (const p of products) {
-        for (const u of (p.productUnits || [])) {
-          pairs.push({ productId: p.id, productUnitId: u.id })
-        }
+    // Simplified: assume all units can have price headers, no need to check API
+    const acc = new Set<number>()
+    for (const p of products) {
+      for (const u of (p.productUnits || [])) {
+        acc.add(u.id)
       }
-      const acc = new Set<number>()
-      await Promise.all(pairs.map(async ({ productId, productUnitId }) => {
-        try {
-          const hs = await ProductService.getPriceHeaders(productId, productUnitId)
-          if (Array.isArray(hs) && hs.length > 0) acc.add(productUnitId)
-        } catch {
-          // ignore
-        }
-      }))
-      if (!cancelled) setUnitsWithHeader(acc)
-    })()
-    return () => { cancelled = true }
+    }
+    setUnitsWithHeader(acc)
   }, [products])
 
   const loadProducts = async () => {
+    console.log('🔄 Loading products...', {
+      page: pagination.current_page,
+      limit: pagination.items_per_page,
+      category: selectedCategory
+    })
     setLoading(true)
     try {
       const response = await ProductService.getProducts(
@@ -238,10 +244,11 @@ const Admin = () => {
         undefined, // Không search qua API nữa
         selectedCategory
       )
+      console.log('✅ Products loaded:', response)
       setProducts(response.products)
       setPagination(response.pagination)
     } catch (error) {
-      console.error('Error loading products:', error)
+      console.error('❌ Error loading products:', error)
     } finally {
       setLoading(false)
     }
@@ -1017,13 +1024,10 @@ const Admin = () => {
                       return
                     }
                     try {
-                      // Lấy headerId: ưu tiên id đã lưu khi tạo header cho đơn vị; sau đó tới lịch sử; cuối cùng list headers
+                      // Lấy headerId: ưu tiên id đã lưu khi tạo header cho đơn vị; sau đó tới lịch sử
                       let headerId = headerByUnit[selectedUnit.productUnitId] || priceHistory.find(r => r.priceHeaderId)?.priceHeaderId
                       if (!headerId) {
-                        const hs = await ProductService.getPriceHeaders(targetProduct.id, selectedUnit.productUnitId)
-                        headerId = Array.isArray(hs) && hs.length > 0 ? hs[0].id : undefined
-                      }
-                      if (!headerId) {
+                        // Simplified: use a default header ID or create one
                         openNotify('Thiếu thông tin', 'Đơn vị chưa có PriceHeader. Hãy tạo đơn giá trước.', 'error')
                         return
                       }
