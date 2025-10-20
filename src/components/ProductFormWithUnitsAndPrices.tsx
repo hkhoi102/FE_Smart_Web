@@ -299,6 +299,10 @@ const ProductFormWithUnitsAndPrices = ({
     })))
   }
 
+  const removeUnit = (unitId: number) => {
+    setProductUnits(prev => prev.filter(u => u.id !== unitId))
+  }
+
   // Header selection handled in Price page
   // noop
   const handleHeaderSelection = (_unitId: number, _headerId: number) => { /* noop */ }
@@ -1090,13 +1094,7 @@ const ProductFormWithUnitsAndPrices = ({
                       {/* Status and Action buttons */}
                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
                         <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 text-xs rounded-full border ${
-                            unit.active
-                              ? 'bg-green-100 text-green-800 border-green-200'
-                              : 'bg-gray-100 text-gray-700 border-gray-200'
-                          }`}>
-                            {unit.active ? 'Hoạt động' : 'Tạm dừng'}
-                          </span>
+
                         </div>
                         <div className="flex items-center gap-1">
                           {!unit.isDefault && (
@@ -1108,17 +1106,29 @@ const ProductFormWithUnitsAndPrices = ({
                               Đặt cơ bản
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => toggleUnitStatus(unit.id, unit.active)}
-                            className={`px-2 py-1 text-xs rounded transition-colors ${
-                              unit.active
-                                ? 'text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50'
-                                : 'text-green-600 hover:text-green-800 hover:bg-green-50'
-                            }`}
-                          >
-                            {unit.active ? 'Tạm dừng' : 'Kích hoạt'}
-                          </button>
+                          {product?.id ? (
+                            // Sửa sản phẩm: hiển thị nút Tạm dừng/Kích hoạt
+                            <button
+                              type="button"
+                              onClick={() => toggleUnitStatus(unit.id, unit.active)}
+                              className={`px-2 py-1 text-xs rounded transition-colors ${
+                                unit.active
+                                  ? 'text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50'
+                                  : 'text-green-600 hover:text-green-800 hover:bg-green-50'
+                              }`}
+                            >
+                              {unit.active ? 'Tạm dừng' : 'Kích hoạt'}
+                            </button>
+                          ) : (
+                            // Thêm sản phẩm mới: hiển thị nút Xóa
+                            <button
+                              type="button"
+                              onClick={() => removeUnit(unit.id)}
+                              className="px-2 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                            >
+                              Xóa
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
