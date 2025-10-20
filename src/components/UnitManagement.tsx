@@ -9,7 +9,9 @@ interface Unit {
 }
 
 const UnitManagement = () => {
+  const [allUnits, setAllUnits] = useState<Unit[]>([])
   const [units, setUnits] = useState<Unit[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null)
   const [formData, setFormData] = useState({
@@ -21,16 +23,61 @@ const UnitManagement = () => {
 
   const loadUnits = async () => {
     try {
+      console.log('🔄 Loading units...')
       const data = await ProductService.getUnits()
-      setUnits(data.map((u: any) => ({ id: u.id, name: u.name, description: u.description, createdAt: u.createdAt || '' })))
+      console.log('📦 Units data received:', data)
+      const mapped = data.map((u: any) => ({ id: u.id, name: u.name, description: u.description, createdAt: u.createdAt || '' }))
+      console.log('📦 Mapped units:', mapped)
+      setAllUnits(mapped)
+      setUnits(mapped)
     } catch (err) {
-      console.error('Không thể tải đơn vị tính:', err)
+      console.error('❌ Không thể tải đơn vị tính:', err)
+      // Set empty arrays to prevent undefined errors
+      setAllUnits([])
+      setUnits([])
     }
   }
 
   useEffect(() => {
     loadUnits()
   }, [])
+
+  // Normalize Vietnamese text for better search
+  const normalizeVietnamese = (text: string): string => {
+    return text
+      .toLowerCase()
+      .normalize('NFD') // Decompose accented characters
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+      .replace(/đ/g, 'd') // Replace đ with d
+      .replace(/Đ/g, 'D') // Replace Đ with D
+  }
+
+  // Filter units based on search term
+  useEffect(() => {
+    const term = searchTerm.toLowerCase().trim()
+    console.log('🔍 Filtering units:', { term, allUnitsLength: allUnits.length, allUnits })
+    
+    if (!term) {
+      console.log('📋 No search term, showing all units:', allUnits)
+      setUnits(allUnits)
+    } else {
+      const normalizedTerm = normalizeVietnamese(term)
+      console.log('🔍 Normalized search term:', normalizedTerm)
+      
+      const filtered = allUnits
+        .slice()
+        .sort((a, b) => a.id - b.id)
+        .filter(u => {
+          const normalizedName = normalizeVietnamese(u.name || '')
+          const normalizedDescription = normalizeVietnamese(u.description || '')
+          const matches = normalizedName.includes(normalizedTerm) || normalizedDescription.includes(normalizedTerm)
+          console.log(`🔍 Checking unit "${u.name}": normalizedName="${normalizedName}", matches=${matches}`)
+          return matches
+        })
+      console.log('🔍 Filtered results:', filtered)
+      setUnits(filtered)
+    }
+  }, [searchTerm, allUnits])
 
   const handleAddUnit = () => {
     setEditingUnit(null)
@@ -82,24 +129,36 @@ const UnitManagement = () => {
     }
   }
 
+  const handleClearSearch = () => {
+    setSearchTerm('')
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Quản lý đơn vị tính</h2>
         <div className="flex items-center gap-3">
-          <input
-            type="text"
-            placeholder="Tìm kiếm đơn vị tính..."
-            onChange={(e) => {
-              const term = e.target.value.toLowerCase()
-              setUnits(prev => prev.slice().sort((a,b)=>a.id-b.id).filter(u =>
-                (u.name || '').toLowerCase().includes(term) ||
-                (u.description || '').toLowerCase().includes(term)
-              ))
-            }}
-            className="hidden md:block w-56 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          />
+          <div className="relative hidden md:block">
+            <input
+              type="text"
+              placeholder="Tìm kiếm đơn vị tính..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-56 px-3 py-1.5 pr-8 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            />
+            {searchTerm && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                title="Xóa tìm kiếm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
           <button
             onClick={handleAddUnit}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
@@ -109,9 +168,51 @@ const UnitManagement = () => {
         </div>
       </div>
 
+      {/* Mobile Search */}
+      <div className="md:hidden">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Tìm kiếm đơn vị tính..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          />
+          {searchTerm && (
+            <button
+              onClick={handleClearSearch}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              title="Xóa tìm kiếm"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Search Results Info */}
+      {searchTerm && (
+        <div className="text-sm text-gray-600">
+          Tìm thấy {units.length} đơn vị tính cho từ khóa "{searchTerm}"
+          <button
+            onClick={handleClearSearch}
+            className="ml-2 text-green-600 hover:text-green-800 underline"
+          >
+            Xóa tìm kiếm
+          </button>
+        </div>
+      )}
+
       {/* Units Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {units.map((unit) => (
+      {units.length === 0 ? (
+        <div className="text-center py-12 text-gray-500 text-lg">
+          {searchTerm ? `Không tìm thấy đơn vị tính nào cho từ khóa "${searchTerm}"` : 'Chưa có đơn vị tính nào'}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {units.map((unit) => (
           <div
             key={unit.id}
             className="p-4 border border-gray-200 rounded-lg bg-white hover:shadow-sm transition-shadow"
@@ -139,7 +240,8 @@ const UnitManagement = () => {
             )}
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (
@@ -191,16 +293,7 @@ const UnitManagement = () => {
                     />
                   </div>
 
-                <div className="flex items-center gap-2">
-                  <input
-                    id="uomIsDefault"
-                    type="checkbox"
-                    checked={formData.isDefault}
-                    onChange={(e) => setFormData(prev => ({ ...prev, isDefault: e.target.checked }))}
-                    className="h-4 w-4 text-green-600 border-gray-300 rounded"
-                  />
-                  <label htmlFor="uomIsDefault" className="text-sm text-gray-700">Đơn vị cơ bản (mặc định)</label>
-                </div>
+                {/* Removed: Đơn vị cơ bản (mặc định) checkbox */}
                 </div>
 
                 <div className="flex justify-end space-x-3 mt-6">
