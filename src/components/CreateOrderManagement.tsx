@@ -1080,15 +1080,32 @@ const CreateOrderManagement: React.FC = () => {
             clearInterval(pollInterval)
             setPaymentPolling(null)
 
-            // Đóng modal thanh toán và hiển thị modal thành công
-            setShowPaymentModal(false)
+          // Đóng modal thanh toán
+          setShowPaymentModal(false)
+
+          // Cập nhật payment status -> PAID
+          await updatePaymentStatus(orderId)
+
+          try {
+            // Cập nhật trạng thái đơn sang COMPLETED để khớp hành vi thanh toán tiền mặt
+            const completedResult = await updateOrderStatusAPI(orderId, 'COMPLETED')
+            const completed = completedResult.data || completedResult
+
+            // Enrich chi tiết để in hóa đơn giống luồng tiền mặt
+            let inv = completed
+            if (inv?.orderDetails && Array.isArray(inv.orderDetails)) {
+              inv = { ...inv, orderDetails: await enrichOrderDetails(inv.orderDetails) }
+            }
+            setCurrentOrder(inv)
+            setInvoiceData(inv)
+            setShowPrintModal(true)
+            setSuccess(`Đơn hàng #${orderId} đã thanh toán và hoàn thành!`)
+          } catch (e) {
+            console.error('❌ Error completing order after bank transfer:', e)
+            // Fallback: hiển thị modal thanh toán thành công nếu không thể hoàn thành
             setShowPaymentSuccessModal(true)
-
-            // Cập nhật payment status
-            await updatePaymentStatus(orderId)
-
-            // Đợi người dùng đóng modal thành công rồi mới hiển thị xác nhận hoàn thành
             setPendingCompleteOrderId(orderId)
+          }
           }
         }
       } catch (error) {
