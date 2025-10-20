@@ -580,7 +580,7 @@ const PromotionHeaderManagement: React.FC = () => {
                   <div key={ln.id} className="border rounded-md">
                     <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
                       <div className="text-sm font-medium text-gray-900">
-                        Khuyến mãi {idx + 1} • {viType(ln.type)} • {viTarget(ln.target_type)} #{ln.target_id}
+                        Khuyến mãi {idx + 1} {viType(ln.type)}
                         {ln.start_date || ln.end_date ? (
                           <span className="ml-2 text-xs text-gray-600">(
                             {ln.start_date ? formatDate(ln.start_date) : '-'}
@@ -673,8 +673,6 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
   const [saving, setSaving] = useState(false)
   const [hdr, setHdr] = useState<any>({ id: header.id, name: header.name, startDate: header.start_date, endDate: header.end_date, active: header.active === 1 })
   const [lines, setLines] = useState<any[]>([])
-  const [productOptions, setProductOptions] = useState<Array<{ id: number; name: string }>>([])
-  const [categoryOptions, setCategoryOptions] = useState<Array<{ id: number; name: string }>>([])
 
   React.useEffect(() => {
     let cancelled = false
@@ -688,22 +686,6 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
     })()
     return () => { cancelled = true }
   }, [header?.id])
-
-  // Load selectable targets (products/categories)
-  React.useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const prods = await ProductService.getProducts(1, 1000)
-        if (!cancelled) setProductOptions(prods.products.map((p: any) => ({ id: p.id, name: p.name })))
-      } catch { if (!cancelled) setProductOptions([]) }
-      try {
-        const cats = await ProductService.getCategories()
-        if (!cancelled) setCategoryOptions(cats.map((c: any) => ({ id: c.id, name: c.name })))
-      } catch { if (!cancelled) setCategoryOptions([]) }
-    })()
-    return () => { cancelled = true }
-  }, [])
 
   const addLine = () => setLines(prev => [...prev, { id: 0, promotionHeaderId: header.id, targetType: 'PRODUCT', targetId: 0, type: 'DISCOUNT_PERCENT', active: true }])
 
@@ -728,114 +710,204 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] p-6 max-h-[100vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Sửa khuyến mãi</h3>
-          <button onClick={() => onClose(false)} className="text-gray-500 hover:text-gray-700">✖</button>
-        </div>
-        {loading ? (
-          <div className="text-sm text-gray-500">Đang tải...</div>
-        ) : (
-          <div className="space-y-4">
-            <div className="rounded border p-4">
-              <div className="font-medium mb-3">Header</div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <input className="px-3 py-2 border rounded" value={hdr.name} onChange={e=>setHdr({...hdr, name:e.target.value})} />
-                <input type="date" className="px-3 py-2 border rounded" value={hdr.startDate || ''} onChange={e=>setHdr({...hdr, startDate:e.target.value})} />
-                <input type="date" className="px-3 py-2 border rounded" value={hdr.endDate || ''} onChange={e=>setHdr({...hdr, endDate:e.target.value})} />
-              </div>
-            </div>
-            <div className="rounded border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="font-medium">Dòng khuyến mãi</div>
-                <button className="px-3 py-1 rounded text-white bg-blue-600 hover:bg-blue-700" onClick={addLine}>+ Thêm dòng</button>
-              </div>
-              <div className="space-y-3">
-                {lines.map((ln, idx) => (
-                  <div key={idx} className="border rounded p-3">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                      <select className="px-2 py-2 border rounded" value={ln.targetType} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetType:e.target.value}:l))}>
-                        <option value="PRODUCT">Sản phẩm</option>
-                        <option value="CATEGORY">Danh mục</option>
-
-                      </select>
-                      {ln.targetType === 'PRODUCT' && (
-                        <div className="relative">
-                          <input
-                            className="px-2 py-2 border rounded w-full"
-                            placeholder="Tìm sản phẩm..."
-                            value={ln.targetNameQuery || ''}
-                            onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetNameQuery:e.target.value, showSuggest:true}:l))}
-                          />
-                          {((ln.targetNameQuery || '').trim().length > 0) && ln.showSuggest && (
-                            <div className="absolute z-10 bg-white border rounded shadow w-full mt-1 max-h-48 overflow-auto">
-                              {productOptions.filter(p=>p.name.toLowerCase().includes(String(ln.targetNameQuery).toLowerCase())).slice(0,8).map(p=> (
-                                <div key={p.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:p.id, targetNameQuery:p.name, showSuggest:false}:l))}>{p.name}</div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {ln.targetType === 'CATEGORY' && (
-                        <div className="relative">
-                          <input className="px-2 py-2 border rounded w-full" placeholder="Tìm danh mục..." value={ln.targetNameQuery || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetNameQuery:e.target.value, showSuggest:true}:l))} />
-                          {((ln.targetNameQuery || '').trim().length > 0) && ln.showSuggest && (
-                            <div className="absolute z-10 bg-white border rounded shadow w-full mt-1 max-h-48 overflow-auto">
-                              {categoryOptions.filter(c=>c.name.toLowerCase().includes(String(ln.targetNameQuery).toLowerCase())).slice(0,8).map(c=> (
-                                <div key={c.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:c.id, targetNameQuery:c.name, showSuggest:false}:l))}>{c.name}</div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {ln.targetType === 'CUSTOMER' && (
-                        <input className="px-2 py-2 border rounded" type="number" value={ln.targetId || 0} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, targetId:Number(e.target.value)}:l))} />
-                      )}
-                      <select className="px-2 py-2 border rounded" value={ln.type || 'DISCOUNT_PERCENT'} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value}:l))}>
-                        <option value="DISCOUNT_PERCENT">Giảm theo %</option>
-                        <option value="DISCOUNT_AMOUNT">Giảm tiền</option>
-                        <option value="BUY_X_GET_Y">Mua X tặng Y</option>
-                      </select>
-                      <div className="flex items-center gap-2">
-                        <input type="date" className="px-2 py-2 border rounded" value={ln.startDate || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, startDate:e.target.value}:l))} />
-                        <input type="date" className="px-2 py-2 border rounded" value={ln.endDate || ''} onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, endDate:e.target.value}:l))} />
-                      </div>
-                    </div>
-                    {/* Detail editing removed in this modal */}
-                    <div className="mt-2 flex items-center gap-3">
-                      <span className="text-xs text-gray-600">Trạng thái:</span>
-                      <button
-                        type="button"
-                        className={`px-2 py-1 text-xs rounded ${ln.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}
-                        onClick={async () => {
-                          try {
-                            if (ln.id) { await PromotionServiceApi.activateLine(ln.id) }
-                            setLines(prev => prev.map((l,i)=> i===idx?{...l, active: true}:l))
-                          } catch {}
-                        }}
-                      >Kích hoạt</button>
-                      <button
-                        type="button"
-                        className={`px-2 py-1 text-xs rounded ${!ln.active ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}
-                        onClick={async () => {
-                          try {
-                            if (ln.id) { await PromotionServiceApi.deactivateLine(ln.id) }
-                            setLines(prev => prev.map((l,i)=> i===idx?{...l, active: false}:l))
-                          } catch {}
-                        }}
-                      >Tạm ngưng</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button className="px-4 py-2 rounded border" onClick={()=>onClose(false)}>Hủy</button>
-              <button disabled={saving} className="px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50" onClick={saveAll}>Lưu</button>
-            </div>
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Sửa khuyến mãi</h3>
+            <p className="text-xs text-gray-600 mt-0.5">Cập nhật thông tin chương trình khuyến mãi</p>
           </div>
-        )}
+          <button 
+            onClick={() => onClose(false)} 
+            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1.5 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-gray-600">Đang tải...</span>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Header Section */}
+              <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h4 className="text-base font-semibold text-gray-900">Thông tin chương trình</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Tên chương trình</label>
+                    <input 
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+                      placeholder="Nhập tên chương trình"
+                      value={hdr.name} 
+                      onChange={e=>setHdr({...hdr, name:e.target.value})} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Ngày bắt đầu</label>
+                    <input 
+                      type="date" 
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+                      value={hdr.startDate || ''} 
+                      onChange={e=>setHdr({...hdr, startDate:e.target.value})} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Ngày kết thúc</label>
+                    <input
+                      type="date" 
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+                      value={hdr.endDate || ''} 
+                      onChange={e=>setHdr({...hdr, endDate:e.target.value})} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Lines Section */}
+              <div className="bg-white rounded-lg border border-gray-200">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                    <h4 className="text-base font-semibold text-gray-900">Dòng khuyến mãi</h4>
+                    <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">{lines.length}</span>
+                  </div>
+                  <button 
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm" 
+                    onClick={addLine}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Thêm dòng
+                  </button>
+                </div>
+                <div className="p-5 space-y-4">
+                  {lines.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <svg className="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                      </svg>
+                      <p className="text-sm">Chưa có dòng khuyến mãi nào</p>
+                    </div>
+                  ) : (
+                    lines.map((ln, idx) => (
+                      <div key={idx} className="bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-3">
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-medium text-gray-600 mb-1.5">Loại khuyến mãi</label>
+                            <select 
+                              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors" 
+                              value={ln.type || 'DISCOUNT_PERCENT'} 
+                              onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value}:l))}
+                            >
+                              <option value="DISCOUNT_PERCENT">📊 Giảm theo %</option>
+                              <option value="DISCOUNT_AMOUNT">💰 Giảm tiền</option>
+                              <option value="BUY_X_GET_Y">🎁 Mua X tặng Y</option>
+                            </select>
+                          </div>
+                          <div className="md:col-span-3">
+                            <label className="block text-xs font-medium text-gray-600 mb-1.5">Thời gian áp dụng</label>
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="date" 
+                                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors" 
+                                value={ln.startDate || ''} 
+                                onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, startDate:e.target.value}:l))} 
+                              />
+                              <span className="text-gray-400">→</span>
+                              <input 
+                                type="date" 
+                                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors" 
+                                value={ln.endDate || ''} 
+                                onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, endDate:e.target.value}:l))} 
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-gray-600">Trạng thái:</span>
+                            <button
+                              type="button"
+                              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                ln.active 
+                                  ? 'bg-green-100 text-green-700 ring-2 ring-green-200' 
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                              onClick={async () => {
+                                try {
+                                  if (ln.id) { await PromotionServiceApi.activateLine(ln.id) }
+                                  setLines(prev => prev.map((l,i)=> i===idx?{...l, active: true}:l))
+                                } catch {}
+                              }}
+                            >
+                              ✓ Kích hoạt
+                            </button>
+                            <button
+                              type="button"
+                              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                !ln.active 
+                                  ? 'bg-red-100 text-red-700 ring-2 ring-red-200' 
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                              onClick={async () => {
+                                try {
+                                  if (ln.id) { await PromotionServiceApi.deactivateLine(ln.id) }
+                                  setLines(prev => prev.map((l,i)=> i===idx?{...l, active: false}:l))
+                                } catch {}
+                              }}
+                            >
+                              ✕ Tạm ngưng
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            className="text-red-600 hover:text-red-800 text-xs font-medium"
+                            onClick={() => setLines(prev => prev.filter((_, i) => i !== idx))}
+                          >
+                            🗑️ Xóa dòng
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <button 
+            className="px-5 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors" 
+            onClick={()=>onClose(false)}
+          >
+            Hủy
+          </button>
+          <button 
+            disabled={saving} 
+            className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm" 
+            onClick={saveAll}
+          >
+            {saving ? 'Đang lưu...' : '💾 Lưu thay đổi'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -949,7 +1021,7 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✖</button>
         </div>
         <div className="flex items-center justify-between mb-6">
-          <div className="text-lg text-gray-800 font-medium">{viType(line?.type)} • {viTarget(line?.targetType)} #{line?.targetId}</div>
+          <div className="text-lg text-gray-800 font-medium">{viType(line?.type)}</div>
           <button className="px-4 py-2 text-xs rounded-md text-white bg-green-600 hover:bg-green-700" onClick={addDetail}>+ Thêm chi tiết</button>
         </div>
         <div className="space-y-4">

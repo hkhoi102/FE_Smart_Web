@@ -1477,11 +1477,9 @@ const CreateOrderManagement: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column - Order Details */}
-        <div className="lg:col-span-6 space-y-6 relative">
-          {/* Actions + Customer Info side-by-side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-6 relative">
           {/* POS Quick Actions */}
           {isPOSMode && (
             <div className="bg-white shadow rounded-lg p-6">
@@ -1525,7 +1523,7 @@ const CreateOrderManagement: React.FC = () => {
 
               {/* Quick Product Grid */}
               {quickSearch && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 max-h-60 overflow-y-auto">
                   {filteredProducts.slice(0, 8).map(product => (
                     <button
                       key={product.id}
@@ -1550,72 +1548,6 @@ const CreateOrderManagement: React.FC = () => {
               )}
             </div>
           )}
-          {/* Customer Selection */}
-          <div className="bg-white shadow rounded-lg p-6 relative">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông tin khách hàng</h2>
-
-            <div className="grid grid-cols-1 gap-4">
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tìm khách hàng *
-                </label>
-                <input
-                  type="text"
-                  value={customerSearchTerm}
-                  onChange={(e) => { setCustomerSearchTerm(e.target.value); setShowCustomerSuggestions(true) }}
-                  onFocus={() => setShowCustomerSuggestions(customerSuggestions.length > 0)}
-                  onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 150)}
-                  placeholder="Nhập tên/SĐT/email/địa chỉ..."
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                {showCustomerSuggestions && customerSuggestions.length > 0 && (
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
-                    {customerSuggestions.map(c => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className="w-full text-left px-3 py-2 hover:bg-gray-50"
-                        onClick={() => {
-                          setSelectedCustomer(c)
-                          setCustomerSearchTerm(`${c.fullName}${c.phoneNumber ? ` - ${c.phoneNumber}` : ''}`)
-                          setShowCustomerSuggestions(false)
-                          setShippingAddress(c.address)
-                        }}
-                      >
-                        <div className="text-sm text-gray-900">{c.fullName} {c.phoneNumber ? `- ${c.phoneNumber}` : ''}</div>
-                        <div className="text-xs text-gray-500 truncate">{c.email || ''}{c.email && c.address ? ' • ' : ''}{c.address || ''}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {selectedCustomer && (
-                <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="text-sm"><span className="font-medium">Họ và tên:</span> {selectedCustomer.fullName}</div>
-                  <div className="text-sm"><span className="font-medium">Địa chỉ:</span> {selectedCustomer.address || '—'}</div>
-                  <div className="text-sm"><span className="font-medium">Số điện thoại:</span> {selectedCustomer.phoneNumber || '—'}</div>
-                  <div className="text-sm"><span className="font-medium">Email:</span> {selectedCustomer.email || '—'}</div>
-                </div>
-              )}
-            </div>
-
-            {!isPOSMode && (
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Địa chỉ giao hàng
-                </label>
-                <textarea
-                  value={shippingAddress}
-                  onChange={(e) => setShippingAddress(e.target.value)}
-                  placeholder="Nhập địa chỉ giao hàng"
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            )}
-          </div>
-          </div>
 
           {/* Products */}
           <div className="bg-white shadow rounded-lg p-6">
@@ -1831,7 +1763,7 @@ const CreateOrderManagement: React.FC = () => {
         </div>
 
         {/* Right Column - Order Summary */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className="space-y-6">
 
           {/* Order Summary */}
           <div className="bg-white shadow rounded-lg p-6">
