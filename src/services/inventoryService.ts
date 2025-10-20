@@ -41,7 +41,15 @@ export interface StockLocationDto {
   name: string
   description?: string
   warehouseId: number
+  zone?: string
+  aisle?: string
+  rack?: string
+  level?: string
+  position?: string
   active: boolean
+  createdAt?: string
+  updatedAt?: string
+  warehouseName?: string
 }
 
 export interface StockBalanceDto {
@@ -176,6 +184,33 @@ export const InventoryService = {
     if (!res.ok) throw new Error('Failed to fetch stock locations')
     const data = await res.json()
     return Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : [])
+  },
+
+  async createStockLocation(payload: Partial<StockLocationDto>): Promise<StockLocationDto> {
+    const res = await fetch(`${API_BASE_URL}/stock-locations`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error('Failed to create stock location')
+    const data = await res.json()
+    return data?.data ?? data
+  },
+
+  async updateStockLocation(id: number, payload: Partial<StockLocationDto>): Promise<StockLocationDto> {
+    const res = await fetch(`${API_BASE_URL}/stock-locations/${id}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error('Failed to update stock location')
+    const data = await res.json()
+    return data?.data ?? data
+  },
+
+  async deleteStockLocation(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/stock-locations/${id}`, { method: 'DELETE', headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to delete stock location')
   },
 
   // Stock balance
