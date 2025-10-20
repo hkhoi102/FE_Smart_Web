@@ -26,7 +26,6 @@ const InventoryManagement = () => {
   const [rejectReason, setRejectReason] = useState('')
   const [rejectingDocId, setRejectingDocId] = useState<number | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [stockBalances, setStockBalances] = useState<EnrichedStockBalance[]>([])
   const [stockLocations, setStockLocations] = useState<Map<number, string>>(new Map())
   const [pagination, setPagination] = useState({
@@ -207,17 +206,13 @@ const InventoryManagement = () => {
     return 'out_of_stock'
   }
 
-  // Filter stock balances based on search term and status
+  // Filter stock balances based on search term
   const filteredBalances = stockBalances.filter(item => {
     const matchesSearch = searchTerm === '' ||
       item.productName?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesWarehouse = selectedWarehouse === 'all' || item.warehouseId === selectedWarehouse
     
-    // Filter by status
-    const itemStatus = getStockStatus(item.quantity || 0)
-    const matchesStatus = statusFilter === 'all' || itemStatus === statusFilter
-    
-    return matchesSearch && matchesWarehouse && matchesStatus
+    return matchesSearch && matchesWarehouse
   })
 
   // Sort balances by status
@@ -259,7 +254,7 @@ const InventoryManagement = () => {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedWarehouse, statusFilter])
+  }, [searchTerm, selectedWarehouse])
 
   return (
     <div className="space-y-6">
@@ -366,19 +361,6 @@ const InventoryManagement = () => {
                   {warehouse.name}
                 </option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-56 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Tất cả</option>
-              <option value="in_stock">Còn hàng</option>
-              <option value="low_stock">Sắp hết hàng</option>
-              <option value="out_of_stock">Hết hàng</option>
             </select>
           </div>
         </div>
