@@ -45,7 +45,9 @@ const InventoryCheckCreate = () => {
   const loadWarehouses = async () => {
     try {
       const whs = await InventoryService.getWarehouses()
-      setWarehouses(whs)
+      // Chỉ hiển thị các kho đang hoạt động (active = true)
+      const activeWarehouses = Array.isArray(whs) ? whs.filter(w => w?.active === true) : []
+      setWarehouses(activeWarehouses)
     } catch (e) {
       console.error(e)
       showNotify('Không thể tải danh sách kho', 'error')

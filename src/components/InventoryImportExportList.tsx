@@ -41,7 +41,9 @@ const InventoryImportExportList = () => {
   const loadWarehouses = async () => {
     try {
       const data = await InventoryService.getWarehouses()
-      setWarehouses(data)
+      // Chỉ hiển thị các kho đang hoạt động (active = true)
+      const activeWarehouses = Array.isArray(data) ? data.filter(w => w?.active === true) : []
+      setWarehouses(activeWarehouses)
     } catch (error) {
       console.error('Error loading warehouses:', error)
     }

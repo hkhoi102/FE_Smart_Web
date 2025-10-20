@@ -96,8 +96,10 @@ const InventoryManagement = () => {
     const loadWarehouses = async () => {
       try {
         const warehousesData = await InventoryService.getWarehouses()
+        // Chỉ lấy các kho đang hoạt động
+        const activeWarehouses = Array.isArray(warehousesData) ? warehousesData.filter(w => w?.active === true) : []
         // Convert WarehouseDto to Warehouse interface
-        const convertedWarehouses = warehousesData.map(w => ({
+        const convertedWarehouses = activeWarehouses.map(w => ({
           id: w.id,
           name: w.name,
           address: w.address || '',
