@@ -169,7 +169,7 @@ const InventoryImportExportDetail = () => {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Không tìm thấy phiếu</h2>
           <button
-            onClick={() => navigate('/admin?tab=inventory-import-export-list')}
+            onClick={() => navigate('/admin/inventory-import-export-list')}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             Quay lại danh sách
@@ -192,7 +192,7 @@ const InventoryImportExportDetail = () => {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => navigate('/admin?tab=inventory-import-export-list')}
+              onClick={() => navigate('/admin/inventory-import-export-list')}
               className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
             >
               Quay lại

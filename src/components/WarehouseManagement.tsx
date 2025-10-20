@@ -394,13 +394,13 @@ const WarehouseManagement = () => {
         </div>
         <div className="flex space-x-2">
           <select
-            value={selectedWarehouse}
-            onChange={(e) => setSelectedWarehouse(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+            value={selectedWarehouse === 'all' ? 'all' : String(selectedWarehouse)}
+            onChange={(e) => setSelectedWarehouse(e.target.value === 'all' ? 'all' : Number(e.target.value))}
             className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
           >
             <option value="all">Tất cả kho</option>
             {warehouses.map(warehouse => (
-              <option key={warehouse.id} value={warehouse.id}>
+              <option key={warehouse.id} value={String(warehouse.id)}>
                 {warehouse.name}
               </option>
             ))}
@@ -574,8 +574,8 @@ const WarehouseManagement = () => {
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleCloseModal} />
 
-            <div className="relative bg-white rounded-lg shadow-xl max-w-[800px] w-full">
-              <div className="flex items-center justify-between p-6 border-b">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-[900px] w-full">
+              <div className="flex items-center justify-between px-6 py-3 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">
                   {editingWarehouse ? 'Chỉnh sửa kho' : 'Thêm kho mới'}
                 </h3>
@@ -599,7 +599,7 @@ const WarehouseManagement = () => {
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       placeholder="Nhập tên kho"
                       required
                     />
@@ -612,7 +612,7 @@ const WarehouseManagement = () => {
                     <textarea
                       value={formData.address}
                       onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       placeholder="Nhập địa chỉ kho"
                       rows={3}
                       required
@@ -628,7 +628,7 @@ const WarehouseManagement = () => {
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         placeholder="0900000000"
                         required
                       />
@@ -642,7 +642,7 @@ const WarehouseManagement = () => {
                         type="text"
                         value={formData.contact_person}
                         onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         placeholder="Tên người liên hệ"
                       />
                     </div>
@@ -655,7 +655,7 @@ const WarehouseManagement = () => {
                     <textarea
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       placeholder="Mô tả về kho"
                       rows={2}
                     />
@@ -692,7 +692,7 @@ const WarehouseManagement = () => {
                             type="text"
                             value={newLocation.name}
                             onChange={(e) => setNewLocation(prev => ({ ...prev, name: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                             placeholder="VD: Kệ A1, Tầng 1..."
                           />
                         </div>
@@ -704,7 +704,7 @@ const WarehouseManagement = () => {
                             type="text"
                             value={newLocation.description}
                             onChange={(e) => setNewLocation(prev => ({ ...prev, description: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                             placeholder="Mô tả vị trí..."
                           />
                         </div>
@@ -719,7 +719,7 @@ const WarehouseManagement = () => {
                             type="text"
                             value={newLocation.zone}
                             onChange={(e) => setNewLocation(prev => ({ ...prev, zone: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                             placeholder="A, B, C..."
                           />
                         </div>
@@ -731,7 +731,7 @@ const WarehouseManagement = () => {
                             type="text"
                             value={newLocation.aisle}
                             onChange={(e) => setNewLocation(prev => ({ ...prev, aisle: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                             placeholder="1, 2, 3..."
                           />
                         </div>
@@ -743,7 +743,7 @@ const WarehouseManagement = () => {
                             type="text"
                             value={newLocation.rack}
                             onChange={(e) => setNewLocation(prev => ({ ...prev, rack: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                             placeholder="1, 2, 3..."
                           />
                         </div>
@@ -755,7 +755,7 @@ const WarehouseManagement = () => {
                             type="text"
                             value={newLocation.level}
                             onChange={(e) => setNewLocation(prev => ({ ...prev, level: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                             placeholder="1, 2, 3..."
                           />
                         </div>
@@ -767,7 +767,7 @@ const WarehouseManagement = () => {
                             type="text"
                             value={newLocation.position}
                             onChange={(e) => setNewLocation(prev => ({ ...prev, position: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                             placeholder="1, 2, 3..."
                           />
                         </div>
