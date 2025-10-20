@@ -8,6 +8,7 @@ interface ProductFormWithUnitsAndPricesProps {
   onSubmit: (productData: any) => void
   onCancel: () => void
   isLoading?: boolean
+  onUnitStatusChange?: (productId: number, unitId: number, active: boolean) => void
 }
 
 const ProductFormWithUnitsAndPrices = ({
@@ -15,7 +16,8 @@ const ProductFormWithUnitsAndPrices = ({
   categories,
   onSubmit,
   onCancel,
-  isLoading = false
+  isLoading = false,
+  onUnitStatusChange
 }: ProductFormWithUnitsAndPricesProps) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -35,6 +37,7 @@ const ProductFormWithUnitsAndPrices = ({
     unitName: string;
     conversionFactor: number;
     isDefault: boolean;
+    active: boolean;
     productCode?: string; // MaSP for this unit
     barcodeCode: string;
     barcodeType: string;
@@ -111,6 +114,7 @@ const ProductFormWithUnitsAndPrices = ({
         unitName: u.unitName,
         conversionFactor: u.conversionFactor,
         isDefault: !!u.isDefault,
+        active: (u as any).active !== undefined ? (u as any).active : true,
         productCode: (u as any).code || (u as any).productCode || '',
         barcodeCode: '',
         barcodeType: 'EAN13',
@@ -228,6 +232,7 @@ const ProductFormWithUnitsAndPrices = ({
       unitName: selectedUnit.name,
       conversionFactor: newUnitCF,
       isDefault: shouldBeDefault,
+      active: true,
       productCode: '',
       barcodeCode: '',
       barcodeType: 'EAN13',
@@ -243,8 +248,30 @@ const ProductFormWithUnitsAndPrices = ({
     // barcode fields removed
   }
 
-  const removeUnit = (unitId: number) => {
-    setProductUnits(prev => prev.filter(u => u.id !== unitId))
+  const toggleUnitStatus = async (unitId: number, currentStatus: boolean) => {
+    if (!product?.id) return
+
+    try {
+      if (currentStatus) {
+        // Tạm dừng
+        await ProductService.deactivateProductUnit(product.id, unitId)
+        setProductUnits(prev => prev.map(u =>
+          u.id === unitId ? { ...u, active: false } : u
+        ))
+        // Thông báo cho component cha
+        onUnitStatusChange?.(product.id, unitId, false)
+      } else {
+        // Kích hoạt
+        await ProductService.activateProductUnit(product.id, unitId)
+        setProductUnits(prev => prev.map(u =>
+          u.id === unitId ? { ...u, active: true } : u
+        ))
+        // Thông báo cho component cha
+        onUnitStatusChange?.(product.id, unitId, true)
+      }
+    } catch (error) {
+      console.error('Error toggling unit status:', error)
+    }
   }
 
   const updateUnitConversionFactor = (unitId: number, conversionFactor: number) => {
@@ -1022,7 +1049,9 @@ const ProductFormWithUnitsAndPrices = ({
                 {/* Table Body */}
                 <div className="divide-y divide-gray-200">
                   {productUnits.map((unit) => (
-                    <div key={unit.id} className="px-3 py-2 hover:bg-gray-50 transition-colors">
+                    <div key={unit.id} className={`px-3 py-2 transition-colors ${
+                      unit.active ? 'hover:bg-gray-50' : 'bg-gray-50 opacity-75'
+                    }`}>
                       <div className="grid grid-cols-10 gap-2 items-center">
                         {/* Đơn vị + Hệ số + Badge */}
                         <div className="col-span-2">
@@ -1058,24 +1087,39 @@ const ProductFormWithUnitsAndPrices = ({
                         </div>
                       </div>
 
-                      {/* Action buttons */}
-                      <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-gray-100">
-                        {!unit.isDefault && (
+                      {/* Status and Action buttons */}
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 text-xs rounded-full border ${
+                            unit.active
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : 'bg-gray-100 text-gray-700 border-gray-200'
+                          }`}>
+                            {unit.active ? 'Hoạt động' : 'Tạm dừng'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {!unit.isDefault && (
+                            <button
+                              type="button"
+                              onClick={() => setDefaultUnit(unit.id)}
+                              className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                            >
+                              Đặt cơ bản
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => setDefaultUnit(unit.id)}
-                            className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                            onClick={() => toggleUnitStatus(unit.id, unit.active)}
+                            className={`px-2 py-1 text-xs rounded transition-colors ${
+                              unit.active
+                                ? 'text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50'
+                                : 'text-green-600 hover:text-green-800 hover:bg-green-50'
+                            }`}
                           >
-                            Đặt cơ bản
+                            {unit.active ? 'Tạm dừng' : 'Kích hoạt'}
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => removeUnit(unit.id)}
-                          className="px-2 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                        >
-                          Xóa
-                        </button>
+                        </div>
                       </div>
                     </div>
                   ))}

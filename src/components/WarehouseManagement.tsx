@@ -126,7 +126,7 @@ const WarehouseManagement = () => {
     setIsModalOpen(true)
   }
 
-  const handleEditWarehouse = (warehouse: Warehouse) => {
+  const handleEditWarehouse = async (warehouse: Warehouse) => {
     setEditingWarehouse(warehouse)
     setFormData({
       name: warehouse.name,
@@ -136,6 +136,13 @@ const WarehouseManagement = () => {
       description: warehouse.description || '',
       active: warehouse.active
     })
+    // Load existing stock locations for this warehouse (including inactive ones)
+    try {
+      const locations = await InventoryService.getStockLocations(warehouse.id, true)
+      setStockLocations(locations)
+    } catch {
+      setStockLocations([])
+    }
     setIsModalOpen(true)
   }
 
@@ -163,6 +170,30 @@ const WarehouseManagement = () => {
     })
   }
 
+  const handleToggleLocationStatus = async (locationId: number, currentStatus: boolean) => {
+    try {
+      if (currentStatus) {
+        // Tạm dừng: gọi API DELETE để set active = false
+        await InventoryService.deleteStockLocation(locationId)
+        // Cập nhật trạng thái trong state
+        setStockLocations(prev => prev.map(loc =>
+          loc.id === locationId ? { ...loc, active: false } : loc
+        ))
+        setNotify({ type: 'success', message: 'Tạm dừng vị trí thành công' })
+      } else {
+        // Kích hoạt: gọi API PATCH để set active = true
+        const updatedLocation = await InventoryService.activateStockLocation(locationId)
+        // Cập nhật danh sách với vị trí đã được kích hoạt
+        setStockLocations(prev => prev.map(loc =>
+          loc.id === locationId ? updatedLocation : loc
+        ))
+        setNotify({ type: 'success', message: 'Kích hoạt vị trí thành công' })
+      }
+    } catch (e) {
+      setNotify({ type: 'error', message: 'Không thể cập nhật trạng thái vị trí' })
+    }
+  }
+
   const handleAddLocation = () => {
     if (!newLocation.name.trim()) {
       setNotify({ type: 'error', message: 'Vui lòng nhập tên vị trí' })
@@ -173,7 +204,7 @@ const WarehouseManagement = () => {
       id: Date.now(), // Temporary ID for UI
       name: newLocation.name,
       description: newLocation.description,
-      warehouseId: 0, // Will be set when warehouse is created
+      warehouseId: editingWarehouse?.id || 0, // Use current warehouse ID if editing
       zone: newLocation.zone,
       aisle: newLocation.aisle,
       rack: newLocation.rack,
@@ -227,9 +258,22 @@ const WarehouseManagement = () => {
         const updatedWarehouse = await InventoryService.updateWarehouse(editingWarehouse.id, payload)
         console.log('✅ Warehouse updated:', updatedWarehouse)
 
+        // Create new stock locations (those with temporary IDs)
+        const newLocations = stockLocations.filter(loc => loc.id && loc.id >= 1000000)
+        if (newLocations.length > 0) {
+          for (const location of newLocations) {
+            await InventoryService.createStockLocation({
+              ...location,
+              warehouseId: editingWarehouse.id
+            })
+          }
+          setNotify({ type: 'success', message: `Cập nhật kho và thêm ${newLocations.length} vị trí mới thành công` })
+        } else {
+          setNotify({ type: 'success', message: 'Cập nhật kho thành công' })
+        }
+
         // Refresh the list
         await loadWarehouses()
-        setNotify({ type: 'success', message: 'Cập nhật kho thành công' })
       } else {
         // Create new warehouse
         const payload = {
@@ -814,11 +858,16 @@ const WarehouseManagement = () => {
                     {/* Locations List */}
                     {stockLocations.length > 0 && (
                       <div className="space-y-2">
-                        <h5 className="text-sm font-medium text-gray-700">Danh sách vị trí đã thêm:</h5>
+                        <h5 className="text-sm font-medium text-gray-700">Vị trí của kho</h5>
                         {stockLocations.map((location, index) => (
-                          <div key={index} className="flex items-center justify-between bg-white border border-gray-200 rounded-md p-3">
+                          <div key={location.id ?? index} className={`flex items-center justify-between border border-gray-200 rounded-md p-3 ${location.active ? 'bg-white' : 'bg-gray-50 opacity-75'}`}>
                             <div className="flex-1">
-                              <div className="font-medium text-gray-900">{location.name}</div>
+                              <div className="flex items-center gap-2">
+                                <div className={`font-medium ${location.active ? 'text-gray-900' : 'text-gray-600'}`}>{location.name}</div>
+                                <span className={`px-2 py-0.5 rounded-full text-xs border ${location.active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                                  {location.active ? 'Hoạt động' : 'Tạm dừng'}
+                                </span>
+                              </div>
                               {location.description && (
                                 <div className="text-sm text-gray-500">{location.description}</div>
                               )}
@@ -828,13 +877,24 @@ const WarehouseManagement = () => {
                                   .join(' - ') || 'Chưa có thông tin vị trí'}
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveLocation(index)}
-                              className="ml-2 px-2 py-1 text-red-600 hover:text-red-800 text-sm"
-                            >
-                              Xóa
-                            </button>
+                            <div className="flex items-center gap-2">
+                              {location.id && location.id < 1000000 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleLocationStatus(Number(location.id), location.active)}
+                                  className={`px-3 py-1.5 text-xs rounded ${location.active ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                                >
+                                  {location.active ? 'Tạm dừng' : 'Kích hoạt'}
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveLocation(index)}
+                                className="px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                              >
+                                Xóa
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>

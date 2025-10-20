@@ -178,8 +178,11 @@ export const InventoryService = {
   },
 
   // Stock locations
-  async getStockLocations(warehouseId?: number): Promise<StockLocationDto[]> {
-    const url = warehouseId ? `${API_BASE_URL}/stock-locations?warehouseId=${warehouseId}` : `${API_BASE_URL}/stock-locations`
+  async getStockLocations(warehouseId?: number, includeInactive: boolean = false): Promise<StockLocationDto[]> {
+    let url = warehouseId ? `${API_BASE_URL}/stock-locations?warehouseId=${warehouseId}` : `${API_BASE_URL}/stock-locations`
+    if (includeInactive) {
+      url += warehouseId ? '&includeInactive=true' : '?includeInactive=true'
+    }
     const res = await fetch(url, { headers: authHeaders() })
     if (!res.ok) throw new Error('Failed to fetch stock locations')
     const data = await res.json()
@@ -211,6 +214,16 @@ export const InventoryService = {
   async deleteStockLocation(id: number): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/stock-locations/${id}`, { method: 'DELETE', headers: authHeaders() })
     if (!res.ok) throw new Error('Failed to delete stock location')
+  },
+
+  async activateStockLocation(id: number): Promise<StockLocationDto> {
+    const res = await fetch(`${API_BASE_URL}/stock-locations/${id}/activate`, {
+      method: 'PATCH',
+      headers: authHeaders()
+    })
+    if (!res.ok) throw new Error('Failed to activate stock location')
+    const data = await res.json()
+    return data?.data ?? data
   },
 
   // Stock balance
