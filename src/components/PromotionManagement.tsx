@@ -114,83 +114,198 @@ const PromotionManagement: React.FC = () => {
       </div>
 
       {isWizardOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 style: !mt-0">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl p-7 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-semibold text-gray-900">Tạo khuyến mãi mới</h3>
-              <button onClick={() => setIsWizardOpen(false)} className="text-gray-500 hover:text-gray-700">✖</button>
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4 !mt-0">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Tạo khuyến mãi mới</h3>
+                <p className="text-xs text-gray-600 mt-0.5">Tạo chương trình khuyến mãi và cấu hình các loại giảm giá</p>
+              </div>
+              <button
+                onClick={() => setIsWizardOpen(false)}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1.5 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div className="space-y-4">
-              {/* Header section */}
-              <div className="rounded-xl border border-gray-200 p-5 bg-white shadow-sm">
-                <div className="text-base font-semibold text-gray-900 mb-4">Thông tin chương trình</div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tên chương trình</label>
-                    <input value={headerForm.name} onChange={e=>setHeaderForm({...headerForm, name:e.target.value})} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Bắt đầu</label>
-                    <input type="date" value={headerForm.startDate} onChange={e=>setHeaderForm({...headerForm, startDate:e.target.value})} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Kết thúc (tùy chọn)</label>
-                    <input type="date" value={headerForm.endDate} onChange={e=>setHeaderForm({...headerForm, endDate:e.target.value})} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
-                    <select className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={headerForm.active ? '1' : '0'} onChange={(e)=>setHeaderForm({...headerForm, active: e.target.value==='1'})}>
-                      <option value="1">Kích hoạt</option>
-                      <option value="0">Tạm dừng</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
 
-              {/* Lines section */}
-              <div className="rounded-xl border border-gray-200 p-5 bg-white shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-base font-semibold text-gray-900">Các loại khuyến mãi áp dụng</div>
-                  <button className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700" onClick={()=>setLines(prev=>[...prev, newLine()])}>
-                    <span className="text-lg leading-none">＋</span> Thêm loại
-                  </button>
-                </div>
-                <div className="space-y-4">
-                  {lines.map((ln, idx) => (
-                    <div key={idx} className="rounded-lg border border-gray-200 p-4 bg-gray-50">
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                        {/* Ẩn hoàn toàn Áp dụng cho & Mục tiêu cho mọi loại khuyến mãi theo yêu cầu */}
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Loại</label>
-                          <select value={ln.type} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value as PromotionType}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="DISCOUNT_PERCENT">Giảm theo %</option>
-                            <option value="DISCOUNT_AMOUNT">Giảm tiền</option>
-                            <option value="BUY_X_GET_Y">Mua X tặng Y</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Bắt đầu</label>
-                          <input type="date" value={ln.lineStartDate || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineStartDate:e.target.value}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Kết thúc</label>
-                          <input type="date" value={ln.lineEndDate || ''} onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineEndDate:e.target.value}:l))} className="w-full h-11 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                      </div>
-                      {/* Bỏ phần detail cho khuyến mãi */}
-                      {lines.length > 1 && (
-                        <div className="flex justify-end mt-3">
-                          <button className="text-red-600 hover:text-red-700" onClick={()=>setLines(prev=>prev.filter((_,i)=>i!==idx))}>Xóa loại</button>
-                        </div>
-                      )}
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <div className="space-y-6">
+                {/* Header Section */}
+                <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
+                  <div className="flex items-center gap-2 mb-4">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h4 className="text-base font-semibold text-gray-900">Thông tin chương trình</h4>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Tên chương trình <span className="text-red-500">*</span>
+                      </label>
+                      <input 
+                        value={headerForm.name} 
+                        onChange={e=>setHeaderForm({...headerForm, name:e.target.value})} 
+                        placeholder="Nhập tên chương trình khuyến mãi..."
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                      />
                     </div>
-                  ))}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Ngày bắt đầu <span className="text-red-500">*</span>
+                        </label>
+                        <input 
+                          type="date" 
+                          value={headerForm.startDate} 
+                          onChange={e=>setHeaderForm({...headerForm, startDate:e.target.value})} 
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Ngày kết thúc <span className="text-gray-400 text-xs">(tùy chọn)</span>
+                        </label>
+                        <input 
+                          type="date" 
+                          value={headerForm.endDate} 
+                          onChange={e=>setHeaderForm({...headerForm, endDate:e.target.value})} 
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Trạng thái</label>
+                        <select 
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-colors" 
+                          value={headerForm.active ? '1' : '0'} 
+                          onChange={(e)=>setHeaderForm({...headerForm, active: e.target.value==='1'})}
+                        >
+                          <option value="1">Kích hoạt</option>
+                          <option value="0">Tạm dừng</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lines Section */}
+                <div className="bg-white rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      <h4 className="text-base font-semibold text-gray-900">Dòng khuyến mãi</h4>
+                      <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        {lines.length}
+                      </span>
+                    </div>
+                    <button 
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm hover:shadow"
+                      onClick={()=>setLines(prev=>[...prev, newLine()])}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Thêm dòng
+                    </button>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    {lines.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <svg className="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        <p className="text-sm">Chưa có dòng khuyến mãi nào</p>
+                      </div>
+                    ) : (
+                      lines.map((ln, idx) => (
+                        <div key={idx} className="bg-gradient-to-br from-white to-gray-50 rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
+                                <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 12 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                                Loại khuyến mãi
+                              </label>
+                              <select 
+                                value={ln.type} 
+                                onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value as PromotionType}:l))} 
+                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-colors"
+                              >
+                                <option value="DISCOUNT_PERCENT">Giảm theo %</option>
+                                <option value="DISCOUNT_AMOUNT">Giảm tiền</option>
+                                <option value="BUY_X_GET_Y">Mua X tặng Y</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
+                                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                Ngày bắt đầu
+                              </label>
+                              <input 
+                                type="date" 
+                                value={ln.lineStartDate || ''} 
+                                onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineStartDate:e.target.value}:l))} 
+                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                              />
+                            </div>
+                            <div>
+                              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
+                                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                Ngày kết thúc
+                              </label>
+                              <input 
+                                type="date" 
+                                value={ln.lineEndDate || ''} 
+                                onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineEndDate:e.target.value}:l))} 
+                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                              />
+                            </div>
+                          </div>
+                          {lines.length > 1 && (
+                            <div className="flex justify-end mt-3 pt-3 border-t border-gray-200">
+                              <button 
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                                onClick={()=>setLines(prev=>prev.filter((_,i)=>i!==idx))}
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Xóa dòng
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex justify-end gap-2">
-                <button className="px-4 py-2 rounded-md border" onClick={()=>setIsWizardOpen(false)}>Hủy</button>
-                <button disabled={creating} className="px-5 py-2 rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50" onClick={async ()=>{
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <button 
+                className="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors shadow-sm"
+                onClick={()=>setIsWizardOpen(false)}
+              >
+                Hủy
+              </button>
+              <button 
+                disabled={creating} 
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm hover:shadow"
+                onClick={async ()=>{
                   if (!headerForm.name.trim() || !headerForm.startDate) return
                   setCreating(true)
                   try {
@@ -206,8 +321,25 @@ const PromotionManagement: React.FC = () => {
                   } catch (e:any) {
                     alert(e?.message || 'Tạo khuyến mãi thất bại')
                   } finally { setCreating(false) }
-                }}>Tạo khuyến mãi</button>
-              </div>
+                }}
+              >
+                {creating ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Đang tạo...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Tạo khuyến mãi
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

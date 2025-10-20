@@ -28,16 +28,14 @@ const InventoryImportExportList = () => {
     items_per_page: 10
   })
   const [currentPage, setCurrentPage] = useState(1)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null)
 
   useEffect(() => {
     loadWarehouses()
-    loadDocuments()
   }, [])
 
   useEffect(() => {
-    if (selectedWarehouse !== undefined) {
-      loadDocuments()
-    }
+    loadDocuments()
   }, [selectedWarehouse])
 
   const loadWarehouses = async () => {
@@ -147,13 +145,34 @@ const InventoryImportExportList = () => {
   }
 
 
+  // Sort documents by status
+  const sortedDocuments = sortOrder ? [...documents].sort((a, b) => {
+    // Define status priority: approved/completed = 2, pending/draft = 1, rejected/cancelled = 0
+    const getStatusPriority = (status: string) => {
+      const s = status.toLowerCase()
+      if (s === 'approved' || s === 'completed') return 2
+      if (s === 'pending' || s === 'draft') return 1
+      if (s === 'rejected' || s === 'cancelled') return 0
+      return -1
+    }
+    
+    const aPriority = getStatusPriority(a.status)
+    const bPriority = getStatusPriority(b.status)
+    
+    if (sortOrder === 'asc') {
+      return aPriority - bPriority // cancelled first, then pending, then approved
+    } else {
+      return bPriority - aPriority // approved first, then pending, then cancelled
+    }
+  }) : documents
+
   // Pagination logic
   const itemsPerPage = 10
-  const totalItems = documents.length
+  const totalItems = sortedDocuments.length
   const totalPages = Math.ceil(totalItems / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedDocuments = documents.slice(startIndex, endIndex)
+  const paginatedDocuments = sortedDocuments.slice(startIndex, endIndex)
 
   // Update pagination state
   useEffect(() => {
@@ -238,8 +257,22 @@ const InventoryImportExportList = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Số phiếu
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Trạng thái
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : sortOrder === 'desc' ? null : 'asc')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Trạng thái
+                        {sortOrder && (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {sortOrder === 'asc' ? (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                            ) : (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            )}
+                          </svg>
+                        )}
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Ngày tạo

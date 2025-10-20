@@ -39,9 +39,9 @@ const WarehouseManagement = () => {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [notify, setNotify] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [loading, setLoading] = useState(false)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null)
 
   // Load warehouses from API
   const loadWarehouses = async () => {
@@ -85,12 +85,22 @@ const WarehouseManagement = () => {
     const matchesSearch = warehouse.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          warehouse.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          warehouse.phone.includes(searchTerm)
-    const matchesStatus = statusFilter === 'all' ||
-                         (statusFilter === 'active' && warehouse.active) ||
-                         (statusFilter === 'inactive' && !warehouse.active)
     const matchesWarehouse = selectedWarehouse === 'all' || warehouse.id === selectedWarehouse
-    return matchesSearch && matchesStatus && matchesWarehouse
+    return matchesSearch && matchesWarehouse
   })
+
+  // Sort warehouses by status
+  const sortedWarehouses = sortOrder ? [...filteredWarehouses].sort((a, b) => {
+    // true (active/Đang hoạt động) = 1, false (inactive/Tạm dừng) = 0
+    const aValue = a.active ? 1 : 0
+    const bValue = b.active ? 1 : 0
+    
+    if (sortOrder === 'asc') {
+      return aValue - bValue // Tạm dừng (0) trước, Đang hoạt động (1) sau
+    } else {
+      return bValue - aValue // Đang hoạt động (1) trước, Tạm dừng (0) sau
+    }
+  }) : filteredWarehouses
 
   const handleAddWarehouse = () => {
     setEditingWarehouse(null)
@@ -405,15 +415,6 @@ const WarehouseManagement = () => {
               </option>
             ))}
           </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="active">Hoạt động</option>
-            <option value="inactive">Tạm dừng</option>
-          </select>
         </div>
       </div>
 
@@ -435,8 +436,22 @@ const WarehouseManagement = () => {
                 <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Người liên hệ
                 </th>
-                <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trạng thái
+                <th 
+                  className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : sortOrder === 'desc' ? null : 'asc')}
+                >
+                  <div className="flex items-center gap-1">
+                    Trạng thái
+                    {sortOrder && (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {sortOrder === 'asc' ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        )}
+                      </svg>
+                    )}
+                  </div>
                 </th>
                 <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ngày tạo
@@ -459,14 +474,14 @@ const WarehouseManagement = () => {
                     </div>
                   </td>
                 </tr>
-              ) : filteredWarehouses.length === 0 ? (
+              ) : sortedWarehouses.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-6 text-center text-gray-500 text-sm">
                     Không có dữ liệu kho
                   </td>
                 </tr>
               ) : (
-                filteredWarehouses.map((warehouse) => (
+                sortedWarehouses.map((warehouse) => (
                 <tr key={warehouse.id} className="hover:bg-gray-50">
                   <td className="px-5 py-2 whitespace-nowrap">
                     <div>
