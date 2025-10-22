@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { InventoryService, StockLocationDto } from '@/services/inventoryService'
+import { InventoryService } from '@/services/inventoryService'
 
 interface Warehouse {
   id: number
@@ -26,7 +26,6 @@ const WarehouseManagement = () => {
     description: '',
     active: true
   })
-  const [stockLocations, setStockLocations] = useState<StockLocationDto[]>([])
   const [newLocation, setNewLocation] = useState({
     name: '',
     description: '',
@@ -40,6 +39,8 @@ const WarehouseManagement = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [notify, setNotify] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [nameError, setNameError] = useState(false)
+  const [phoneError, setPhoneError] = useState(false)
   const [loading, setLoading] = useState(false)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null)
 
@@ -94,7 +95,7 @@ const WarehouseManagement = () => {
     // true (active/Đang hoạt động) = 1, false (inactive/Tạm dừng) = 0
     const aValue = a.active ? 1 : 0
     const bValue = b.active ? 1 : 0
-    
+
     if (sortOrder === 'asc') {
       return aValue - bValue // Tạm dừng (0) trước, Đang hoạt động (1) sau
     } else {
@@ -112,7 +113,6 @@ const WarehouseManagement = () => {
       description: '',
       active: true
     })
-    setStockLocations([])
     setNewLocation({
       name: '',
       description: '',
@@ -123,6 +123,8 @@ const WarehouseManagement = () => {
       position: '',
       active: true
     })
+    setNameError(false) // Reset lỗi tên khi mở modal mới
+    setPhoneError(false) // Reset lỗi số điện thoại khi mở modal mới
     setIsModalOpen(true)
   }
 
@@ -136,12 +138,36 @@ const WarehouseManagement = () => {
       description: warehouse.description || '',
       active: warehouse.active
     })
-    // Load existing stock locations for this warehouse (including inactive ones)
+    setNameError(false) // Reset lỗi tên khi edit warehouse
+    setPhoneError(false) // Reset lỗi số điện thoại khi edit warehouse
+    // Load existing stock location for this warehouse
     try {
       const locations = await InventoryService.getStockLocations(warehouse.id, true)
-      setStockLocations(locations)
+      if (locations.length > 0) {
+        const location = locations[0] // Get first (and only) location
+        setNewLocation({
+          name: location.name || '',
+          description: location.description || '',
+          zone: location.zone || '',
+          aisle: location.aisle || '',
+          rack: location.rack || '',
+          level: location.level || '',
+          position: location.position || '',
+          active: location.active
+        })
+      }
     } catch {
-      setStockLocations([])
+      // Reset form if no location found
+      setNewLocation({
+        name: '',
+        description: '',
+        zone: '',
+        aisle: '',
+        rack: '',
+        level: '',
+        position: '',
+        active: true
+      })
     }
     setIsModalOpen(true)
   }
@@ -157,7 +183,6 @@ const WarehouseManagement = () => {
       description: '',
       active: true
     })
-    setStockLocations([])
     setNewLocation({
       name: '',
       description: '',
@@ -170,65 +195,7 @@ const WarehouseManagement = () => {
     })
   }
 
-  const handleToggleLocationStatus = async (locationId: number, currentStatus: boolean) => {
-    try {
-      if (currentStatus) {
-        // Tạm dừng: gọi API DELETE để set active = false
-        await InventoryService.deleteStockLocation(locationId)
-        // Cập nhật trạng thái trong state
-        setStockLocations(prev => prev.map(loc =>
-          loc.id === locationId ? { ...loc, active: false } : loc
-        ))
-        setNotify({ type: 'success', message: 'Tạm dừng vị trí thành công' })
-      } else {
-        // Kích hoạt: gọi API PATCH để set active = true
-        const updatedLocation = await InventoryService.activateStockLocation(locationId)
-        // Cập nhật danh sách với vị trí đã được kích hoạt
-        setStockLocations(prev => prev.map(loc =>
-          loc.id === locationId ? updatedLocation : loc
-        ))
-        setNotify({ type: 'success', message: 'Kích hoạt vị trí thành công' })
-      }
-    } catch (e) {
-      setNotify({ type: 'error', message: 'Không thể cập nhật trạng thái vị trí' })
-    }
-  }
 
-  const handleAddLocation = () => {
-    if (!newLocation.name.trim()) {
-      setNotify({ type: 'error', message: 'Vui lòng nhập tên vị trí' })
-      return
-    }
-
-    const location: StockLocationDto = {
-      id: Date.now(), // Temporary ID for UI
-      name: newLocation.name,
-      description: newLocation.description,
-      warehouseId: editingWarehouse?.id || 0, // Use current warehouse ID if editing
-      zone: newLocation.zone,
-      aisle: newLocation.aisle,
-      rack: newLocation.rack,
-      level: newLocation.level,
-      position: newLocation.position,
-      active: newLocation.active
-    }
-
-    setStockLocations(prev => [...prev, location])
-    setNewLocation({
-      name: '',
-      description: '',
-      zone: '',
-      aisle: '',
-      rack: '',
-      level: '',
-      position: '',
-      active: true
-    })
-  }
-
-  const handleRemoveLocation = (index: number) => {
-    setStockLocations(prev => prev.filter((_, i) => i !== index))
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -238,43 +205,29 @@ const WarehouseManagement = () => {
       return
     }
 
+    // Kiểm tra định dạng số điện thoại
+    const phoneRegex = /^0\d{9}$/
+    if (!phoneRegex.test(formData.phone)) {
+      setPhoneError(true)
+      setNotify({ type: 'error', message: 'Số điện thoại phải bắt đầu bằng 0 và có đúng 10 số' })
+      return
+    }
+
+    // Kiểm tra tên kho trùng (chỉ khi tạo mới hoặc đổi tên)
+    if (!editingWarehouse || formData.name !== editingWarehouse.name) {
+      const existingWarehouse = warehouses.find(w =>
+        w.name.toLowerCase() === formData.name.toLowerCase() && w.id !== editingWarehouse?.id
+      )
+      if (existingWarehouse) {
+        setNameError(true) // Highlight trường tên khi có lỗi
+        return // Không đóng modal, để người dùng sửa tên
+      }
+    }
+
     setIsSubmitting(true)
 
     try {
-      if (editingWarehouse) {
-        // Update existing warehouse
-        const payload = {
-          name: formData.name,
-          address: formData.address,
-          phone: formData.phone,
-          contactPerson: formData.contact_person || undefined,
-          manager: formData.contact_person || undefined,
-          contact_person: formData.contact_person || undefined,
-          description: formData.description || undefined,
-          active: formData.active
-        }
-        console.log('📝 Updating warehouse with payload:', payload)
-
-        const updatedWarehouse = await InventoryService.updateWarehouse(editingWarehouse.id, payload)
-        console.log('✅ Warehouse updated:', updatedWarehouse)
-
-        // Create new stock locations (those with temporary IDs)
-        const newLocations = stockLocations.filter(loc => loc.id && loc.id >= 1000000)
-        if (newLocations.length > 0) {
-          for (const location of newLocations) {
-            await InventoryService.createStockLocation({
-              ...location,
-              warehouseId: editingWarehouse.id
-            })
-          }
-          setNotify({ type: 'success', message: `Cập nhật kho và thêm ${newLocations.length} vị trí mới thành công` })
-        } else {
-          setNotify({ type: 'success', message: 'Cập nhật kho thành công' })
-        }
-
-        // Refresh the list
-        await loadWarehouses()
-      } else {
+      if (!editingWarehouse) {
         // Create new warehouse
         const payload = {
           name: formData.name,
@@ -291,17 +244,77 @@ const WarehouseManagement = () => {
         const newWarehouse = await InventoryService.createWarehouse(payload)
         console.log('✅ Warehouse created:', newWarehouse)
 
-        // Create stock locations for the warehouse
-        if (stockLocations.length > 0) {
-          for (const location of stockLocations) {
-            await InventoryService.createStockLocation({
-              ...location,
-              warehouseId: newWarehouse.id
-            })
-          }
-          setNotify({ type: 'success', message: `Thêm kho và ${stockLocations.length} vị trí thành công` })
+        // Create stock location for the warehouse if name is provided
+        if (newLocation.name.trim()) {
+          await InventoryService.createStockLocation({
+            name: newLocation.name,
+            description: newLocation.description,
+            warehouseId: newWarehouse.id,
+            zone: newLocation.zone,
+            aisle: newLocation.aisle,
+            rack: newLocation.rack,
+            level: newLocation.level,
+            position: newLocation.position,
+            active: newLocation.active
+          })
+          setNotify({ type: 'success', message: 'Thêm kho và vị trí thành công' })
         } else {
           setNotify({ type: 'success', message: 'Thêm kho thành công' })
+        }
+
+        // Refresh the list
+        await loadWarehouses()
+      } else if (editingWarehouse) {
+        // Update existing warehouse
+        const payload = {
+          name: formData.name,
+          address: formData.address,
+          phone: formData.phone,
+          contactPerson: formData.contact_person || undefined,
+          manager: formData.contact_person || undefined,
+          contact_person: formData.contact_person || undefined,
+          description: formData.description || undefined,
+          active: formData.active
+        }
+        console.log('📝 Updating warehouse with payload:', payload)
+
+        const updatedWarehouse = await InventoryService.updateWarehouse(editingWarehouse.id, payload)
+        console.log('✅ Warehouse updated:', updatedWarehouse)
+
+        // Update stock location for the warehouse if name is provided
+        if (newLocation.name.trim()) {
+          // First, get existing locations to update or create
+          const existingLocations = await InventoryService.getStockLocations(editingWarehouse.id, true)
+
+          if (existingLocations.length > 0) {
+            // Update existing location
+            await InventoryService.updateStockLocation(existingLocations[0].id, {
+              name: newLocation.name,
+              description: newLocation.description,
+              zone: newLocation.zone,
+              aisle: newLocation.aisle,
+              rack: newLocation.rack,
+              level: newLocation.level,
+              position: newLocation.position,
+              active: newLocation.active
+            })
+          } else {
+            // Create new location
+            await InventoryService.createStockLocation({
+              name: newLocation.name,
+              description: newLocation.description,
+              warehouseId: editingWarehouse.id,
+              zone: newLocation.zone,
+              aisle: newLocation.aisle,
+              rack: newLocation.rack,
+              level: newLocation.level,
+              position: newLocation.position,
+              active: newLocation.active
+            })
+          }
+          setNotify({ type: 'success', message: 'Cập nhật kho và vị trí thành công' })
+        } else {
+          setNotify({ type: 'success', message: 'Cập nhật kho thành công' })
         }
 
         // Refresh the list
@@ -309,29 +322,56 @@ const WarehouseManagement = () => {
       }
 
       handleCloseModal()
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error saving warehouse:', error)
-      setNotify({ type: 'error', message: 'Không thể lưu kho. Vui lòng thử lại.' })
+
+      // Xử lý lỗi cụ thể từ backend
+      let errorMessage = 'Không thể lưu kho. Vui lòng thử lại.'
+      let shouldCloseModal = true // Mặc định đóng modal
+      let isNameConflict = false // Flag để kiểm tra lỗi tên trùng
+
+      // Kiểm tra response error từ API
+      if (error?.response?.data?.error) {
+        const apiError = error.response.data.error.toLowerCase()
+        if (apiError.includes('already exists') || apiError.includes('đã tồn tại')) {
+          shouldCloseModal = false // Không đóng modal khi tên trùng
+          setNameError(true) // Highlight trường tên khi có lỗi
+          isNameConflict = true // Đánh dấu là lỗi tên trùng
+        } else if (apiError.includes('not found')) {
+          errorMessage = 'Không tìm thấy kho. Vui lòng thử lại.'
+        } else {
+          errorMessage = error.response.data.error
+        }
+      } else if (error?.message) {
+        const message = error.message.toLowerCase()
+        if (message.includes('already exists') || message.includes('đã tồn tại')) {
+          shouldCloseModal = false // Không đóng modal khi tên trùng
+          setNameError(true) // Highlight trường tên khi có lỗi
+          isNameConflict = true // Đánh dấu là lỗi tên trùng
+        } else if (message.includes('not found')) {
+          errorMessage = 'Không tìm thấy kho. Vui lòng thử lại.'
+        } else if (message.includes('validation') || message.includes('invalid')) {
+          errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.'
+          shouldCloseModal = false // Không đóng modal khi validation lỗi
+        } else {
+          errorMessage = error.message
+        }
+      }
+
+      // Chỉ hiển thị thông báo lỗi nếu không phải lỗi tên trùng
+      if (!isNameConflict) {
+        setNotify({ type: 'error', message: errorMessage })
+      }
+
+      // Chỉ đóng modal nếu không phải lỗi tên trùng hoặc validation
+      if (shouldCloseModal) {
+        handleCloseModal()
+      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleDeleteWarehouse = async (id: number) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa kho này?')) {
-      try {
-        await InventoryService.deleteWarehouse(id)
-        console.log('✅ Warehouse deleted:', id)
-
-        // Refresh the list
-        await loadWarehouses()
-        setNotify({ type: 'success', message: 'Xóa kho thành công' })
-      } catch (error) {
-        console.error('❌ Error deleting warehouse:', error)
-        setNotify({ type: 'error', message: 'Không thể xóa kho. Vui lòng thử lại.' })
-      }
-    }
-  }
 
   const handleToggleStatus = async (id: number) => {
     try {
@@ -480,7 +520,7 @@ const WarehouseManagement = () => {
                 <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Người liên hệ
                 </th>
-                <th 
+                <th
                   className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                   onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : sortOrder === 'desc' ? null : 'asc')}
                 >
@@ -574,12 +614,6 @@ const WarehouseManagement = () => {
                       >
                         {warehouse.active ? 'Tạm dừng' : 'Kích hoạt'}
                       </button>
-                      <button
-                        onClick={() => handleDeleteWarehouse(warehouse.id)}
-                        className="px-2.5 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
-                      >
-                        Xóa
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -657,11 +691,23 @@ const WarehouseManagement = () => {
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, name: e.target.value }))
+                        setNameError(false) // Reset lỗi khi người dùng thay đổi tên
+                      }}
+                      className={`w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:border-green-500 ${
+                        nameError
+                          ? 'border-red-500 focus:ring-red-500 bg-red-50'
+                          : 'border-gray-300 focus:ring-green-500'
+                      }`}
                       placeholder="Nhập tên kho"
                       required
                     />
+                    {nameError && (
+                      <p className="mt-1 text-xs text-red-600">
+                        ⚠️ Tên kho đã tồn tại. Vui lòng chọn tên khác.
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -686,11 +732,32 @@ const WarehouseManagement = () => {
                       <input
                         type="tel"
                         value={formData.phone}
-                        onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        onChange={(e) => {
+                          const phoneValue = e.target.value
+                          setFormData(prev => ({ ...prev, phone: phoneValue }))
+
+                          // Real-time validation
+                          if (phoneValue && !/^0\d{0,9}$/.test(phoneValue)) {
+                            setPhoneError(true)
+                          } else if (phoneValue && phoneValue.length === 10 && !/^0\d{9}$/.test(phoneValue)) {
+                            setPhoneError(true)
+                          } else {
+                            setPhoneError(false)
+                          }
+                        }}
+                        className={`w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:border-green-500 ${
+                          phoneError
+                            ? 'border-red-500 focus:ring-red-500 bg-red-50'
+                            : 'border-gray-300 focus:ring-green-500'
+                        }`}
                         placeholder="0900000000"
                         required
                       />
+                      {phoneError && (
+                        <p className="mt-1 text-xs text-red-600">
+                          ⚠️ Số điện thoại phải bắt đầu bằng 0 và có đúng 10 số
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -735,170 +802,116 @@ const WarehouseManagement = () => {
 
                   {/* Stock Locations Section */}
                   <div className="border-t pt-4">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4">
                       <h4 className="text-lg font-medium text-gray-900">Vị trí cụ thể trong kho</h4>
-                      <span className="text-sm text-gray-500">{stockLocations.length} vị trí</span>
                     </div>
 
-                    {/* Add Location Form */}
-                    <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Tên vị trí *
-                          </label>
-                          <input
-                            type="text"
-                            value={newLocation.name}
-                            onChange={(e) => setNewLocation(prev => ({ ...prev, name: e.target.value }))}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            placeholder="VD: Kệ A1, Tầng 1..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Mô tả
-                          </label>
-                          <input
-                            type="text"
-                            value={newLocation.description}
-                            onChange={(e) => setNewLocation(prev => ({ ...prev, description: e.target.value }))}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            placeholder="Mô tả vị trí..."
-                          />
-                        </div>
-                      </div>
+                     {/* Single Location Form - Always show for warehouse */}
+                     <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                         <div className="grid grid-cols-2 gap-4 mb-4">
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Tên vị trí *
+                             </label>
+                             <input
+                               type="text"
+                               value={newLocation.name}
+                               onChange={(e) => setNewLocation(prev => ({ ...prev, name: e.target.value }))}
+                               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                               placeholder="VD: Kệ A1, Tầng 1..."
+                             />
+                           </div>
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Mô tả
+                             </label>
+                             <input
+                               type="text"
+                               value={newLocation.description}
+                               onChange={(e) => setNewLocation(prev => ({ ...prev, description: e.target.value }))}
+                               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                               placeholder="Mô tả vị trí..."
+                             />
+                           </div>
+                         </div>
 
-                      <div className="grid grid-cols-5 gap-2 mb-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Khu vực
-                          </label>
-                          <input
-                            type="text"
-                            value={newLocation.zone}
-                            onChange={(e) => setNewLocation(prev => ({ ...prev, zone: e.target.value }))}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            placeholder="A, B, C..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Lối đi
-                          </label>
-                          <input
-                            type="text"
-                            value={newLocation.aisle}
-                            onChange={(e) => setNewLocation(prev => ({ ...prev, aisle: e.target.value }))}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            placeholder="1, 2, 3..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Kệ
-                          </label>
-                          <input
-                            type="text"
-                            value={newLocation.rack}
-                            onChange={(e) => setNewLocation(prev => ({ ...prev, rack: e.target.value }))}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            placeholder="1, 2, 3..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Tầng
-                          </label>
-                          <input
-                            type="text"
-                            value={newLocation.level}
-                            onChange={(e) => setNewLocation(prev => ({ ...prev, level: e.target.value }))}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            placeholder="1, 2, 3..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Vị trí
-                          </label>
-                          <input
-                            type="text"
-                            value={newLocation.position}
-                            onChange={(e) => setNewLocation(prev => ({ ...prev, position: e.target.value }))}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            placeholder="1, 2, 3..."
-                          />
-                        </div>
-                      </div>
+                         <div className="grid grid-cols-5 gap-2 mb-4">
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Khu vực
+                             </label>
+                             <input
+                               type="text"
+                               value={newLocation.zone}
+                               onChange={(e) => setNewLocation(prev => ({ ...prev, zone: e.target.value }))}
+                               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                               placeholder="A, B, C..."
+                             />
+                           </div>
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Lối đi
+                             </label>
+                             <input
+                               type="text"
+                               value={newLocation.aisle}
+                               onChange={(e) => setNewLocation(prev => ({ ...prev, aisle: e.target.value }))}
+                               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                               placeholder="1, 2, 3..."
+                             />
+                           </div>
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Kệ
+                             </label>
+                             <input
+                               type="text"
+                               value={newLocation.rack}
+                               onChange={(e) => setNewLocation(prev => ({ ...prev, rack: e.target.value }))}
+                               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                               placeholder="1, 2, 3..."
+                             />
+                           </div>
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Tầng
+                             </label>
+                             <input
+                               type="text"
+                               value={newLocation.level}
+                               onChange={(e) => setNewLocation(prev => ({ ...prev, level: e.target.value }))}
+                               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                               placeholder="1, 2, 3..."
+                             />
+                           </div>
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Vị trí
+                             </label>
+                             <input
+                               type="text"
+                               value={newLocation.position}
+                               onChange={(e) => setNewLocation(prev => ({ ...prev, position: e.target.value }))}
+                               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                               placeholder="1, 2, 3..."
+                             />
+                           </div>
+                         </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id="locationActive"
-                            checked={newLocation.active}
-                            onChange={(e) => setNewLocation(prev => ({ ...prev, active: e.target.checked }))}
-                            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                          />
-                          <label htmlFor="locationActive" className="ml-2 block text-sm text-gray-900">
-                            Vị trí hoạt động
-                          </label>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddLocation}
-                          className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        >
-                          Thêm vị trí
-                        </button>
-                      </div>
-                    </div>
+                         <div className="flex items-center">
+                           <input
+                             type="checkbox"
+                             id="locationActive"
+                             checked={newLocation.active}
+                             onChange={(e) => setNewLocation(prev => ({ ...prev, active: e.target.checked }))}
+                             className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                           />
+                           <label htmlFor="locationActive" className="ml-2 block text-sm text-gray-900">
+                             Vị trí hoạt động
+                           </label>
+                         </div>
+                       </div>
 
-                    {/* Locations List */}
-                    {stockLocations.length > 0 && (
-                      <div className="space-y-2">
-                        <h5 className="text-sm font-medium text-gray-700">Vị trí của kho</h5>
-                        {stockLocations.map((location, index) => (
-                          <div key={location.id ?? index} className={`flex items-center justify-between border border-gray-200 rounded-md p-3 ${location.active ? 'bg-white' : 'bg-gray-50 opacity-75'}`}>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <div className={`font-medium ${location.active ? 'text-gray-900' : 'text-gray-600'}`}>{location.name}</div>
-                                <span className={`px-2 py-0.5 rounded-full text-xs border ${location.active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                                  {location.active ? 'Hoạt động' : 'Tạm dừng'}
-                                </span>
-                              </div>
-                              {location.description && (
-                                <div className="text-sm text-gray-500">{location.description}</div>
-                              )}
-                              <div className="text-xs text-gray-400">
-                                {[location.zone, location.aisle, location.rack, location.level, location.position]
-                                  .filter(Boolean)
-                                  .join(' - ') || 'Chưa có thông tin vị trí'}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {location.id && location.id < 1000000 ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleLocationStatus(Number(location.id), location.active)}
-                                  className={`px-3 py-1.5 text-xs rounded ${location.active ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
-                                >
-                                  {location.active ? 'Tạm dừng' : 'Kích hoạt'}
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveLocation(index)}
-                                className="px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
-                              >
-                                Xóa
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
 

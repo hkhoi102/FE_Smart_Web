@@ -9,8 +9,9 @@ interface ProductUnit {
   productName: string
   unitName: string
   systemQuantity: number
+  conversionFactor?: number
   selected: boolean
-  actualQuantity: number
+  actualQuantity: number | ''
   note: string
   // Thông tin lô cho nhập kho
   lotNumber?: string
@@ -32,6 +33,12 @@ const InventoryImportExportCreate = () => {
   const [notes, setNotes] = useState('')
   const [slipType, setSlipType] = useState<'IMPORT' | 'EXPORT'>('IMPORT')
   const [showAllProducts, setShowAllProducts] = useState(false)
+  const [notify, setNotify] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' | 'info' }>({
+    open: false,
+    title: '',
+    message: '',
+    type: 'info'
+  })
 
   useEffect(() => {
     loadWarehouses()
@@ -58,6 +65,14 @@ const InventoryImportExportCreate = () => {
     setProducts(products.map(product =>
       product.id === productId ? { ...product, [field]: value } : product
     ))
+  }
+
+  const openNotify = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotify({ open: true, title, message, type })
+  }
+
+  const closeNotify = () => {
+    setNotify({ open: false, title: '', message: '', type: 'info' })
   }
 
 
@@ -189,8 +204,9 @@ const InventoryImportExportCreate = () => {
                   productName: productData.name || `Product ${productData.id}`,
                   unitName: productUnitData.unitName || 'Cái',
                   systemQuantity: productUnitData.availableQuantity || productUnitData.quantity || 0,
+                  conversionFactor: productUnitData.conversionFactor ?? productUnitData.conversionRate ?? 1,
                   selected: false,
-                  actualQuantity: 0,
+                  actualQuantity: '',
                   note: ''
                 }
                 productUnits.push(productUnit)
@@ -206,45 +222,47 @@ const InventoryImportExportCreate = () => {
                 unitName: 'Cái',
                 systemQuantity: 0,
                 selected: false,
-                actualQuantity: 0,
+                actualQuantity: '',
                 note: ''
               }
               productUnits.push(productUnit)
               console.log('✅ Added fallback product unit:', productUnit)
             }
           } else {
-            // Xuất hàng: API chỉ trả về productUnitId, cần gọi thêm API để lấy thông tin chi tiết
-            console.log('🔍 Processing export productUnit with ID:', productData.id)
+            // Xuất hàng: API stock trả về productUnitId, cần gọi thêm API để lấy thông tin chi tiết
+            console.log('🔍 Processing export productUnit with ID:', productData.productUnitId)
 
             try {
-              console.log('📦 Fetching product unit details for productUnitId:', productData.id)
-              const productUnitDetail = await ProductService.getProductUnitById(productData.id)
+              console.log('📦 Fetching product unit details for productUnitId:', productData.productUnitId)
+              const productUnitDetail = await ProductService.getProductUnitById(productData.productUnitId)
               console.log('📋 Fetched product unit detail:', productUnitDetail)
 
               if (productUnitDetail) {
                 const productUnit: ProductUnit = {
-                  id: productData.id,
+                  id: productData.productUnitId,
                   productId: productUnitDetail.productId || 0,
                   productName: productUnitDetail.productName || `Product ${productUnitDetail.productId}`,
                   unitName: productUnitDetail.unitName || 'Cái',
                   systemQuantity: productData.availableQuantity || productData.quantity || 0,
+                  conversionFactor: (productUnitDetail as any)?.conversionFactor ?? (productUnitDetail as any)?.conversionRate ?? 1,
                   selected: false,
-                  actualQuantity: 0,
+                  actualQuantity: '',
                   note: ''
                 }
                 productUnits.push(productUnit)
                 console.log('✅ Added product unit with fetched details:', productUnit)
               } else {
-                console.warn('⚠️ Product unit detail not found for productUnitId:', productData.id)
+                console.warn('⚠️ Product unit detail not found for productUnitId:', productData.productUnitId)
                 // Fallback với ID
                 const productUnit: ProductUnit = {
-                  id: productData.id,
-                  productId: productData.productId || 0,
-                  productName: `Product Unit ${productData.id}`,
+                  id: productData.productUnitId,
+                  productId: 0,
+                  productName: `Product Unit ${productData.productUnitId}`,
                   unitName: 'Cái',
                   systemQuantity: productData.availableQuantity || productData.quantity || 0,
+                  conversionFactor: 1,
                   selected: false,
-                  actualQuantity: 0,
+                  actualQuantity: '',
                   note: ''
                 }
                 productUnits.push(productUnit)
@@ -254,13 +272,14 @@ const InventoryImportExportCreate = () => {
               console.error('❌ Error fetching product unit detail:', error)
               // Fallback với ID
               const productUnit: ProductUnit = {
-                id: productData.id,
-                productId: productData.productId || 0,
-                productName: `Product Unit ${productData.id}`,
+                id: productData.productUnitId,
+                productId: 0,
+                productName: `Product Unit ${productData.productUnitId}`,
                 unitName: 'Cái',
                 systemQuantity: productData.availableQuantity || productData.quantity || 0,
+                conversionFactor: 1,
                 selected: false,
-                actualQuantity: 0,
+                actualQuantity: '',
                 note: ''
               }
               productUnits.push(productUnit)
@@ -286,21 +305,21 @@ const InventoryImportExportCreate = () => {
   const handleNext = () => {
     if (currentStep === 1) {
       if (!slipName.trim()) {
-        alert('Vui lòng nhập tên phiếu')
+        openNotify('Lỗi', 'Vui lòng nhập tên phiếu', 'error')
         return
       }
       if (!selectedWarehouse) {
-        alert('Vui lòng chọn kho')
+        openNotify('Lỗi', 'Vui lòng chọn kho', 'error')
         return
       }
       if (!slipDate) {
-        alert('Vui lòng chọn ngày')
+        openNotify('Lỗi', 'Vui lòng chọn ngày', 'error')
         return
       }
       // Kiểm tra phải chọn ít nhất một sản phẩm
       const selectedProducts = products.filter(p => p.selected)
       if (selectedProducts.length === 0) {
-        alert('Vui lòng chọn ít nhất một sản phẩm')
+        openNotify('Lỗi', 'Vui lòng chọn ít nhất một sản phẩm', 'error')
         return
       }
     }
@@ -321,23 +340,42 @@ const InventoryImportExportCreate = () => {
 
       const selectedProducts = products.filter(p => p.selected)
       if (selectedProducts.length === 0) {
-        alert('Vui lòng chọn ít nhất một sản phẩm')
+        openNotify('Lỗi', 'Vui lòng chọn ít nhất một sản phẩm', 'error')
         return
       }
 
       // Validate số lượng > 0 cho tất cả sản phẩm đã chọn
-      const invalidQty = selectedProducts.filter(p => !p.actualQuantity || p.actualQuantity <= 0)
+      const invalidQty = selectedProducts.filter(p => {
+        const qty = typeof p.actualQuantity === 'string' ? parseInt(p.actualQuantity || '0', 10) : p.actualQuantity
+        return !qty || qty <= 0
+      })
       if (invalidQty.length > 0) {
-        alert(slipType === 'IMPORT' ? 'Số lượng nhập phải lớn hơn 0' : 'Số lượng xuất phải lớn hơn 0')
+        openNotify('Lỗi', slipType === 'IMPORT' ? 'Số lượng nhập phải lớn hơn 0' : 'Số lượng xuất phải lớn hơn 0', 'error')
         return
       }
 
       // Validation cho nhập kho theo lô (bắt buộc)
       if (slipType === 'IMPORT') {
-        const productsWithoutLotNumber = selectedProducts.filter(p => !p.lotNumber)
+        const productsWithoutLotNumber = selectedProducts.filter(p => !p.lotNumber || p.lotNumber.trim() === '')
 
         if (productsWithoutLotNumber.length > 0) {
-          alert('Vui lòng nhập số lô cho tất cả sản phẩm đã chọn. Số lô là bắt buộc khi nhập kho.')
+          openNotify('Lỗi', 'Vui lòng nhập số lô cho tất cả sản phẩm đã chọn. Số lô là bắt buộc khi nhập kho.', 'error')
+          return
+        }
+
+        // Kiểm tra ngày sản xuất không được để trống
+        const productsWithoutManufacturingDate = selectedProducts.filter(p => !p.manufacturingDate || p.manufacturingDate.trim() === '')
+
+        if (productsWithoutManufacturingDate.length > 0) {
+          openNotify('Lỗi', 'Vui lòng nhập ngày sản xuất cho tất cả sản phẩm đã chọn. Ngày sản xuất là bắt buộc khi nhập kho.', 'error')
+          return
+        }
+
+        // Kiểm tra hạn sử dụng không được để trống
+        const productsWithoutExpiryDate = selectedProducts.filter(p => !p.expiryDate || p.expiryDate.trim() === '')
+
+        if (productsWithoutExpiryDate.length > 0) {
+          openNotify('Lỗi', 'Vui lòng nhập hạn sử dụng cho tất cả sản phẩm đã chọn. Hạn sử dụng là bắt buộc khi nhập kho.', 'error')
           return
         }
 
@@ -347,7 +385,7 @@ const InventoryImportExportCreate = () => {
           const ln = (p.lotNumber || '').trim()
           if (!ln) continue
           if (lotNumberMap.has(ln)) {
-            alert('Số lô không được trùng')
+            openNotify('Lỗi', 'Số lô không được trùng', 'error')
             return
           }
           lotNumberMap.set(ln, 1)
@@ -357,7 +395,7 @@ const InventoryImportExportCreate = () => {
       // Lấy stock location đầu tiên của kho
       const stockLocations = await InventoryService.getStockLocations(selectedWarehouse!)
       if (stockLocations.length === 0) {
-        alert('Kho này chưa có vị trí lưu trữ')
+        openNotify('Lỗi', 'Kho này chưa có vị trí lưu trữ', 'error')
         return
       }
       const stockLocationId = stockLocations[0].id
@@ -379,9 +417,10 @@ const InventoryImportExportCreate = () => {
 
         // Thêm từng dòng kèm thông tin lô theo đặc tả BE
         for (const p of selectedProducts) {
+          const qty = typeof p.actualQuantity === 'string' ? parseInt(p.actualQuantity || '0', 10) : p.actualQuantity
           const line = {
             productUnitId: p.id,
-            quantity: p.actualQuantity,
+            quantity: qty,
             lotNumber: p.lotNumber,
             expiryDate: p.expiryDate,
             manufacturingDate: p.manufacturingDate,
@@ -389,9 +428,41 @@ const InventoryImportExportCreate = () => {
             supplierBatchNumber: p.supplierBatchNumber,
           }
           console.log('Adding inbound document line (pending):', line)
-          await InventoryService.addDocumentLine(document.id, line)
+          try {
+            await InventoryService.addDocumentLine(document.id, line)
+          } catch (error: any) {
+            console.error('Error adding document line:', error)
+            if (error?.status === 400 || error?.response?.status === 400) {
+              let errorMessage = 'Có lỗi xảy ra khi thêm sản phẩm vào phiếu'
+              if (error?.message) {
+                const message = error.message.toLowerCase()
+                if (message.includes('số lô') && (message.includes('đã được sử dụng') || message.includes('already used') ||
+                    message.includes('đã tồn tại') || message.includes('already exists'))) {
+                  errorMessage = `Số lô '${p.lotNumber}' đã được sử dụng cho sản phẩm khác. Vui lòng chọn số lô khác.`
+                } else if (message.includes('lot') && (message.includes('already used') || message.includes('already exists'))) {
+                  errorMessage = `Lot number '${p.lotNumber}' has already been used for another product. Please choose a different lot number.`
+                } else if (error.message && error.message !== 'Failed to add document line: 400 Bad Request') {
+                  errorMessage = error.message
+                }
+              }
+              openNotify('Lỗi', errorMessage, 'error')
+              return
+            }
+            throw error
+          }
         }
-        alert('Tạo phiếu nhập kho thành công! Phiếu đang chờ duyệt.')
+        openNotify('Thành công', 'Tạo phiếu nhập kho thành công! Phiếu đang chờ duyệt.', 'success')
+
+        // Delay reset form để user có thể thấy thông báo
+        setTimeout(() => {
+          setCurrentStep(1)
+          setProducts([])
+          setSelectedWarehouse(null)
+          setSlipName('')
+          setSlipDate(new Date().toISOString().slice(0, 16))
+          setNotes('')
+          setShowAllProducts(false)
+        }, 2000) // 2 giây delay
       } else {
         // Xuất kho: Giữ nguyên logic cũ
         const documentData = {
@@ -406,29 +477,50 @@ const InventoryImportExportCreate = () => {
         const document = await InventoryService.createDocument(documentData)
         console.log('Document created:', document)
 
-        const documentLines = selectedProducts.map(p => ({
+        const documentLines = selectedProducts.map(p => {
+          const qty = typeof p.actualQuantity === 'string' ? parseInt(p.actualQuantity || '0', 10) : p.actualQuantity
+          return {
           productUnitId: p.id,
-          quantity: p.actualQuantity
-        }))
+          quantity: qty
+        }
+        })
 
         console.log('Adding document lines:', documentLines)
-        await InventoryService.addDocumentLinesBulk(document.id, documentLines)
-        alert('Tạo phiếu xuất kho thành công! Phiếu đang chờ duyệt.')
+        try {
+          await InventoryService.addDocumentLinesBulk(document.id, documentLines)
+        } catch (error: any) {
+          // Hiển thị thông báo lỗi hết hàng/không đủ tồn
+          if (error?.status === 400 || error?.response?.status === 400) {
+            let errorMessage = 'Không thể tạo phiếu xuất. Có sản phẩm không đủ tồn kho.'
+            if (error?.message) {
+              const msg = String(error.message).toLowerCase()
+              if (msg.includes('không đủ') || msg.includes('het hang') || msg.includes('hết hàng') || msg.includes('insufficient') || msg.includes('not enough') || msg.includes('out of stock')) {
+                errorMessage = 'Không thể tạo phiếu xuất vì tồn kho không đủ.'
+              } else {
+                errorMessage = error.message
+              }
+            }
+            openNotify('Lỗi', errorMessage, 'error')
+            return
+          }
+          throw error
+        }
+        openNotify('Thành công', 'Tạo phiếu xuất kho thành công! Phiếu đang chờ duyệt.', 'success')
+
+        // Delay reset form để user có thể thấy thông báo
+        setTimeout(() => {
+          setCurrentStep(1)
+          setProducts([])
+          setSelectedWarehouse(null)
+          setSlipName('')
+          setSlipDate(new Date().toISOString().slice(0, 16))
+          setNotes('')
+          setShowAllProducts(false)
+        }, 2000) // 2 giây delay
       }
-
-      // Reset form về trạng thái ban đầu
-      setCurrentStep(1)
-      setProducts([])
-      setSelectedWarehouse(null)
-      setSlipName('')
-      setSlipDate(new Date().toISOString().slice(0, 16))
-      setNotes('')
-      setShowAllProducts(false)
-
-      navigate('/admin?tab=inventory-import-export-list')
     } catch (error) {
       console.error('Error creating slip:', error)
-      alert('Có lỗi xảy ra khi tạo phiếu: ' + (error as Error).message)
+      openNotify('Lỗi', 'Có lỗi xảy ra khi tạo phiếu: ' + (error as Error).message, 'error')
     } finally {
       setLoading(false)
     }
@@ -724,9 +816,29 @@ const InventoryImportExportCreate = () => {
                             min="1"
                             value={product.actualQuantity}
                             onChange={(e) => {
-                              setProducts(prev => prev.map(p =>
-                                p.id === product.id ? { ...p, actualQuantity: Number(e.target.value) } : p
-                              ))
+                              const { value } = e.target
+                              // Cho phép rỗng trong khi nhập để tránh tiền tố 0
+                              if (value === '') {
+                                setProducts(prev => prev.map(p =>
+                                  p.id === product.id ? { ...p, actualQuantity: '' } : p
+                                ))
+                                return
+                              }
+                              // Loại bỏ leading zeros và chỉ nhận số dương (không cho phép 0 và số âm)
+                              const parsed = parseInt(value, 10)
+                              if (!isNaN(parsed) && parsed > 0) {
+                                setProducts(prev => prev.map(p =>
+                                  p.id === product.id ? { ...p, actualQuantity: parsed } : p
+                                ))
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const value = e.target.value
+                              if (value === '' || value === '0') {
+                                setProducts(prev => prev.map(p =>
+                                  p.id === product.id ? { ...p, actualQuantity: 1 } : p
+                                ))
+                              }
                             }}
                             className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                           />
@@ -761,7 +873,19 @@ const InventoryImportExportCreate = () => {
                               <input
                                 type="date"
                                 value={product.manufacturingDate || ''}
-                                onChange={(e) => handleLotInfoChange(product.id, 'manufacturingDate', e.target.value)}
+                                max={new Date().toISOString().split('T')[0]}
+                                required
+                                onChange={(e) => {
+                                  const selectedDate = e.target.value
+                                  const today = new Date().toISOString().split('T')[0]
+
+                                  if (selectedDate && selectedDate > today) {
+                                    openNotify('Lỗi', 'Ngày sản xuất phải trước ngày hiện tại', 'error')
+                                    return
+                                  }
+
+                                  handleLotInfoChange(product.id, 'manufacturingDate', selectedDate)
+                                }}
                                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                               />
                             </td>
@@ -769,7 +893,19 @@ const InventoryImportExportCreate = () => {
                               <input
                                 type="date"
                                 value={product.expiryDate || ''}
-                                onChange={(e) => handleLotInfoChange(product.id, 'expiryDate', e.target.value)}
+                                min={new Date().toISOString().split('T')[0]}
+                                required
+                                onChange={(e) => {
+                                  const selectedDate = e.target.value
+                                  const today = new Date().toISOString().split('T')[0]
+
+                                  if (selectedDate && selectedDate <= today) {
+                                    openNotify('Lỗi', 'Hạn sử dụng phải sau ngày hiện tại', 'error')
+                                    return
+                                  }
+
+                                  handleLotInfoChange(product.id, 'expiryDate', selectedDate)
+                                }}
                                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                               />
                             </td>
@@ -809,6 +945,46 @@ const InventoryImportExportCreate = () => {
           )}
         </div>
       </div>
+
+      {/* Notification Modal */}
+      {notify.open && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={closeNotify} />
+            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h3 className={`text-lg font-semibold ${notify.type === 'success' ? 'text-green-900' : notify.type === 'error' ? 'text-red-900' : 'text-blue-900'}`}>
+                  {notify.title}
+                </h3>
+                <button onClick={closeNotify} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-6">
+                <p className={`text-sm ${notify.type === 'success' ? 'text-green-700' : notify.type === 'error' ? 'text-red-700' : 'text-blue-700'}`}>
+                  {notify.message}
+                </p>
+              </div>
+              <div className="flex justify-end px-6 py-4 border-t bg-gray-50">
+                <button
+                  onClick={closeNotify}
+                  className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                    notify.type === 'success'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : notify.type === 'error'
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

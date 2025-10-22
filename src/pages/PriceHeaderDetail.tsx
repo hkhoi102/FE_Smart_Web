@@ -9,16 +9,30 @@ const PriceHeaderDetail = () => {
   const navigate = useNavigate()
   const [header, setHeader] = useState<{ id: number; name: string; description?: string; timeStart?: string; timeEnd?: string } | null>(null)
   const [maSP, setMaSP] = useState('')
-  const [unitOptions, setUnitOptions] = useState<Array<{ id: number; name: string; code?: string }>>([])
+  const [unitOptions, setUnitOptions] = useState<Array<{ id: number; name: string; code?: string; conversionFactor?: number; isDefault?: boolean }>>([])
   const [foundProductName, setFoundProductName] = useState<string>('')
   const [selectedUnitId, setSelectedUnitId] = useState<number | ''>('')
   const [price, setPrice] = useState('')
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string>('')
+  const [priceError, setPriceError] = useState(false)
   const [suggestions, setSuggestions] = useState<Array<{ id: number; name: string; code?: string }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const searchDebounceRef = useRef<number | undefined>(undefined)
+  const [existingProducts, setExistingProducts] = useState<Array<{
+    productCode: string | null;
+    productId: number;
+    productName: string;
+    units: Array<{
+      productUnitId: number;
+      unitName: string;
+      price: number;
+      createdAt: string;
+    }>;
+    totalUnits: number;
+  }>>([])
+  const [showExistingProducts, setShowExistingProducts] = useState(false)
 
   useEffect(() => {
     // Load basic header info from list to show name/desc
@@ -31,30 +45,58 @@ const PriceHeaderDetail = () => {
     })()
   }, [headerId])
 
+  // Load existing products in header
+  const loadExistingProducts = async () => {
+    if (!headerId) return
+    try {
+      const data = await ProductService.checkProductsInHeader(Number(headerId))
+      setExistingProducts(data.productsInHeader)
+    } catch (error) {
+      console.error('Error loading existing products:', error)
+      setExistingProducts([])
+    }
+  }
+
+  useEffect(() => {
+    loadExistingProducts()
+  }, [headerId])
+
   const loadUnitsByCode = async (code: string) => {
     try {
       setUnitOptions([])
       setSelectedUnitId('')
-      // Ưu tiên tìm theo mã ĐƠN VỊ (maSP thuộc đơn vị)
-      let prod = await ProductService.getProductByUnitCode(code)
-      if (!prod) {
-        // fallback: một số mã cũ lưu ở cấp sản phẩm
-        prod = await ProductService.getProductByProductCode(code)
-      }
+      setFoundProductName('')
+
+      // Tìm sản phẩm theo mã chung (mã sản phẩm)
+      const prod = await ProductService.getProductByProductCode(code)
+
       if (prod && Array.isArray(prod.productUnits)) {
         setFoundProductName(prod.name || '')
-        const opts = prod.productUnits.map((u: any) => ({ id: u.id, name: u.unitName, code: (u as any).code }))
+        const opts = prod.productUnits.map((u: any) => ({
+          id: u.id,
+          name: u.unitName,
+          code: (u as any).code,
+          conversionFactor: u.conversionFactor || 1,
+          isDefault: u.isDefault || false
+        }))
         setUnitOptions(opts)
-        // Auto-chọn đơn vị trùng mã (ưu tiên), nếu không có thì chọn đơn vị đầu tiên
-        const matched = opts.find(u => (u.code || '').toLowerCase() === code.toLowerCase())
-        setSelectedUnitId(matched ? matched.id : (opts[0]?.id || ''))
+
+        // Chọn đơn vị mặc định nếu có, nếu không thì chọn đơn vị đầu tiên
+        const defaultUnit = opts.find(u => u.isDefault) || opts[0]
+        setSelectedUnitId(defaultUnit?.id || '')
+
+        setMessage('')
       } else {
         setFoundProductName('')
         setMessage('Không tìm thấy sản phẩm theo mã')
         setTimeout(() => setMessage(''), 3000)
       }
-    } catch {
+    } catch (error) {
+      console.error('Error loading product by code:', error)
       setUnitOptions([])
+      setFoundProductName('')
+      setMessage('Lỗi khi tìm kiếm sản phẩm')
+      setTimeout(() => setMessage(''), 3000)
     }
   }
 
@@ -74,9 +116,11 @@ const PriceHeaderDetail = () => {
 
     searchDebounceRef.current = window.setTimeout(async () => {
       try {
-        // Chỉ thực hiện fuzzy search để gợi ý; KHÔNG gọi API by-unit-code tại đây
+        // Tìm kiếm sản phẩm theo mã hoặc tên để gợi ý
         const res = await ProductService.getProducts(1, 8, term)
-        const items = (res?.products || []).map(p => ({ id: p.id, name: p.name, code: p.code }))
+        const items = (res?.products || [])
+          .filter(p => p.code && p.code.toLowerCase().includes(term.toLowerCase()))
+          .map(p => ({ id: p.id, name: p.name, code: p.code }))
         setSuggestions(items)
         setShowSuggestions(items.length > 0)
       } catch {
@@ -92,13 +136,87 @@ const PriceHeaderDetail = () => {
     }
   }, [maSP])
 
-  const addItem = () => {
-    if (!maSP.trim() || !selectedUnitId || !price) return
+  const addItem = async () => {
+    if (!maSP.trim() || !selectedUnitId || !price) {
+      if (!price.trim()) {
+        setPriceError(true)
+      }
+      setMessage('Vui lòng điền đầy đủ thông tin sản phẩm, đơn vị và giá')
+      setTimeout(() => setMessage(''), 3000)
+      return
+    }
+
     const p = parseFloat(String(price).replace(/\./g, ''))
-    if (isNaN(p) || p <= 0) return
-    const unitName = unitOptions.find(u => u.id === Number(selectedUnitId))?.name || `Unit #${selectedUnitId}`
-    setItems(prev => [...prev, { productCode: maSP.trim(), productName: foundProductName || maSP.trim(), unitId: Number(selectedUnitId), unitName, price: p }])
+    if (isNaN(p) || p <= 0) {
+      setPriceError(true)
+      setMessage('Giá phải là số dương')
+      setTimeout(() => setMessage(''), 3000)
+      return
+    }
+
+    const productUnitId = Number(selectedUnitId)
+    const unitName = unitOptions.find(u => u.id === productUnitId)?.name || `Unit #${selectedUnitId}`
+
+    // Kiểm tra xem sản phẩm đã có trong header chưa
+    const productExists = existingProducts.find(ep =>
+      ep.productCode === maSP.trim() ||
+      ep.units.some(unit => unit.productUnitId === productUnitId)
+    )
+
+    if (productExists) {
+      setMessage('Sản phẩm này đã có giá trong bảng giá. Vui lòng chọn sản phẩm khác.')
+      setTimeout(() => setMessage(''), 3000)
+      return
+    }
+
+    // Kiểm tra xem đã có trong danh sách chờ thêm chưa
+    const alreadyInItems = items.some(item => item.unitId === productUnitId)
+
+    if (alreadyInItems) {
+      setMessage('Sản phẩm này đã có trong danh sách chờ thêm.')
+      setTimeout(() => setMessage(''), 3000)
+      return
+    }
+
+    // Kiểm tra xung đột thời gian với các header giá khác
+    try {
+      setLoading(true)
+      const timeConflictResult = await ProductService.checkTimeConflict(productUnitId, Number(headerId))
+
+      if (timeConflictResult.hasConflict) {
+        // Sử dụng thông báo chi tiết từ API và chuẩn hóa thời gian
+        let conflictMessage = timeConflictResult.message || 'Sản phẩm này có xung đột thời gian với các bảng giá khác'
+
+        // Chuẩn hóa thời gian và dịch "header" thành "bảng giá"
+        conflictMessage = conflictMessage
+          .replace(/header/gi, 'bảng giá')
+          .replace(/Header/gi, 'Bảng giá')
+          .replace(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}):\d{2}/g, (match) => {
+            // Chuyển đổi từ ISO format sang format Việt Nam (chỉ ngày)
+            const dateObj = new Date(match)
+            const day = dateObj.getDate().toString().padStart(2, '0')
+            const month = (dateObj.getMonth() + 1).toString().padStart(2, '0')
+            const year = dateObj.getFullYear()
+            return `${day}/${month}/${year}`
+          })
+
+        setMessage(conflictMessage)
+        setTimeout(() => setMessage(''), 5000)
+        return
+      }
+    } catch (error) {
+      console.error('Error checking time conflict:', error)
+      setMessage('Không thể kiểm tra xung đột thời gian. Vui lòng thử lại.')
+      setTimeout(() => setMessage(''), 3000)
+      return
+    } finally {
+      setLoading(false)
+    }
+
+    setItems(prev => [...prev, { productCode: maSP.trim(), productName: foundProductName || maSP.trim(), unitId: productUnitId, unitName, price: p }])
     setPrice('')
+    setPriceError(false) // Reset lỗi giá khi thành công
+    setMessage('') // Clear any previous error message
   }
 
   const submit = async () => {
@@ -119,9 +237,38 @@ const PriceHeaderDetail = () => {
       setFoundProductName('')
       setMessage('Đã thêm giá vào bảng giá')
       setTimeout(() => setMessage(''), 3000)
+
+      // Reload existing products để cập nhật danh sách
+      await loadExistingProducts()
     } catch (e: any) {
-      setMessage(e?.message || 'Không thể thêm giá')
-      setTimeout(() => setMessage(''), 3000)
+      console.error('Error adding prices:', e)
+
+      // Xử lý lỗi 400 - sản phẩm đã có giá trong header
+      if (e?.status === 400) {
+        let errorMessage = 'Không thể thêm giá'
+
+        if (e?.message) {
+          const message = e.message.toLowerCase()
+          console.log('🔍 Bulk add prices error message from backend:', e.message)
+
+          // Kiểm tra lỗi sản phẩm đã có giá
+          if (message.includes('already exists') || message.includes('đã tồn tại') ||
+              message.includes('duplicate') || message.includes('trùng') ||
+              message.includes('already have price') || message.includes('đã có giá')) {
+            errorMessage = 'Một số sản phẩm đã có giá trong bảng giá này. Vui lòng kiểm tra lại.'
+          }
+          // Nếu có thông báo cụ thể từ backend, sử dụng nó
+          else if (e.message && e.message !== 'Failed to bulk add prices: 400 Bad Request') {
+            errorMessage = e.message
+          }
+        }
+
+        setMessage(errorMessage)
+      } else {
+        setMessage(e?.message || 'Không thể thêm giá')
+      }
+
+      setTimeout(() => setMessage(''), 5000) // Hiển thị lâu hơn cho lỗi quan trọng
     } finally {
       setLoading(false)
     }
@@ -154,8 +301,63 @@ const PriceHeaderDetail = () => {
       </div>
       {header?.description && <p className="text-gray-600 mt-1">{header.description}</p>}
 
+      {/* Hiển thị thông tin sản phẩm đã có trong header */}
+      {existingProducts.length > 0 && (
+        <div className="mb-4 px-4 py-2 rounded border bg-blue-50 text-blue-800 border-blue-200">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">
+              Đã có {existingProducts.length} sản phẩm trong bảng giá này
+            </span>
+            <button
+              onClick={() => setShowExistingProducts(!showExistingProducts)}
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              {showExistingProducts ? 'Ẩn danh sách' : 'Xem danh sách'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Danh sách sản phẩm đã có trong header */}
+      {showExistingProducts && existingProducts.length > 0 && (
+        <div className="mb-4 bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Sản phẩm đã có trong bảng giá</h3>
+          <div className="space-y-4">
+            {existingProducts.map((product) => (
+              <div key={product.productId} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900">{product.productName}</h4>
+                    {product.productCode && (
+                      <p className="text-xs text-gray-500">Mã: {product.productCode}</p>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-500">{product.totalUnits} đơn vị</span>
+                </div>
+                <div className="space-y-1">
+                  {product.units.map((unit, unitIndex) => (
+                    <div key={unitIndex} className="flex items-center justify-between text-xs bg-gray-50 px-2 py-1 rounded">
+                      <span className="text-gray-700">{unit.unitName}</span>
+                      <span className="text-gray-900 font-medium">
+                        {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(unit.price)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {message && (
-        <div className="mb-4 px-4 py-2 rounded border bg-yellow-50 text-yellow-800">{message}</div>
+        <div className={`mb-4 px-4 py-2 rounded border ${
+          message.includes('Đã thêm giá')
+            ? 'bg-green-50 text-green-800 border-green-200'
+            : 'bg-red-50 text-red-800 border-red-200'
+        }`}>
+          {message}
+        </div>
       )}
 
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
@@ -192,7 +394,7 @@ const PriceHeaderDetail = () => {
                           setMaSP(s.code)
                           await loadUnitsByCode(s.code)
                         } else {
-                          setMessage('Sản phẩm chưa có mã đơn vị. Vui lòng chọn mục có mã.')
+                          setMessage('Sản phẩm chưa có mã. Vui lòng chọn sản phẩm có mã.')
                           setTimeout(() => setMessage(''), 2000)
                         }
                       }}
@@ -205,28 +407,69 @@ const PriceHeaderDetail = () => {
               )}
               {/* Removed explicit search button; selection from suggestions auto-loads units */}
             </div>
-            {/* Removed product info chip */}
+            {/* Hiển thị tên sản phẩm đã tìm thấy */}
+            {foundProductName && (
+              <div className="mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-md">
+                <div className="text-sm text-green-800">
+                  <span className="font-medium">Sản phẩm:</span> {foundProductName}
+                </div>
+              </div>
+            )}
           </div>
           {unitOptions.length > 0 && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị</label>
-                <div className="px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-800">
-                  {unitOptions.find(u => u.id === Number(selectedUnitId))?.name || '—'}
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị tính</label>
+                <select
+                  value={selectedUnitId}
+                  onChange={(e) => setSelectedUnitId(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  {unitOptions.map(unit => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name} {unit.isDefault ? '' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Giá (VND)</label>
                 <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    placeholder="Nhập giá"
-                  />
-                  <button type="button" onClick={addItem} className="px-3 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">Thêm</button>
+                  <div className="flex-1 relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={price}
+                      onChange={(e) => {
+                        setPrice(e.target.value)
+                        setPriceError(false) // Reset lỗi khi người dùng thay đổi giá
+                      }}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:border-green-500 ${
+                        priceError
+                          ? 'border-red-500 focus:ring-red-500 bg-red-50'
+                          : 'border-gray-300 focus:ring-green-500'
+                      }`}
+                      placeholder="Nhập giá"
+                      required
+                    />
+                    {priceError && (
+                      <p className="mt-1 text-xs text-red-600">
+                        ⚠️ Vui lòng nhập giá sản phẩm
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    disabled={loading}
+                    className={`px-3 py-2 rounded-md text-white ${
+                      loading
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
+                  >
+                    {loading ? 'Đang kiểm tra...' : 'Thêm'}
+                  </button>
                 </div>
               </div>
             </>
