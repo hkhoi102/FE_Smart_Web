@@ -118,11 +118,14 @@ const PromotionDetail: React.FC = () => {
   }
 
   const openLineEditor = async (line: any) => {
+    console.log('Opening line editor for line:', line)
     setLineEditing(line)
     try {
       const ds = await PromotionServiceApi.getDetailsAll(line.id)
+      console.log('Loaded details from API:', ds)
       setLineDetails(Array.isArray(ds) ? ds : [])
-    } catch {
+    } catch (error) {
+      console.error('Error loading details:', error)
       setLineDetails([])
     }
     setLineEditOpen(true)
@@ -331,6 +334,10 @@ const PromotionDetail: React.FC = () => {
 const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: any[]) => void; onClose: () => void }> = ({ line, details, onChange, onClose }) => {
   const [saving, setSaving] = useState(false)
   const [giftNameByUnitId, setGiftNameByUnitId] = useState<Record<number, string>>({})
+  const [conditionNameByUnitId, setConditionNameByUnitId] = useState<Record<number, string>>({})
+  const [giftProductIdByUnitId, setGiftProductIdByUnitId] = useState<Record<number, number>>({})
+  const [conditionProductIdByUnitId, setConditionProductIdByUnitId] = useState<Record<number, number>>({})
+  const [productOptions, setProductOptions] = useState<Array<{ id: number; name: string }>>([])
   const [giftUnitOptions, setGiftUnitOptions] = useState<Array<{ id: number; label: string }>>([])
   const [conditionUnitOptions, setConditionUnitOptions] = useState<Array<{ id: number; label: string }>>([])
 
@@ -351,7 +358,28 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
     }
   }
 
-  const addDetail = () => onChange([...(details || []), { id: 0, promotionLineId: line.id, discountPercent: '', discountAmount: '', minAmount: '', maxDiscount: '', conditionQuantity: '', freeQuantity: '', giftProductUnitId: '', conditionProductUnitId: '', active: true }])
+  const addDetail = () => onChange([...(details || []), { 
+    id: 0, 
+    promotionLineId: line.id, 
+    discountPercent: '', 
+    discountAmount: '', 
+    minAmount: '', 
+    maxDiscount: '', 
+    conditionQuantity: '', 
+    freeQuantity: '', 
+    giftProductUnitId: '', 
+    conditionProductUnitId: '', 
+    // New fields for separated product and unit selection
+    conditionProductQuery: '',
+    conditionUnitQuery: '',
+    giftProductQuery: '',
+    giftUnitQuery: '',
+    showSuggestConditionProduct: false,
+    showSuggestConditionUnit: false,
+    showSuggestGiftProduct: false,
+    showSuggestGiftUnit: false,
+    active: true 
+  }])
   const removeDetail = (idx: number) => onChange(details.filter((_, i) => i !== idx))
 
   const save = async () => {
@@ -388,29 +416,36 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
     try {
       const info = await ProductService.getProductUnitById(idNum)
       const name = info?.productName || ''
+      const productId = info?.productId || 0
       setGiftNameByUnitId(prev => ({ ...prev, [idNum]: name }))
+      if (productId) {
+        setGiftProductIdByUnitId(prev => ({ ...prev, [idNum]: productId }))
+        console.log('Resolved gift product:', { unitId: idNum, productId, name })
+      }
     } catch {}
   }
 
-  // Load selectable gift and condition product units
+  // Load products for search
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
         const list = await ProductService.getProducts(1, 1000)
         if (cancelled) return
-        const opts: Array<{ id: number; label: string }> = []
+        
+        // Tạo danh sách sản phẩm riêng biệt
+        const productOptions: Array<{ id: number; name: string }> = []
+        
         ;(list?.products || []).forEach((p: any) => {
-          (p.productUnits || []).forEach((u: any) => {
-            const label = `${p.name}${u.unitName ? ' • ' + u.unitName : ''}`
-            if (u.id) opts.push({ id: Number(u.id), label })
-          })
+          if (p.id && p.name) {
+            productOptions.push({ id: Number(p.id), name: p.name })
+          }
         })
-        setGiftUnitOptions(opts)
-        setConditionUnitOptions(opts)
+        
+        setProductOptions(productOptions)
+        console.log('Loaded products:', productOptions.length, 'products')
       } catch {
-        setGiftUnitOptions([])
-        setConditionUnitOptions([])
+        setProductOptions([])
       }
     })()
     return () => { cancelled = true }
@@ -419,17 +454,163 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
   // Resolve names for existing details (when modal opens)
   useEffect(() => {
     ;(async () => {
+      console.log('LineDetailEditor: Resolving names for details:', details)
+      
       for (const d of details) {
+        console.log('Processing detail:', d)
+        
+        // First resolve names to get productIds
         if (d && d.giftProductUnitId) {
+          console.log('Resolving gift name for unitId:', d.giftProductUnitId)
           await resolveGiftName(d.giftProductUnitId)
+        }
+        if (d && d.conditionProductUnitId) {
+          console.log('Resolving condition name for unitId:', d.conditionProductUnitId)
+          await resolveConditionName(d.conditionProductUnitId)
+        }
+      }
+      
+      // Then load units after resolving names
+      for (const d of details) {
+        // Load units for selected products
+        if (d && d.conditionProductId) {
+          console.log('Loading units for condition product:', d.conditionProductId)
+          await loadUnitsForProduct(d.conditionProductId, false)
+        } else if (d && d.conditionProductUnitId) {
+          // Try to get productId from unitId and load units
+          const productId = conditionProductIdByUnitId[d.conditionProductUnitId]
+          if (productId) {
+            console.log('Loading units for condition product from unitId:', productId)
+            await loadUnitsForProduct(productId, false)
+          }
+        }
+        if (d && d.giftProductId) {
+          console.log('Loading units for gift product:', d.giftProductId)
+          await loadUnitsForProduct(d.giftProductId, true)
+        } else if (d && d.giftProductUnitId) {
+          // Try to get productId from unitId and load units
+          const productId = giftProductIdByUnitId[d.giftProductUnitId]
+          if (productId) {
+            console.log('Loading units for gift product from unitId:', productId)
+            await loadUnitsForProduct(productId, true)
+          }
         }
       }
     })()
   }, [details])
 
+  const resolveConditionName = async (unitId?: number | string) => {
+    const idNum = Number(unitId)
+    if (!idNum || isNaN(idNum)) return
+    if (conditionNameByUnitId[idNum]) return
+    try {
+      const info = await ProductService.getProductUnitById(idNum)
+      const name = info?.productName || ''
+      const productId = info?.productId || 0
+      setConditionNameByUnitId(prev => ({ ...prev, [idNum]: name }))
+      if (productId) {
+        setConditionProductIdByUnitId(prev => ({ ...prev, [idNum]: productId }))
+        console.log('Resolved condition product:', { unitId: idNum, productId, name })
+      }
+    } catch {}
+  }
+
+  const getUnitNameFromId = (unitId?: number | string) => {
+    const idNum = Number(unitId)
+    if (!idNum || isNaN(idNum)) return ''
+    const option = conditionUnitOptions.find(o => o.id === idNum)
+    return option ? option.label.split(' • ')[1] || '' : ''
+  }
+
+  const getGiftUnitNameFromId = (unitId?: number | string) => {
+    const idNum = Number(unitId)
+    if (!idNum || isNaN(idNum)) return ''
+    const option = giftUnitOptions.find(o => o.id === idNum)
+    return option ? option.label.split(' • ')[1] || '' : ''
+  }
+
+  // Load units for a specific product
+  const loadUnitsForProduct = async (productId: number, isGift: boolean = false) => {
+    try {
+      // First try to get product details to get its units
+      const product = await ProductService.getProductById(productId)
+      if (product && product.productUnits && product.productUnits.length > 0) {
+        const units = product.productUnits
+        
+        console.log('Loaded units for product', productId, ':', units)
+        
+        const unitOptions = units.map((unit: any) => ({
+          id: unit.id,
+          label: unit.unitName || unit.unit_name || ''
+        }))
+        
+        if (isGift) {
+          setGiftUnitOptions(unitOptions)
+          console.log('Set gift unit options:', unitOptions)
+        } else {
+          setConditionUnitOptions(unitOptions)
+          console.log('Set condition unit options:', unitOptions)
+        }
+        return
+      }
+      
+      // Fallback: try direct API call if ProductService doesn't have units
+      console.log('ProductService did not return units, trying direct API call...')
+      const response = await fetch(`${window.location.origin.replace('3000', '8080')}/api/products/${productId}/units`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('user_access_token') || localStorage.getItem('admin_access_token')}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        console.error('Failed to load units:', response.status, response.statusText)
+        return
+      }
+      
+      const data = await response.json()
+      const units = data.data || data || []
+      
+      console.log('Loaded units for product', productId, ':', units)
+      
+      const unitOptions = units.map((unit: any) => ({
+        id: unit.id,
+        label: unit.unitName || unit.unit_name || ''
+      }))
+      
+      if (isGift) {
+        setGiftUnitOptions(unitOptions)
+        console.log('Set gift unit options:', unitOptions)
+      } else {
+        setConditionUnitOptions(unitOptions)
+        console.log('Set condition unit options:', unitOptions)
+      }
+    } catch (error) {
+      console.error('Error loading units:', error)
+      // If all fails, try to load all units as fallback
+      try {
+        const allUnits = await ProductService.getUnits()
+        const unitOptions = allUnits.map((unit: any) => ({
+          id: unit.id,
+          label: unit.name || ''
+        }))
+        
+        if (isGift) {
+          setGiftUnitOptions(unitOptions)
+          console.log('Set fallback gift unit options:', unitOptions)
+        } else {
+          setConditionUnitOptions(unitOptions)
+          console.log('Set fallback condition unit options:', unitOptions)
+        }
+      } catch (fallbackError) {
+        console.error('Fallback unit loading also failed:', fallbackError)
+      }
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 style: !mt-0">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl p-8 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl p-8 max-h-[90vh] overflow-y-auto" style={{width: '1000px'}}>
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-semibold text-gray-900">Sửa chi tiết khuyến mãi</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✖</button>
@@ -469,59 +650,162 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                 )}
                 {t === 'BUY_X_GET_Y' && (
                   <>
-                    <div className="col-span-12 md:col-span-3 relative">
-                      <div className="text-sm text-gray-700 mb-1">Sản phẩm điều kiện (Mua X)</div>
+                    {/* Sản phẩm mua */}
+                    <div className="col-span-3 relative">
+                      <div className="text-xs text-gray-700 mb-1">Sản phẩm mua</div>
                       <input
-                        placeholder="Nhập tên sản phẩm điều kiện..."
-                        className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={(d.conditionQuery ?? '')}
+                        placeholder="Nhập tên sản phẩm mua..."
+                        className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={(() => {
+                          // First try to get product name from conditionProductId
+                          if (d.conditionProductId) {
+                            return productOptions.find(p => p.id === d.conditionProductId)?.name || ''
+                          }
+                          // Then try to get product name from unitId
+                          if (d.conditionProductUnitId) {
+                            const productId = conditionProductIdByUnitId[d.conditionProductUnitId]
+                            if (productId) {
+                              return productOptions.find(p => p.id === productId)?.name || ''
+                            }
+                            return conditionNameByUnitId[d.conditionProductUnitId] || ''
+                          }
+                          // Fallback to query
+                          return d.conditionProductQuery || ''
+                        })()}
                         onChange={(e)=>{
                           const q = e.target.value
-                          onChange(details.map((x,i)=> i===idx?{...x, conditionQuery:q, showSuggestCondition:true}:x))
+                          onChange(details.map((x,i)=> i===idx?{...x, conditionProductQuery:q, showSuggestConditionProduct:true}:x))
                         }}
                       />
-                      {((d.conditionQuery || '').trim().length > 0) && d.showSuggestCondition && (
+                      {((d.conditionProductQuery || '').trim().length > 0) && d.showSuggestConditionProduct && (
                         <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
-                          {conditionUnitOptions.filter(o => o.label.toLowerCase().includes(String(d.conditionQuery).toLowerCase())).slice(0,8).map(opt => (
-                            <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>{
-                              onChange(details.map((x,i)=> i===idx?{...x, conditionProductUnitId: opt.id, conditionQuery: opt.label, showSuggestCondition:false}:x))
-                            }}>{opt.label}</div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="col-span-12 md:col-span-2">
-                      <div className="text-sm text-gray-700 mb-1">Số lượng mua (X)</div>
-                      <input placeholder="SL X" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.conditionQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, conditionQuantity:e.target.value}:x))} />
-                    </div>
-                    <div className="col-span-12 md:col-span-4 relative">
-                      <div className="text-sm text-gray-700 mb-1">Đơn vị quà tặng</div>
-                      <input
-                        placeholder="Nhập tên sản phẩm để tìm..."
-                        className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={(d.giftQuery ?? (giftNameByUnitId[Number(d.giftProductUnitId)] || ''))}
-                        onChange={(e)=>{
-                          const q = e.target.value
-                          onChange(details.map((x,i)=> i===idx?{...x, giftQuery:q, showSuggest:true}:x))
-                        }}
-                      />
-                      {((d.giftQuery || '').trim().length > 0) && d.showSuggest && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
-                          {giftUnitOptions.filter(o => o.label.toLowerCase().includes(String(d.giftQuery).toLowerCase())).slice(0,8).map(opt => (
+                          {productOptions.filter(o => o.name.toLowerCase().includes(String(d.conditionProductQuery).toLowerCase())).slice(0,8).map(opt => (
                             <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={async ()=>{
-                              onChange(details.map((x,i)=> i===idx?{...x, giftProductUnitId: opt.id, giftQuery: opt.label, showSuggest:false}:x))
-                              await resolveGiftName(opt.id)
-                            }}>{opt.label}</div>
+                              onChange(details.map((x,i)=> i===idx?{...x, conditionProductId: opt.id, conditionProductQuery: opt.name, showSuggestConditionProduct:false}:x))
+                              await loadUnitsForProduct(opt.id, false)
+                            }}>{opt.name}</div>
                           ))}
                         </div>
                       )}
                     </div>
-                    <div className="col-span-12 md:col-span-2">
-                      <div className="text-sm text-gray-700 mb-1">Số lượng tặng (Y)</div>
-                      <input placeholder="SL Y" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.freeQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, freeQuantity:e.target.value}:x))} />
+                    
+                    {/* Đơn vị sản phẩm mua */}
+                    <div className="col-span-2 relative">
+                      <div className="text-xs text-gray-700 mb-1">Đơn vị</div>
+                      <input
+                        placeholder={d.conditionProductId ? "Nhập đơn vị..." : "Chọn sản phẩm trước"}
+                        className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={(d.conditionUnitQuery ?? getUnitNameFromId(d.conditionProductUnitId))}
+                        onChange={(e)=>{
+                          const q = e.target.value
+                          onChange(details.map((x,i)=> i===idx?{...x, conditionUnitQuery:q, showSuggestConditionUnit:true}:x))
+                        }}
+                        disabled={!d.conditionProductId}
+                      />
+                      {((d.conditionUnitQuery || '').trim().length > 0) && d.showSuggestConditionUnit && d.conditionProductId && conditionUnitOptions.length > 0 && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
+                          {(() => {
+                            const filtered = conditionUnitOptions.filter(o => o.label.toLowerCase().includes(String(d.conditionUnitQuery).toLowerCase()))
+                            console.log('Condition unit query:', d.conditionUnitQuery)
+                            console.log('Condition product ID:', d.conditionProductId)
+                            console.log('Condition unit options:', conditionUnitOptions)
+                            console.log('Filtered units:', filtered)
+                            return filtered.slice(0,8).map(opt => (
+                              <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>{
+                                onChange(details.map((x,i)=> i===idx?{...x, conditionProductUnitId: opt.id, conditionUnitQuery: opt.label, showSuggestConditionUnit:false}:x))
+                              }}>{opt.label}</div>
+                            ))
+                          })()}
+                        </div>
+                      )}
                     </div>
-                    <div className="col-span-12 md:col-span-1 flex items-end justify-end">
-                      <button className="px-3 py-2 text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
+                    
+                      {/* Số lượng mua (X) */}
+                      <div className="col-span-1">
+                        <div className="text-xs text-gray-700 mb-1">SL mua</div>
+                      <input placeholder="SL X" className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.conditionQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, conditionQuantity:e.target.value}:x))} />
+                    </div>
+                    
+                    {/* Sản phẩm tặng */}
+                    <div className="col-span-3 relative">
+                      <div className="text-xs text-gray-700 mb-1">Sản phẩm tặng</div>
+                      <input
+                        placeholder="Nhập tên sản phẩm tặng..."
+                        className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={(() => {
+                          // First try to get product name from giftProductId
+                          if (d.giftProductId) {
+                            return productOptions.find(p => p.id === d.giftProductId)?.name || ''
+                          }
+                          // Then try to get product name from unitId
+                          if (d.giftProductUnitId) {
+                            const productId = giftProductIdByUnitId[d.giftProductUnitId]
+                            if (productId) {
+                              return productOptions.find(p => p.id === productId)?.name || ''
+                            }
+                            return giftNameByUnitId[d.giftProductUnitId] || ''
+                          }
+                          // Fallback to query
+                          return d.giftProductQuery || ''
+                        })()}
+                        onChange={(e)=>{
+                          const q = e.target.value
+                          onChange(details.map((x,i)=> i===idx?{...x, giftProductQuery:q, showSuggestGiftProduct:true}:x))
+                        }}
+                      />
+                      {((d.giftProductQuery || '').trim().length > 0) && d.showSuggestGiftProduct && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
+                          {productOptions.filter(o => o.name.toLowerCase().includes(String(d.giftProductQuery).toLowerCase())).slice(0,8).map(opt => (
+                            <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={async ()=>{
+                              onChange(details.map((x,i)=> i===idx?{...x, giftProductId: opt.id, giftProductQuery: opt.name, showSuggestGiftProduct:false}:x))
+                              await loadUnitsForProduct(opt.id, true)
+                            }}>{opt.name}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Đơn vị sản phẩm tặng */}
+                    <div className="col-span-2 relative">
+                      <div className="text-xs text-gray-700 mb-1">Đơn vị</div>
+                      <input
+                        placeholder={d.giftProductId ? "Nhập đơn vị..." : "Chọn sản phẩm trước"}
+                        className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={(d.giftUnitQuery ?? getGiftUnitNameFromId(d.giftProductUnitId))}
+                        onChange={(e)=>{
+                          const q = e.target.value
+                          onChange(details.map((x,i)=> i===idx?{...x, giftUnitQuery:q, showSuggestGiftUnit:true}:x))
+                        }}
+                        disabled={!d.giftProductId}
+                      />
+                      {((d.giftUnitQuery || '').trim().length > 0) && d.showSuggestGiftUnit && d.giftProductId && giftUnitOptions.length > 0 && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
+                          {(() => {
+                            const filtered = giftUnitOptions.filter(o => o.label.toLowerCase().includes(String(d.giftUnitQuery).toLowerCase()))
+                            console.log('Gift unit query:', d.giftUnitQuery)
+                            console.log('Gift product ID:', d.giftProductId)
+                            console.log('Gift unit options:', giftUnitOptions)
+                            console.log('Filtered gift units:', filtered)
+                            return filtered.slice(0,8).map(opt => (
+                              <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={async ()=>{
+                                onChange(details.map((x,i)=> i===idx?{...x, giftProductUnitId: opt.id, giftUnitQuery: opt.label, showSuggestGiftUnit:false}:x))
+                                await resolveGiftName(opt.id)
+                              }}>{opt.label}</div>
+                            ))
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                    
+                      {/* Số lượng tặng (Y) */}
+                      <div className="col-span-1">
+                        <div className="text-xs text-gray-700 mb-1">SL tặng</div>
+                      <input placeholder="SL Y" className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.freeQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, freeQuantity:e.target.value}:x))} />
+                    </div>
+                    
+                    {/* Nút xóa */}
+                    <div className="col-span-1 flex items-end justify-end">
+                      <button className="px-2 py-1 text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
                     </div>
                   </>
                 )}

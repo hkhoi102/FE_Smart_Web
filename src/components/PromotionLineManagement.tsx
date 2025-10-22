@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import Modal from './Modal'
 import { PromotionServiceApi, PromotionMutations } from '@/services/promotionService'
+import { validatePromotionDates, getTodayString } from '@/utils/dateValidation'
 
 const PromotionLineManagement: React.FC = () => {
   const [lines, setLines] = useState<any[]>([])
@@ -24,6 +25,7 @@ const PromotionLineManagement: React.FC = () => {
     end_date: '',
     active: 1
   })
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   const loadHeadersAndLines = async () => {
     try {
@@ -96,6 +98,17 @@ const PromotionLineManagement: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Clear previous errors
+    setValidationErrors([])
+    
+    // Validate dates
+    const validation = validatePromotionDates(formData.start_date, formData.end_date, true) // Allow past dates for lines
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors)
+      return
+    }
+    
     const payload = {
       targetType: formData.target_type as any,
       targetId: formData.target_id,
@@ -585,6 +598,7 @@ const PromotionLineManagement: React.FC = () => {
               <input
                 type="date"
                 required
+                min={getTodayString()}
                 value={formData.start_date}
                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                 className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -598,6 +612,7 @@ const PromotionLineManagement: React.FC = () => {
               <input
                 type="date"
                 required
+                min={formData.start_date || getTodayString()}
                 value={formData.end_date}
                 onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                 className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"

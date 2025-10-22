@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { ProductService, Product, ProductCategory, ProductUnit, CreateProductRequest, UpdateProductRequest } from '@/services/productService'
 import { InventoryService, WarehouseDto, StockLocationDto } from '@/services/inventoryService'
 import { Pagination, ProductTable, ProductFormWithUnitsAndPrices, Modal, UnitManagement, PriceManagement, AccountManagement, InventoryManagement, InventoryCheckManagement, WarehouseTab, PromotionManagement, OrderManagement, OrderProcessingManagement, OrderListManagement, AdminSidebar } from '@/components'
@@ -10,7 +10,6 @@ import InventoryImportExportList from '@/components/InventoryImportExportList'
 import PriceHeaderDetail from '@/pages/PriceHeaderDetail'
 import InventoryCheckCreate from '@/pages/InventoryCheckCreate'
 import CategoryManagement from '@/components/CategoryManagement'
-import ReturnOrderManagement from '@/components/ReturnOrderManagement'
 
 const Admin = () => {
   const { user, logout, isAuthenticated } = useAuth()
@@ -26,9 +25,6 @@ const Admin = () => {
 
   // Detect price header detail page
   const isPriceHeaderDetail = location.pathname.startsWith('/admin/prices/') && headerId
-
-  // Detect return order page
-  const isReturnOrder = location.pathname.startsWith('/admin/return-order/')
 
   // State for products
   const [products, setProducts] = useState<Product[]>([])
@@ -48,8 +44,7 @@ const Admin = () => {
     (tab as TabType) ||
     (isInventoryCheckCreate ? 'inventory-check-create' :
      isPriceManagement ? 'prices' :
-     isPriceHeaderDetail ? 'prices' :
-     isReturnOrder ? 'return-processing' : 'overview')
+     isPriceHeaderDetail ? 'prices' : 'overview')
   )
 
   const handleTabChange = (next: TabType) => {
@@ -69,8 +64,6 @@ const Admin = () => {
       setCurrentTab('prices')
     } else if (isPriceHeaderDetail) {
       setCurrentTab('prices')
-    } else if (isReturnOrder) {
-      setCurrentTab('return-processing')
     } else if (tab) {
       setCurrentTab(tab as TabType)
     } else if (!tab && currentTab !== 'overview' && location.pathname === '/admin') {
@@ -896,14 +889,10 @@ const Admin = () => {
           )}
 
           {currentTab === 'return-processing' && (
-            isReturnOrder ? (
-              <ReturnOrderManagement />
-            ) : (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Xử lý đơn trả về</h2>
-                <p className="text-gray-600">Chức năng xử lý đơn trả về sẽ được triển khai ở đây.</p>
-              </div>
-            )
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Xử lý đơn trả về</h2>
+              <p className="text-gray-600">Chức năng xử lý đơn trả về sẽ được triển khai ở đây.</p>
+        </div>
           )}
 
           {currentTab === 'create-order' && (
@@ -1253,32 +1242,8 @@ const Admin = () => {
                                 const fresh = await ProductService.getProductById(targetProduct!.id)
                                 setDetailedProduct(fresh)
                                 openNotify('Thành công', 'Đã lưu barcode', 'success')
-                              } catch (err: any) {
-                                console.error('Error saving barcode:', err)
-
-                                // Xử lý lỗi 400 - trùng mã barcode
-                                if (err?.status === 400) {
-                                  let errorMessage = 'Không thể lưu barcode'
-
-                                  if (err?.message) {
-                                    const message = err.message.toLowerCase()
-                                    console.log('🔍 Barcode error message from backend:', err.message)
-
-                                    // Kiểm tra trùng mã barcode
-                                    if (message.includes('barcode') && (message.includes('already exists') || message.includes('đã tồn tại') ||
-                                        message.includes('duplicate') || message.includes('trùng'))) {
-                                      errorMessage = 'Mã barcode đã tồn tại. Vui lòng chọn mã khác.'
-                                    }
-                                    // Nếu có thông báo cụ thể từ backend, sử dụng nó
-                                    else if (err.message && err.message !== 'Failed to add barcode: 400 Bad Request') {
-                                      errorMessage = err.message
-                                    }
-                                  }
-
-                                  openNotify('Lỗi', errorMessage, 'error')
-                                } else {
-                                  openNotify('Thất bại', 'Không thể lưu barcode', 'error')
-                                }
+                              } catch (err) {
+                                openNotify('Thất bại', 'Không thể lưu barcode', 'error')
                               }
                             }}
                           >Lưu barcode</button>

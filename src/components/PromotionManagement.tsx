@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { PromotionService, PromotionType, TargetType } from '@/services/promotionService'
 import PromotionHeaderManagement from './PromotionHeaderManagement'
 import { ProductService } from '@/services/productService'
+import { validatePromotionDates, validatePromotionLinesDates, getTodayString } from '@/utils/dateValidation'
 
 export interface PromotionHeader {
   id: number
@@ -42,6 +43,8 @@ const PromotionManagement: React.FC = () => {
   const [headerForm, setHeaderForm] = useState({
     name: '', startDate: '', endDate: '', type: 'DISCOUNT_PERCENT' as PromotionType, active: true,
   })
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [lineValidationErrors, setLineValidationErrors] = useState<{[key: number]: string[]}>({})
   type LineItem = {
     targetType: TargetType
     targetId: number
@@ -52,6 +55,29 @@ const PromotionManagement: React.FC = () => {
   }
   const newLine = (): LineItem => ({ targetType: 'PRODUCT', targetId: 0, type: 'DISCOUNT_PERCENT' })
   const [lines, setLines] = useState<LineItem[]>([newLine()])
+
+  // Function to validate individual line
+  const validateLine = (line: LineItem, index: number) => {
+    if (!line.lineStartDate && !line.lineEndDate) {
+      setLineValidationErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[index]
+        return newErrors
+      })
+      return
+    }
+
+    const validation = validatePromotionDates(
+      line.lineStartDate || '', 
+      line.lineEndDate, 
+      true // Allow past dates for lines
+    )
+    
+    setLineValidationErrors(prev => ({
+      ...prev,
+      [index]: validation.isValid ? [] : validation.errors
+    }))
+  }
 
   const [productOptions, setProductOptions] = useState<Array<{ id: number; name: string }>>([])
   const [categoryOptions, setCategoryOptions] = useState<Array<{ id: number; name: string }>>([])
@@ -134,6 +160,25 @@ const PromotionManagement: React.FC = () => {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-5">
+              {/* Validation Errors */}
+              {validationErrors.length > 0 && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <h4 className="text-sm font-medium text-red-800 mb-2">Có lỗi xảy ra:</h4>
+                      <ul className="text-sm text-red-700 space-y-1">
+                        {validationErrors.map((error, index) => (
+                          <li key={index}>• {error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="space-y-6">
                 {/* Header Section */}
                 <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
@@ -163,6 +208,7 @@ const PromotionManagement: React.FC = () => {
                         <input 
                           type="date" 
                           value={headerForm.startDate} 
+                          min={getTodayString()}
                           onChange={e=>setHeaderForm({...headerForm, startDate:e.target.value})} 
                           className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
                         />
@@ -174,6 +220,7 @@ const PromotionManagement: React.FC = () => {
                         <input 
                           type="date" 
                           value={headerForm.endDate} 
+                          min={headerForm.startDate || getTodayString()}
                           onChange={e=>setHeaderForm({...headerForm, endDate:e.target.value})} 
                           className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
                         />
@@ -207,7 +254,16 @@ const PromotionManagement: React.FC = () => {
                     </div>
                     <button 
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm hover:shadow"
-                      onClick={()=>setLines(prev=>[...prev, newLine()])}
+                      onClick={()=>{
+                        const newLineItem = newLine()
+                        setLines(prev=>[...prev, newLineItem])
+                        // Clear validation errors for the new line
+                        setLineValidationErrors(prev => {
+                          const newErrors = { ...prev }
+                          delete newErrors[lines.length]
+                          return newErrors
+                        })
+                      }}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -254,8 +310,19 @@ const PromotionManagement: React.FC = () => {
                               <input 
                                 type="date" 
                                 value={ln.lineStartDate || ''} 
-                                onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineStartDate:e.target.value}:l))} 
-                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                                min={getTodayString()}
+                                onChange={e=>{
+                                  setLines(prev=>{
+                                    const newLines = prev.map((l,i)=> i===idx?{...l, lineStartDate:e.target.value}:l)
+                                    validateLine({...ln, lineStartDate: e.target.value}, idx)
+                                    return newLines
+                                  })
+                                }} 
+                                className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:border-green-500 transition-colors ${
+                                  lineValidationErrors[idx]?.length > 0 
+                                    ? 'border-red-300 focus:ring-red-500' 
+                                    : 'border-gray-300 focus:ring-green-500'
+                                }`}
                               />
                             </div>
                             <div>
@@ -268,16 +335,62 @@ const PromotionManagement: React.FC = () => {
                               <input 
                                 type="date" 
                                 value={ln.lineEndDate || ''} 
-                                onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineEndDate:e.target.value}:l))} 
-                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                                min={ln.lineStartDate || getTodayString()}
+                                onChange={e=>{
+                                  setLines(prev=>{
+                                    const newLines = prev.map((l,i)=> i===idx?{...l, lineEndDate:e.target.value}:l)
+                                    validateLine({...ln, lineEndDate: e.target.value}, idx)
+                                    return newLines
+                                  })
+                                }} 
+                                className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:border-green-500 transition-colors ${
+                                  lineValidationErrors[idx]?.length > 0 
+                                    ? 'border-red-300 focus:ring-red-500' 
+                                    : 'border-gray-300 focus:ring-green-500'
+                                }`}
                               />
                             </div>
                           </div>
+                          
+                          {/* Line validation errors */}
+                          {lineValidationErrors[idx]?.length > 0 && (
+                            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <div className="flex items-start">
+                                <svg className="w-4 h-4 text-red-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div>
+                                  <h5 className="text-xs font-medium text-red-800 mb-1">Dòng {idx + 1} có lỗi:</h5>
+                                  <ul className="text-xs text-red-700 space-y-0.5">
+                                    {lineValidationErrors[idx].map((error, errorIdx) => (
+                                      <li key={errorIdx}>• {error}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
                           {lines.length > 1 && (
                             <div className="flex justify-end mt-3 pt-3 border-t border-gray-200">
                               <button 
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-                                onClick={()=>setLines(prev=>prev.filter((_,i)=>i!==idx))}
+                                onClick={()=>{
+                                  setLines(prev=>prev.filter((_,i)=>i!==idx))
+                                  // Clear validation errors for the removed line and reindex remaining errors
+                                  setLineValidationErrors(prev => {
+                                    const newErrors: {[key: number]: string[]} = {}
+                                    Object.keys(prev).forEach(key => {
+                                      const index = parseInt(key)
+                                      if (index < idx) {
+                                        newErrors[index] = prev[index]
+                                      } else if (index > idx) {
+                                        newErrors[index - 1] = prev[index]
+                                      }
+                                    })
+                                    return newErrors
+                                  })
+                                }}
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -306,7 +419,47 @@ const PromotionManagement: React.FC = () => {
                 disabled={creating} 
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm hover:shadow"
                 onClick={async ()=>{
-                  if (!headerForm.name.trim() || !headerForm.startDate) return
+                  // Clear previous errors
+                  setValidationErrors([])
+                  setLineValidationErrors({})
+                  
+                  // Basic validation
+                  if (!headerForm.name.trim() || !headerForm.startDate) {
+                    setValidationErrors(['Tên chương trình và ngày bắt đầu là bắt buộc'])
+                    return
+                  }
+
+                  // Validate header dates
+                  const headerValidation = validatePromotionDates(headerForm.startDate, headerForm.endDate)
+                  if (!headerValidation.isValid) {
+                    setValidationErrors(headerValidation.errors)
+                    return
+                  }
+
+                  // Validate all lines and collect errors
+                  let hasLineErrors = false
+                  const newLineErrors: {[key: number]: string[]} = {}
+                  
+                  lines.forEach((line, index) => {
+                    if (line.lineStartDate || line.lineEndDate) {
+                      const lineValidation = validatePromotionDates(
+                        line.lineStartDate || '', 
+                        line.lineEndDate, 
+                        true // Allow past dates for lines
+                      )
+                      if (!lineValidation.isValid) {
+                        newLineErrors[index] = lineValidation.errors
+                        hasLineErrors = true
+                      }
+                    }
+                  })
+                  
+                  if (hasLineErrors) {
+                    setLineValidationErrors(newLineErrors)
+                    setValidationErrors(['Vui lòng kiểm tra lại thông tin các dòng khuyến mãi'])
+                    return
+                  }
+
                   setCreating(true)
                   try {
                     const header = { name: headerForm.name.trim(), startDate: headerForm.startDate, endDate: headerForm.endDate || undefined, active: !!headerForm.active }
