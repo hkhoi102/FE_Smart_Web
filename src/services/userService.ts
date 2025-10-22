@@ -8,6 +8,8 @@ export interface User {
   role: 'ADMIN' | 'MANAGER' | 'USER'
   phoneNumber: string
   active: boolean
+  defaultWarehouseId?: number | null
+  defaultStockLocationId?: number | null
   createdAt?: string
   otp?: string | null
   otpExpiresAt?: string | null
@@ -27,6 +29,8 @@ export interface CreateUserRequest {
   password: string
   phoneNumber: string
   role: 'ADMIN' | 'MANAGER' | 'USER'
+  defaultWarehouseId?: number | null
+  defaultStockLocationId?: number | null
 }
 
 export interface UpdateUserRequest {
@@ -34,6 +38,8 @@ export interface UpdateUserRequest {
   email: string
   phoneNumber: string
   role: 'ADMIN' | 'MANAGER' | 'USER'
+  defaultWarehouseId?: number | null
+  defaultStockLocationId?: number | null
 }
 
 export interface UpdateStatusRequest {
@@ -118,7 +124,17 @@ export class UserService {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || `Failed to create user: ${response.statusText}`)
+
+      // Handle specific error messages from backend
+      if (response.status === 400) {
+        if (errorData.error === 'Email exists') {
+          throw new Error(JSON.stringify({ error: 'Email exists' }))
+        } else if (errorData.error === 'Phone exists') {
+          throw new Error(JSON.stringify({ error: 'Phone exists' }))
+        }
+      }
+
+      throw new Error(errorData.message || errorData.error || `Failed to create user: ${response.statusText}`)
     }
 
     return response.json()

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { OrderApi } from '../services/orderService'
 import { ProductService } from '../services/productService'
+import { InventoryService } from '../services/inventoryService'
 import Modal from './Modal'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -72,6 +73,19 @@ const CreateOrderManagement: React.FC = () => {
   const [showPrintModal, setShowPrintModal] = useState(false)
   const [invoiceData, setInvoiceData] = useState<any>(null)
   const [autoCompleteOnPayment, setAutoCompleteOnPayment] = useState(false)
+  const [userWarehouseId, setUserWarehouseId] = useState<number>(1)
+  const [userStockLocationId, setUserStockLocationId] = useState<number>(1)
+
+  // Helper functions for auto-hide messages
+  const showErrorMessage = (message: string) => {
+    setError(message)
+    setTimeout(() => setError(null), 10000) // Auto-hide after 10 seconds
+  }
+
+  const showSuccessMessage = (message: string) => {
+    setSuccess(message)
+    setTimeout(() => setSuccess(null), 10000) // Auto-hide after 10 seconds
+  }
 
   // Enrich order details with product/unit names from productUnitId
   const enrichOrderDetails = async (details: Array<any>) => {
@@ -114,6 +128,56 @@ const CreateOrderManagement: React.FC = () => {
 
   useEffect(() => {
     fetchInitialData()
+  }, [])
+
+  // Load user's default warehouse and stock location
+  useEffect(() => {
+    const loadUserDefaults = async () => {
+      try {
+        const token = localStorage.getItem('access_token')
+        if (token) {
+          const userResponse = await fetch(`${API_BASE_URL}/users/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+
+          if (userResponse.ok) {
+            const userData = await userResponse.json()
+            const user = userData.data ?? userData
+
+            // Set user's default warehouse and stock location
+            if (user.defaultWarehouseId) {
+              setUserWarehouseId(user.defaultWarehouseId)
+            }
+            if (user.defaultStockLocationId) {
+              setUserStockLocationId(user.defaultStockLocationId)
+            }
+
+            console.log('✅ Loaded user defaults:', {
+              defaultWarehouseId: user.defaultWarehouseId,
+              defaultStockLocationId: user.defaultStockLocationId
+            })
+          } else {
+            // Handle backend error statuses (e.g., 400)
+            let message = 'Không thể tải thông tin người dùng'
+            try {
+              const errData = await userResponse.json()
+              message = errData?.message || message
+            } catch {}
+            if (userResponse.status === 400) {
+              showErrorMessage(message)
+            } else {
+              console.warn('⚠️ Load user defaults failed:', userResponse.status, message)
+            }
+          }
+        }
+      } catch (userError) {
+        console.warn('⚠️ Could not load user defaults:', userError)
+      }
+    }
+    loadUserDefaults()
   }, [])
 
   // Debounced local search for customer suggestions
@@ -292,7 +356,7 @@ const CreateOrderManagement: React.FC = () => {
         ]
         console.log('📋 Using fallback products with multiple units:', fallbackProducts)
         setProducts(fallbackProducts)
-        setError('Không thể tải sản phẩm từ database. Đang sử dụng dữ liệu mẫu.')
+        showErrorMessage('Không thể tải sản phẩm từ database. Đang sử dụng dữ liệu mẫu.')
       } else {
         console.log('✅ Products loaded successfully:', productUnits.length, 'products')
         setProducts(productUnits)
@@ -325,7 +389,7 @@ const CreateOrderManagement: React.FC = () => {
       setCustomers(mockCustomers)
       setPromotions([])
 
-      setError('Không thể tải dữ liệu từ server. Đang sử dụng dữ liệu mẫu để demo.')
+      showErrorMessage('Không thể tải dữ liệu từ server. Đang sử dụng dữ liệu mẫu để demo.')
     } finally {
       setLoading(false)
     }
@@ -336,6 +400,12 @@ const CreateOrderManagement: React.FC = () => {
 
     const product = products.find(p => p.id === selectedProduct)
     if (!product) return
+
+    // Kiểm tra sản phẩm có giá hay không
+    if (product.price <= 0) {
+      showErrorMessage('Sản phẩm chưa có giá. Vui lòng liên hệ để biết giá.')
+      return
+    }
 
     const existingItem = orderItems.find(item => item.productUnitId === selectedProduct)
 
@@ -414,6 +484,14 @@ const CreateOrderManagement: React.FC = () => {
 
             console.log('✅ Found product unit:', productUnit)
 
+            // Kiểm tra sản phẩm có giá hay không
+            if (productUnit.price <= 0) {
+              showErrorMessage('Sản phẩm chưa có giá. Vui lòng liên hệ để biết giá.')
+              setTimeout(() => setError(null), 5000)
+              setBarcodeInput('')
+              return
+            }
+
             // Thêm vào giỏ hàng
             const existingItem = orderItems.find(item => item.productUnitId === productUnit.id)
             if (existingItem) {
@@ -437,25 +515,34 @@ const CreateOrderManagement: React.FC = () => {
             }
 
             setBarcodeInput('')
-            setSuccess(`Đã thêm ${productUnit.productName} - ${productUnit.unitName}`)
+            showSuccessMessage(`Đã thêm ${productUnit.productName} - ${productUnit.unitName}`)
           } else {
-            setError('Sản phẩm không có đơn vị tính')
+            showErrorMessage('Sản phẩm không có đơn vị tính')
           }
         } else {
-          setError('Không tìm thấy sản phẩm với mã: ' + barcode)
+          showErrorMessage('Không tìm thấy sản phẩm với mã: ' + barcode)
         }
       } else {
-        setError('Không tìm thấy sản phẩm với mã: ' + barcode)
+        showErrorMessage('Không tìm thấy sản phẩm với mã: ' + barcode)
       }
     } catch (error) {
       console.error('Error searching barcode:', error)
-      setError('Lỗi khi tìm kiếm sản phẩm: ' + barcode)
+      showErrorMessage('Lỗi khi tìm kiếm sản phẩm: ' + barcode)
     } finally {
       setLoading(false)
     }
   }
 
   const handleQuickAdd = (productId: number) => {
+    const product = products.find(p => p.id === productId)
+    if (!product) return
+
+    // Kiểm tra sản phẩm có giá hay không
+    if (product.price <= 0) {
+      showErrorMessage('Sản phẩm chưa có giá. Vui lòng liên hệ để biết giá.')
+      return
+    }
+
     setSelectedProduct(productId)
     setQuantity(1)
     handleAddProduct()
@@ -516,18 +603,18 @@ const CreateOrderManagement: React.FC = () => {
             console.log('📷 ZXing found barcode from image:', text)
             await handleBarcodeScan(String(text))
           } else {
-            setError('Không tìm thấy mã vạch trong hình ảnh')
+            showErrorMessage('Không tìm thấy mã vạch trong hình ảnh')
           }
         } catch (e: any) {
           console.error('📷 Image barcode scan error:', e)
-          setError('Không thể quét mã vạch từ hình ảnh: ' + (e?.message || 'Lỗi không xác định'))
+          showErrorMessage('Không thể quét mã vạch từ hình ảnh: ' + (e?.message || 'Lỗi không xác định'))
         } finally {
           setLoading(false)
         }
       }
 
       img.onerror = () => {
-        setError('Không thể tải hình ảnh')
+        showErrorMessage('Không thể tải hình ảnh')
         setLoading(false)
       }
 
@@ -540,7 +627,7 @@ const CreateOrderManagement: React.FC = () => {
 
     } catch (e: any) {
       console.error('📷 Image barcode scan failed:', e)
-      setError('Lỗi khi quét mã vạch từ hình ảnh: ' + (e?.message || 'Lỗi không xác định'))
+      showErrorMessage('Lỗi khi quét mã vạch từ hình ảnh: ' + (e?.message || 'Lỗi không xác định'))
       setLoading(false)
     }
   }
@@ -611,7 +698,7 @@ const CreateOrderManagement: React.FC = () => {
         errorMessage += e?.message || 'Lỗi không xác định'
       }
 
-      setError(errorMessage)
+      showErrorMessage(errorMessage)
       await stopCameraScanner()
     }
   }
@@ -729,7 +816,7 @@ const CreateOrderManagement: React.FC = () => {
 
             // Chỉ hiển thị mã vạch vào input, không tự động gọi API
             setBarcodeInput(text)
-            setSuccess(`Đã quét được mã vạch: ${text}`)
+            showSuccessMessage(`Đã quét được mã vạch: ${text}`)
 
             // Tự động focus vào input để người dùng có thể nhấn Enter
             setTimeout(() => {
@@ -776,7 +863,7 @@ const CreateOrderManagement: React.FC = () => {
 
     } catch (e: any) {
       console.error('📷 ZXing error:', e)
-      setError('Không thể khởi động barcode scanner: ' + (e?.message || 'Lỗi không xác định'))
+      showErrorMessage('Không thể khởi động barcode scanner: ' + (e?.message || 'Lỗi không xác định'))
     }
   }
 
@@ -857,7 +944,7 @@ const CreateOrderManagement: React.FC = () => {
       // Kiểm tra token trước khi gọi API
       const isTokenValid = await checkAndRefreshToken()
       if (!isTokenValid) {
-        setError('Vui lòng đăng nhập lại để sử dụng tính năng preview.')
+        showErrorMessage('Vui lòng đăng nhập lại để sử dụng tính năng preview.')
         setOrderPreview(null)
         return
       }
@@ -902,17 +989,17 @@ const CreateOrderManagement: React.FC = () => {
 
         // Show user-friendly error
         if (response.status === 403) {
-          setError('Không có quyền truy cập API preview. Vui lòng kiểm tra đăng nhập.')
+          showErrorMessage('Không có quyền truy cập API preview. Vui lòng kiểm tra đăng nhập.')
         } else if (response.status === 401) {
-          setError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
+          showErrorMessage('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
         } else {
-          setError(`Lỗi API preview: ${response.status} ${response.statusText}`)
+          showErrorMessage(`Lỗi API preview: ${response.status} ${response.statusText}`)
         }
       }
     } catch (error) {
       console.error('❌ Error calling order/preview:', error)
       setOrderPreview(null)
-      setError('Lỗi kết nối API preview. Vui lòng thử lại.')
+      showErrorMessage('Lỗi kết nối API preview. Vui lòng thử lại.')
     } finally {
       setPreviewLoading(false)
     }
@@ -950,7 +1037,7 @@ const CreateOrderManagement: React.FC = () => {
         const confirmedResult = await updateOrderStatusAPI(orderId, 'CONFIRMED')
         setOrderStatus('CONFIRMED')
         setCurrentOrder(confirmedResult.data || confirmedResult)
-        setSuccess('Đã xác nhận đơn hàng!')
+        showSuccessMessage('Đã xác nhận đơn hàng!')
 
         // Bước 2: CONFIRMED → DELIVERING (xuất kho)
         setTimeout(async () => {
@@ -959,7 +1046,7 @@ const CreateOrderManagement: React.FC = () => {
             const deliveringResult = await updateOrderStatusAPI(orderId, 'DELIVERING')
             setOrderStatus('DELIVERING')
             setCurrentOrder(deliveringResult.data || deliveringResult)
-            setSuccess('Đã xuất kho! Đơn hàng đang được giao.')
+            showSuccessMessage('Đã xuất kho! Đơn hàng đang được giao.')
 
             // Bước 3: DELIVERING → COMPLETED (tự động) và mở in hóa đơn
             setTimeout(async () => {
@@ -980,7 +1067,7 @@ const CreateOrderManagement: React.FC = () => {
                 const completed = completedResult.data || completedResult
                 setOrderStatus('COMPLETED')
                 setCurrentOrder(completed)
-                setSuccess('Đơn hàng đã hoàn thành! Giao dịch thành công.')
+                showSuccessMessage('Đơn hàng đã hoàn thành! Giao dịch thành công.')
 
                 // Nếu COD thì cập nhật PAID
                 try {
@@ -997,17 +1084,17 @@ const CreateOrderManagement: React.FC = () => {
                 setShowPrintModal(true)
               } catch (error: any) {
                 console.error('❌ Error in step 3 (COMPLETED):', error)
-                setError('Lỗi khi hoàn thành đơn hàng: ' + error.message)
+                showErrorMessage('Lỗi khi hoàn thành đơn hàng: ' + error.message)
               }
             }, 1000)
           } catch (error: any) {
             console.error('❌ Error in step 2 (DELIVERING):', error)
-            setError('Lỗi khi xuất kho: ' + error.message)
+            showErrorMessage('Lỗi khi xuất kho: ' + error.message)
           }
         }, 1000)
       } catch (error: any) {
         console.error('❌ Error in step 1 (CONFIRMED):', error)
-        setError('Lỗi khi xác nhận đơn hàng: ' + error.message)
+        showErrorMessage('Lỗi khi xác nhận đơn hàng: ' + error.message)
       }
     }, 1000)
   }
@@ -1045,11 +1132,11 @@ const CreateOrderManagement: React.FC = () => {
       } else {
         const errorText = await response.text()
         console.error('❌ Failed to create payment intent:', response.status, errorText)
-        setError('Không thể tạo QR thanh toán: ' + response.statusText)
+        showErrorMessage('Không thể tạo QR thanh toán: ' + response.statusText)
       }
     } catch (error: any) {
       console.error('❌ Error creating payment intent:', error)
-      setError('Lỗi khi tạo QR thanh toán: ' + error.message)
+      showErrorMessage('Lỗi khi tạo QR thanh toán: ' + error.message)
     }
   }
 
@@ -1133,15 +1220,15 @@ const CreateOrderManagement: React.FC = () => {
       if (response.ok) {
         const result = await response.json()
         console.log('✅ Payment status updated:', result)
-        setSuccess('Đã xác nhận thanh toán! Đang xử lý đơn hàng...')
+        showSuccessMessage('Đã xác nhận thanh toán! Đang xử lý đơn hàng...')
       } else {
         const errorText = await response.text()
         console.error('❌ Failed to update payment status:', response.status, errorText)
-        setError('Không thể cập nhật trạng thái thanh toán')
+        showErrorMessage('Không thể cập nhật trạng thái thanh toán')
       }
     } catch (error: any) {
       console.error('❌ Error updating payment status:', error)
-      setError('Lỗi khi cập nhật trạng thái thanh toán: ' + error.message)
+      showErrorMessage('Lỗi khi cập nhật trạng thái thanh toán: ' + error.message)
     }
   }
 
@@ -1152,8 +1239,8 @@ const CreateOrderManagement: React.FC = () => {
     const requestBody = {
       status: newStatus,
       note: `POS: Chuyển trạng thái sang ${newStatus}`,
-      warehouseId: 1, // Default warehouse for POS
-      stockLocationId: 1 // Default stock location for POS
+      warehouseId: userWarehouseId,
+      stockLocationId: userStockLocationId
     }
 
     console.log('📋 Request body:', requestBody)
@@ -1230,7 +1317,7 @@ const CreateOrderManagement: React.FC = () => {
 
   const handleContinueToPayment = () => {
     if (orderItems.length === 0) {
-      setError('Vui lòng thêm sản phẩm vào giỏ hàng')
+      showErrorMessage('Vui lòng thêm sản phẩm vào giỏ hàng')
       return
     }
     setShowPaymentMethodModal(true)
@@ -1303,18 +1390,59 @@ const CreateOrderManagement: React.FC = () => {
 
   const handleCreateOrder = async () => {
     if (!isPOSMode && !selectedCustomer) {
-      setError('Vui lòng chọn khách hàng')
+      showErrorMessage('Vui lòng chọn khách hàng')
       return
     }
 
     if (orderItems.length === 0) {
-      setError('Vui lòng thêm ít nhất một sản phẩm')
+      showErrorMessage('Vui lòng thêm ít nhất một sản phẩm')
       return
     }
 
     try {
       setLoading(true)
       setError(null)
+
+      // 1) Check stock availability before creating order
+      try {
+        const checkItems = orderItems.map(item => ({ productUnitId: item.productUnitId, quantity: item.quantity }))
+        // Sử dụng kho/vị trí của user để kiểm tra tồn
+        const availability = await InventoryService.checkAvailability(checkItems, {
+          warehouseId: userWarehouseId,
+          stockLocationId: userStockLocationId
+        })
+        if (!availability.allAvailable) {
+          // Lấy số tồn thực tế từ API stock (tổng theo tất cả vị trí nếu BE trả về theo từng vị trí)
+          const stockMaps = await Promise.all(availability.unavailableItems.map(async (u) => {
+            try {
+              const balances = await InventoryService.getStock({ productUnitId: u.productUnitId })
+              const availableQty = Array.isArray(balances) ? balances.reduce((sum: number, b: any) => sum + (Number(b.availableQuantity ?? b.quantity ?? 0)), 0) : 0
+              return { id: u.productUnitId, available: availableQty }
+            } catch {
+              return { id: u.productUnitId, available: typeof u.available === 'number' ? u.available : 0 }
+            }
+          }))
+
+          const realAvailableById: Record<number, number> = {}
+          stockMaps.forEach(m => { realAvailableById[m.id] = m.available })
+
+          // Build readable error message
+          const lines = availability.unavailableItems.map(u => {
+            const oi = orderItems.find(it => it.productUnitId === u.productUnitId)
+            const name = oi ? `${oi.productName} (${oi.unitName})` : `PU#${u.productUnitId}`
+            const availableDisplay = realAvailableById[u.productUnitId] !== undefined ? realAvailableById[u.productUnitId] : (typeof u.available === 'number' ? u.available : 0)
+            return `${name}: yêu cầu ${u.required}, còn ${availableDisplay}`
+          })
+          showErrorMessage(lines.length > 0 ? `Hết hàng hoặc không đủ tồn kho cho:\n- ${lines.join('\n- ')}` : 'Một số sản phẩm đã hết hàng trong kho')
+          setLoading(false)
+          return
+        }
+      } catch (e: any) {
+        // If availability check itself fails unexpectedly, block to be safe
+        showErrorMessage('Không thể kiểm tra tồn kho. Vui lòng thử lại.')
+        setLoading(false)
+        return
+      }
 
       const orderDetails = orderItems.map(item => ({
         productUnitId: item.productUnitId,
@@ -1326,7 +1454,9 @@ const CreateOrderManagement: React.FC = () => {
         orderDetails,
         promotionAppliedId: selectedPromotion?.id,
         paymentMethod,
-        shippingAddress: shippingAddress || selectedCustomer?.address || ''
+        shippingAddress: shippingAddress || selectedCustomer?.address || '',
+        warehouseId: userWarehouseId,
+        stockLocationId: userStockLocationId
       }
 
       const result = await OrderApi.createOrder(orderData)
@@ -1350,22 +1480,22 @@ const CreateOrderManagement: React.FC = () => {
             }
             setInvoiceData(inv)
             setShowPrintModal(true)
-            setSuccess(`Đơn hàng #${result.id} đã hoàn thành!`)
+            showSuccessMessage(`Đơn hàng #${result.id} đã hoàn thành!`)
           } finally {
             setAutoCompleteOnPayment(false)
           }
         } else {
           // Xử lý thanh toán theo phương thức đã chọn (luồng cũ)
           if (paymentMethod === 'BANK_TRANSFER') {
-            setSuccess(`Đơn hàng #${result.id} đã tạo! Vui lòng quét QR để thanh toán.`)
+            showSuccessMessage(`Đơn hàng #${result.id} đã tạo! Vui lòng quét QR để thanh toán.`)
             await handleBankTransferPayment(result.id, total)
           } else {
-            setSuccess(`Đơn hàng #${result.id} đã tạo!`)
+            showSuccessMessage(`Đơn hàng #${result.id} đã tạo!`)
             await handleCashPaymentWorkflow(result.id, true)
           }
         }
       } else {
-        setSuccess(`Đơn hàng #${result.id} đã được tạo thành công!`)
+        showSuccessMessage(`Đơn hàng #${result.id} đã được tạo thành công!`)
 
         // Reset form cho mode thường
         setSelectedCustomer(null)
@@ -1379,7 +1509,7 @@ const CreateOrderManagement: React.FC = () => {
       }
 
     } catch (err: any) {
-      setError('Tạo đơn hàng thất bại: ' + err.message)
+      showErrorMessage('Tạo đơn hàng thất bại: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -1544,15 +1674,20 @@ const CreateOrderManagement: React.FC = () => {
                   {filteredProducts.slice(0, 8).map(product => (
                     <button
                       key={product.id}
-                      onClick={() => handleQuickAdd(product.id)}
-                      className="p-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-blue-300 transition-colors"
+                      onClick={() => product.price > 0 && handleQuickAdd(product.id)}
+                      disabled={product.price <= 0}
+                      className={`p-3 text-left border rounded-lg transition-colors ${
+                        product.price > 0
+                          ? 'border-gray-200 hover:bg-gray-50 hover:border-blue-300 cursor-pointer'
+                          : 'border-gray-300 bg-gray-100 cursor-not-allowed opacity-60'
+                      }`}
                     >
                       <div className="text-sm font-medium text-gray-900">{product.productName}</div>
                       <div className="text-xs text-gray-500 mb-1">
                         Đơn vị: {product.unitName}
                       </div>
                       <div className="text-xs text-blue-600 font-medium">
-                        {formatCurrency(product.price)}
+                        {product.price > 0 ? formatCurrency(product.price) : 'Liên hệ'}
                       </div>
                       {product.stock > 0 && (
                         <div className="text-xs text-green-600">
@@ -1704,6 +1839,7 @@ const CreateOrderManagement: React.FC = () => {
               </div>
             </div>
           )}
+
 
           {/* Order Notes */}
           <div className="bg-white shadow rounded-lg p-6">
@@ -2143,7 +2279,7 @@ const CreateOrderManagement: React.FC = () => {
                     // Copy payment info to clipboard
                     const paymentText = `Số tài khoản: ${paymentInfo.accountNumber}\nTên: ${paymentInfo.accountName}\nNgân hàng: ${getBankName(paymentInfo.bankCode)}\nSố tiền: ${formatCurrency(currentOrder?.totalAmount || 0)}\nNội dung: ${paymentInfo.transferContent}`
                     navigator.clipboard.writeText(paymentText)
-                    setSuccess('Đã copy thông tin chuyển khoản!')
+                    showSuccessMessage('Đã copy thông tin chuyển khoản!')
                   }}
                   className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 font-medium"
                 >
@@ -2308,7 +2444,7 @@ const CreateOrderManagement: React.FC = () => {
               <option value="">Chọn sản phẩm</option>
               {products.map(product => (
                 <option key={product.id} value={product.id}>
-                  {product.productName} - {product.unitName} - {formatCurrency(product.price)}
+                  {product.productName} - {product.unitName} - {product.price > 0 ? formatCurrency(product.price) : 'Liên hệ'}
                   {product.stock > 0 ? ` (Còn: ${product.stock})` : ' (Hết hàng)'}
                 </option>
               ))}

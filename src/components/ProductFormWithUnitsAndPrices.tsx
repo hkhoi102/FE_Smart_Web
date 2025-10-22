@@ -21,8 +21,7 @@ const ProductFormWithUnitsAndPrices = ({
 }: ProductFormWithUnitsAndPricesProps) => {
   const [formData, setFormData] = useState({
     name: '',
-    // code removed from product level; code is managed per unit
-    code: '',
+    code: '', // Mã sản phẩm chung
     description: '',
     category_id: 1,
     image_url: '',
@@ -38,7 +37,7 @@ const ProductFormWithUnitsAndPrices = ({
     conversionFactor: number;
     isDefault: boolean;
     active: boolean;
-    productCode?: string; // MaSP for this unit
+    // productCode removed - using common product code instead
     barcodeCode: string;
     barcodeType: string;
     prices: Array<{
@@ -51,7 +50,7 @@ const ProductFormWithUnitsAndPrices = ({
   }>>([])
 
   const [newUnitId, setNewUnitId] = useState<number | ''>('')
-  const [newUnitCF, setNewUnitCF] = useState<number>(1)
+  const [newUnitCF, setNewUnitCF] = useState<number | ''>(1)
   const [newUnitIsDefault, setNewUnitIsDefault] = useState<boolean>(false)
   // Barcode inputs removed from add-new-unit UI
 
@@ -94,7 +93,7 @@ const ProductFormWithUnitsAndPrices = ({
     if (product) {
       setFormData({
         name: product.name,
-        code: '',
+        code: product.code || '', // Sử dụng mã sản phẩm chung
         description: product.description,
         category_id: (product as any).categoryId || (product as any).category_id,
         image_url: (product as any).imageUrl || (product as any).image_url || '',
@@ -115,7 +114,7 @@ const ProductFormWithUnitsAndPrices = ({
         conversionFactor: u.conversionFactor,
         isDefault: !!u.isDefault,
         active: (u as any).active !== undefined ? (u as any).active : true,
-        productCode: (u as any).code || (u as any).productCode || '',
+        // productCode removed - using common product code
         barcodeCode: '',
         barcodeType: 'EAN13',
         prices: [] as Array<{ price: number; validFrom: string; validTo: string; isNew?: boolean }>
@@ -222,6 +221,9 @@ const ProductFormWithUnitsAndPrices = ({
     const selectedUnit = allUnits.find(u => u.id === Number(newUnitId))
     if (!selectedUnit) return
 
+    // Đảm bảo conversionFactor là số hợp lệ
+    const validConversionFactor = typeof newUnitCF === 'number' && newUnitCF > 0 ? newUnitCF : 1
+
     // Nếu đây là đơn vị đầu tiên và chưa có đơn vị mặc định nào, tự động đặt làm mặc định
     const isFirstUnit = productUnits.length === 0
     const shouldBeDefault = newUnitIsDefault || (isFirstUnit && !productUnits.some(u => u.isDefault))
@@ -230,10 +232,10 @@ const ProductFormWithUnitsAndPrices = ({
       id: Date.now(), // temporary ID
       unitId: Number(newUnitId),
       unitName: selectedUnit.name,
-      conversionFactor: newUnitCF,
+      conversionFactor: validConversionFactor,
       isDefault: shouldBeDefault,
       active: true,
-      productCode: '',
+      // productCode removed - using common product code
       barcodeCode: '',
       barcodeType: 'EAN13',
       prices: [] // Không thêm giá khi tạo đơn vị mới
@@ -286,11 +288,7 @@ const ProductFormWithUnitsAndPrices = ({
     ))
   }
 
-  const updateUnitCode = (unitId: number, productCode: string) => {
-    setProductUnits(prev => prev.map(u =>
-      u.id === unitId ? { ...u, productCode } : u
-    ))
-  }
+  // updateUnitCode removed - using common product code instead
 
   const setDefaultUnit = (unitId: number) => {
     setProductUnits(prev => prev.map(u => ({
@@ -539,16 +537,20 @@ const ProductFormWithUnitsAndPrices = ({
     e.preventDefault()
 
     if (!formData.name.trim()) {
-      alert('Vui lòng nhập tên sản phẩm')
+      showErrorToUser('Vui lòng nhập tên sản phẩm')
       return
     }
 
-    // Không yêu cầu mã sản phẩm ở cấp sản phẩm nữa; sẽ nhập theo đơn vị
+    if (!formData.code.trim()) {
+      showErrorToUser('Vui lòng nhập mã sản phẩm')
+      return
+    }
 
     // Không ràng buộc giá trong modal Sản phẩm; phần giá xử lý ở trang Giá
 
     const productData = {
       name: formData.name,
+      code: formData.code, // Thêm mã sản phẩm chung
       description: formData.description,
       expirationDate: formData.expiration_date || undefined,
       categoryId: formData.category_id,
@@ -571,9 +573,21 @@ const ProductFormWithUnitsAndPrices = ({
           } else {
             createdProduct = await ProductService.createProductWithImage(productData as any, imageFile)
           }
-        } catch (err) {
-          // fallback to regular creation
-          createdProduct = await ProductService.createProduct(productData as any)
+        } catch (err: any) {
+          // Chỉ fallback nếu lỗi không phải 400 (trùng mã/tên)
+          if (err?.status === 400) {
+            throw err // Re-throw lỗi 400 để xử lý ở catch block chính
+          }
+          // fallback to regular creation chỉ cho lỗi khác (như upload ảnh)
+          try {
+            createdProduct = await ProductService.createProduct(productData as any)
+          } catch (fallbackErr: any) {
+            // Nếu fallback cũng lỗi 400, throw lỗi gốc
+            if (fallbackErr?.status === 400) {
+              throw fallbackErr
+            }
+            throw err // Throw lỗi gốc nếu fallback lỗi khác
+          }
         }
       } else {
         // Regular creation without image
@@ -625,14 +639,7 @@ const ProductFormWithUnitsAndPrices = ({
             }
 
             if (productUnitId) {
-              // Update MaSP for unit if provided
-              try {
-                if (unit.productCode && unit.productCode.trim()) {
-                  await ProductService.updateProductUnitCode(productUnitId, unit.productCode.trim())
-                }
-              } catch (codeErr) {
-                console.warn('Failed to set unit code:', codeErr)
-              }
+              // Unit code handling removed - using common product code instead
               // Upsert barcode: delete existing then add if provided
               try {
                 const { BarcodeService } = await import('@/services/barcodeService')
@@ -643,8 +650,31 @@ const ProductFormWithUnitsAndPrices = ({
                 if (unit.barcodeCode && unit.barcodeCode.trim()) {
                   await BarcodeService.addBarcode(productUnitId, unit.barcodeCode.trim(), unit.barcodeType)
                 }
-              } catch (barcodeErr) {
+              } catch (barcodeErr: any) {
                 console.warn('Failed to upsert barcode:', barcodeErr)
+
+                // Xử lý lỗi 400 - trùng mã barcode
+                if (barcodeErr?.status === 400) {
+                  let errorMessage = 'Có lỗi xảy ra khi lưu barcode'
+
+                  if (barcodeErr?.message) {
+                    const message = barcodeErr.message.toLowerCase()
+                    console.log('🔍 Barcode error message from backend:', barcodeErr.message)
+
+                    // Kiểm tra trùng mã barcode
+                    if (message.includes('barcode') && (message.includes('already exists') || message.includes('đã tồn tại') ||
+                        message.includes('duplicate') || message.includes('trùng'))) {
+                      errorMessage = 'Mã barcode đã tồn tại. Vui lòng chọn mã khác.'
+                    }
+                    // Nếu có thông báo cụ thể từ backend, sử dụng nó
+                    else if (barcodeErr.message && barcodeErr.message !== 'Failed to add barcode: 400 Bad Request') {
+                      errorMessage = barcodeErr.message
+                    }
+                  }
+
+                  showErrorToUser(errorMessage)
+                  return // Dừng xử lý nếu có lỗi barcode
+                }
               }
 
               // Add prices if any (only when editing and user selected header)
@@ -811,22 +841,54 @@ const ProductFormWithUnitsAndPrices = ({
 
       // Chỉ hiển thị thông báo thành công nếu không có lỗi
       if (!hasErrors) {
-        if (productUnits.length > 0) {
-          if (product && totalPricesAdded > 0) {
-            alert(`Sản phẩm đã được cập nhật thành công với ${productUnits.length} đơn vị và ${totalPricesAdded} giá!`)
-          } else {
-            alert(`Sản phẩm đã được ${product ? 'cập nhật' : 'tạo'} thành công với ${productUnits.length} đơn vị!`)
-          }
-        } else {
-          alert(`Sản phẩm đã được ${product ? 'cập nhật' : 'tạo'} thành công!`)
-        }
+        // Thông báo thành công sẽ được hiển thị qua modal từ component cha
+        console.log('✅ Sản phẩm đã được lưu thành công')
       } else {
         // Nếu có lỗi, không hiển thị thông báo thành công
         console.log('❌ Có lỗi xảy ra, không hiển thị thông báo thành công')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating/updating product:', error)
-      alert('Có lỗi xảy ra khi lưu sản phẩm')
+
+      // Xử lý lỗi 400 - trùng mã hoặc tên sản phẩm
+      if (error?.status === 400 || error?.response?.status === 400) {
+        let errorMessage = 'Có lỗi xảy ra khi lưu sản phẩm'
+
+        // Kiểm tra thông báo lỗi từ backend
+        if (error?.message) {
+          const message = error.message.toLowerCase()
+          console.log('🔍 Error message from backend:', error.message)
+
+          // Kiểm tra trùng mã sản phẩm
+          if (message.includes('mã sản phẩm đã tồn tại') || message.includes('product code already exists') ||
+              message.includes('code') && (message.includes('already exists') || message.includes('đã tồn tại'))) {
+            errorMessage = 'Mã sản phẩm đã tồn tại. Vui lòng chọn mã khác.'
+          }
+          // Kiểm tra trùng tên sản phẩm
+          else if (message.includes('product with name') && message.includes('already exists') ||
+                   message.includes('tên') && message.includes('đã tồn tại') ||
+                   message.includes('name') && message.includes('already exists')) {
+            errorMessage = 'Tên sản phẩm đã tồn tại. Vui lòng chọn tên khác.'
+          }
+          // Kiểm tra trùng chung
+          else if (message.includes('duplicate') || message.includes('trùng') || message.includes('đã tồn tại') ||
+                   message.includes('already exists')) {
+            errorMessage = 'Thông tin sản phẩm đã tồn tại. Vui lòng kiểm tra lại.'
+          }
+          // Nếu có thông báo cụ thể từ backend, sử dụng nó
+          else if (error.message && error.message !== 'Failed to create product: 400 Bad Request' &&
+                   error.message !== 'Failed to update product: 400 Bad Request') {
+            errorMessage = error.message
+          }
+        }
+
+        console.log('📢 Displaying error message:', errorMessage)
+        showErrorToUser(errorMessage)
+        return
+      }
+
+      // Lỗi khác
+      showErrorToUser('Có lỗi xảy ra khi lưu sản phẩm. Vui lòng thử lại.')
     }
   }
 
@@ -861,7 +923,7 @@ const ProductFormWithUnitsAndPrices = ({
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-6">
-          {/* Tên sản phẩm và Ảnh sản phẩm cùng hàng */}
+          {/* Tên sản phẩm và Mã sản phẩm cùng hàng */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -879,11 +941,30 @@ const ProductFormWithUnitsAndPrices = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mã sản phẩm *
+              </label>
+              <input
+                type="text"
+                name="code"
+                value={formData.code}
+                onChange={handleInputChange}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                placeholder="Nhập mã sản phẩm"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Ảnh sản phẩm, Danh mục và Trạng thái cùng hàng */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Ảnh sản phẩm */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Ảnh sản phẩm
               </label>
               {imagePreview && (
-                <img src={imagePreview} alt="preview" className="mb-2 h-20 w-20 object-cover rounded" />
+                <img src={imagePreview} alt="preview" className="mb-2 h-16 w-16 object-cover rounded" />
               )}
               <div className="flex items-center gap-2">
                 <input
@@ -909,10 +990,8 @@ const ProductFormWithUnitsAndPrices = ({
               </div>
               <p className="text-xs text-gray-500 mt-1">{uploading ? 'Đang xử lý ảnh...' : 'Chọn ảnh từ máy tính'}</p>
             </div>
-          </div>
 
-          {/* Danh mục và Trạng thái cùng hàng */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Danh mục */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Danh mục *
@@ -932,6 +1011,7 @@ const ProductFormWithUnitsAndPrices = ({
               </select>
             </div>
 
+            {/* Trạng thái */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Trạng thái
@@ -1002,7 +1082,25 @@ const ProductFormWithUnitsAndPrices = ({
                   type="number"
                   min="1"
                   value={newUnitCF}
-                  onChange={(e) => setNewUnitCF(Number(e.target.value))}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value === '') {
+                      // Cho phép xóa hoàn toàn
+                      setNewUnitCF('')
+                    } else {
+                      // Loại bỏ các số 0 ở đầu và chuyển đổi thành số
+                      const cleanValue = parseInt(value, 10)
+                      if (!isNaN(cleanValue) && cleanValue > 0) {
+                        setNewUnitCF(cleanValue)
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Khi mất focus, đảm bảo có giá trị hợp lệ
+                    if (e.target.value === '' || e.target.value === '0') {
+                      setNewUnitCF(1)
+                    }
+                  }}
                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                 />
               </div>
@@ -1043,9 +1141,8 @@ const ProductFormWithUnitsAndPrices = ({
               <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
                 {/* Table Header */}
                 <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
-                  <div className="grid grid-cols-10 gap-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
+                  <div className="grid grid-cols-6 gap-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
                     <div className="col-span-2">Đơn vị</div>
-                    <div className="col-span-4">Mã SP</div>
                     <div className="col-span-4">Barcode</div>
                   </div>
                 </div>
@@ -1056,7 +1153,7 @@ const ProductFormWithUnitsAndPrices = ({
                     <div key={unit.id} className={`px-3 py-2 transition-colors ${
                       unit.active ? 'hover:bg-gray-50' : 'bg-gray-50 opacity-75'
                     }`}>
-                      <div className="grid grid-cols-10 gap-2 items-center">
+                      <div className="grid grid-cols-6 gap-2 items-center">
                         {/* Đơn vị + Hệ số + Badge */}
                         <div className="col-span-2">
                           <div className="flex items-center gap-1">
@@ -1066,17 +1163,6 @@ const ProductFormWithUnitsAndPrices = ({
                             )}
                           </div>
                           <div className="text-xs text-gray-500">Hệ số: {unit.conversionFactor}</div>
-                        </div>
-
-                        {/* Mã SP */}
-                        <div className="col-span-4">
-                          <input
-                            type="text"
-                            value={unit.productCode || ''}
-                            onChange={(e) => updateUnitCode(unit.id, e.target.value)}
-                            placeholder="Nhập mã SP"
-                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
-                          />
                         </div>
 
                         {/* Barcode */}

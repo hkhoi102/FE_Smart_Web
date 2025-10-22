@@ -29,6 +29,17 @@ const InventoryImportExportList = () => {
   })
   const [currentPage, setCurrentPage] = useState(1)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null)
+  const [notify, setNotify] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' | 'info' }>({
+    open: false,
+    title: '',
+    message: '',
+    type: 'info'
+  })
+  const [rejectModal, setRejectModal] = useState<{ open: boolean; documentId: number | null; reason: string }>({
+    open: false,
+    documentId: null,
+    reason: ''
+  })
 
   useEffect(() => {
     loadWarehouses()
@@ -37,6 +48,22 @@ const InventoryImportExportList = () => {
   useEffect(() => {
     loadDocuments()
   }, [selectedWarehouse])
+
+  const openNotify = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotify({ open: true, title, message, type })
+  }
+
+  const closeNotify = () => {
+    setNotify({ open: false, title: '', message: '', type: 'info' })
+  }
+
+  const openRejectModal = (documentId: number) => {
+    setRejectModal({ open: true, documentId, reason: '' })
+  }
+
+  const closeRejectModal = () => {
+    setRejectModal({ open: false, documentId: null, reason: '' })
+  }
 
   const loadWarehouses = async () => {
     try {
@@ -124,25 +151,32 @@ const InventoryImportExportList = () => {
   const handleApprove = async (documentId: number) => {
     try {
       await InventoryService.approveDocument(documentId)
-      alert('Phiếu đã được chấp nhận!')
+      openNotify('Thành công', 'Phiếu đã được chấp nhận!', 'success')
       loadDocuments() // Reload danh sách
     } catch (error) {
       console.error('Error approving document:', error)
-      alert('Có lỗi xảy ra khi chấp nhận phiếu: ' + (error as Error).message)
+      openNotify('Lỗi', 'Có lỗi xảy ra khi chấp nhận phiếu: ' + (error as Error).message, 'error')
     }
   }
 
-  const handleReject = async (documentId: number) => {
-    const reason = prompt('Nhập lý do từ chối:')
-    if (reason === null) return // User cancelled
+  const handleReject = (documentId: number) => {
+    openRejectModal(documentId)
+  }
+
+  const confirmReject = async () => {
+    if (!rejectModal.documentId || !rejectModal.reason.trim()) {
+      openNotify('Lỗi', 'Vui lòng nhập lý do từ chối', 'error')
+      return
+    }
 
     try {
-      await InventoryService.rejectDocument(documentId, reason)
-      alert('Phiếu đã bị từ chối!')
+      await InventoryService.rejectDocument(rejectModal.documentId, rejectModal.reason)
+      openNotify('Thành công', 'Phiếu đã bị từ chối!', 'success')
+      closeRejectModal()
       loadDocuments() // Reload danh sách
     } catch (error) {
       console.error('Error rejecting document:', error)
-      alert('Có lỗi xảy ra khi từ chối phiếu: ' + (error as Error).message)
+      openNotify('Lỗi', 'Có lỗi xảy ra khi từ chối phiếu: ' + (error as Error).message, 'error')
     }
   }
 
@@ -157,10 +191,10 @@ const InventoryImportExportList = () => {
       if (s === 'rejected' || s === 'cancelled') return 0
       return -1
     }
-    
+
     const aPriority = getStatusPriority(a.status)
     const bPriority = getStatusPriority(b.status)
-    
+
     if (sortOrder === 'asc') {
       return aPriority - bPriority // cancelled first, then pending, then approved
     } else {
@@ -259,7 +293,7 @@ const InventoryImportExportList = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Số phiếu
                     </th>
-                    <th 
+                    <th
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                       onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : sortOrder === 'desc' ? null : 'asc')}
                     >
@@ -354,6 +388,96 @@ const InventoryImportExportList = () => {
           )}
         </div>
       </div>
+
+      {/* Notification Modal */}
+      {notify.open && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={closeNotify} />
+            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h3 className={`text-lg font-semibold ${notify.type === 'success' ? 'text-green-900' : notify.type === 'error' ? 'text-red-900' : 'text-blue-900'}`}>
+                  {notify.title}
+                </h3>
+                <button onClick={closeNotify} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-6">
+                <p className={`text-sm ${notify.type === 'success' ? 'text-green-700' : notify.type === 'error' ? 'text-red-700' : 'text-blue-700'}`}>
+                  {notify.message}
+                </p>
+              </div>
+              <div className="flex justify-end px-6 py-4 border-t bg-gray-50">
+                <button
+                  onClick={closeNotify}
+                  className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                    notify.type === 'success'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : notify.type === 'error'
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {rejectModal.open && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={closeRejectModal} />
+            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h3 className="text-lg font-semibold text-red-900">
+                  Từ chối phiếu
+                </h3>
+                <button onClick={closeRejectModal} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-6">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Lý do từ chối *
+                  </label>
+                  <textarea
+                    value={rejectModal.reason}
+                    onChange={(e) => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
+                    placeholder="Nhập lý do từ chối phiếu..."
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50">
+                <button
+                  onClick={closeRejectModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={confirmReject}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700"
+                >
+                  Từ chối
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

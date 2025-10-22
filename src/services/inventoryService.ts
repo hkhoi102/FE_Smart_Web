@@ -130,6 +130,70 @@ export interface CheckItemDto {
 }
 
 export const InventoryService = {
+  // Check availability for a list of items before creating an order
+  async checkAvailability(
+    items: Array<{ productUnitId: number; quantity: number }>,
+    options?: { warehouseId?: number; stockLocationId?: number }
+  ): Promise<{ allAvailable: boolean; unavailableItems: Array<{ productUnitId: number; required: number; available: number }> }> {
+    const url = `${API_BASE_URL}/inventory/stock/check-availability`
+    console.log('🔍 Checking stock availability (single-item calls):', { url, items, options })
+
+    try {
+      const unavailable: Array<{ productUnitId: number; required: number; available: number }> = []
+      for (const it of items) {
+        const singleBody: any = {
+          productUnitId: it.productUnitId,
+          requiredQuantity: it.quantity,
+          ...(options?.warehouseId !== undefined ? { warehouseId: options.warehouseId } : {}),
+          ...(options?.stockLocationId !== undefined ? { stockLocationId: options.stockLocationId } : {}),
+        }
+        const r = await fetch(url, { method: 'POST', headers: authHeaders(), body: JSON.stringify(singleBody) })
+        if (!r.ok) {
+          // Treat error as insufficient to be safe
+          const text = await r.text().catch(() => '')
+          console.warn('⚠️ Availability check failed for item:', it.productUnitId, r.status, text)
+          unavailable.push({ productUnitId: it.productUnitId, required: it.quantity, available: 0 })
+          continue
+        }
+        const jd = await r.json().catch(() => ({}))
+        const pay: any = jd?.data ?? jd
+
+        // Strict quantity-based validation: only numeric quantities decide pass/fail
+        const requiredQty = Number(pay?.requiredQuantity ?? it.quantity)
+        let availableQtyNum = pay && typeof pay === 'object'
+          ? (pay.availableQuantity ?? pay.quantityAvailable ?? pay.availableStock ?? pay.stock ?? pay.balance ?? pay.remaining ?? pay.remainingQuantity)
+          : undefined
+
+        // If backend provides shortageQuantity, derive available = required - shortage
+        if (typeof pay?.shortageQuantity === 'number' && !Number.isNaN(Number(requiredQty))) {
+          const derived = Number(requiredQty) - Number(pay.shortageQuantity)
+          availableQtyNum = Math.max(derived, 0)
+        }
+
+        let availableQty = 0
+        if (typeof availableQtyNum === 'number' && !Number.isNaN(availableQtyNum)) {
+          availableQty = Number(availableQtyNum)
+        } else if (typeof pay === 'number') {
+          availableQty = Number(pay)
+        } else if (pay?.available === true || pay?.isAvailable === true || pay?.canFulfill === true || pay?.allAvailable === true) {
+          // Fallback when numeric fields are absent: treat true as sufficient
+          availableQty = requiredQty
+        } else {
+          // If nothing numeric present, default to 0 to be safe
+          availableQty = 0
+        }
+
+        const requiredToCompare = Number.isFinite(requiredQty) ? requiredQty : it.quantity
+        if (availableQty < requiredToCompare) {
+          unavailable.push({ productUnitId: it.productUnitId, required: it.quantity, available: Math.max(availableQty, 0) })
+        }
+      }
+      return { allAvailable: unavailable.length === 0, unavailableItems: unavailable }
+    } catch (e) {
+      console.warn('⚠️ Availability check error, optimistic allow:', e)
+      return { allAvailable: true, unavailableItems: [] }
+    }
+  },
   // Warehouses
   async getWarehouses(): Promise<WarehouseDto[]> {
     console.log('🔍 Fetching warehouses from:', `${API_BASE_URL}/warehouses`)
@@ -260,7 +324,21 @@ export const InventoryService = {
 
   async addDocumentLinesBulk(documentId: number, lines: Array<{ productUnitId: number; quantity: number }>): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/inventory/documents/${documentId}/lines/bulk`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ lines }) })
-    if (!res.ok) throw new Error('Failed to add document lines (bulk)')
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      let errorMessage = text || `Failed to add document lines (bulk): ${res.status} ${res.statusText}`
+      if (res.status === 400) {
+        try {
+          const errorData = JSON.parse(text)
+          if (errorData.message) errorMessage = errorData.message
+        } catch {
+          if (text && text.trim()) errorMessage = text
+        }
+      }
+      const error = new Error(errorMessage) as any
+      error.status = res.status
+      throw error
+    }
     return await res.json().catch(() => ({}))
   },
 
@@ -278,7 +356,25 @@ export const InventoryService = {
     }
   ): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/inventory/documents/${documentId}/lines`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(line) })
-    if (!res.ok) throw new Error('Failed to add document line')
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      let errorMessage = text || `Failed to add document line: ${res.status} ${res.statusText}`
+      if (res.status === 400) {
+        try {
+          const errorData = JSON.parse(text)
+          if (errorData.message) {
+            errorMessage = errorData.message
+          }
+        } catch (parseError) {
+          if (text && text.trim()) {
+            errorMessage = text
+          }
+        }
+      }
+      const error = new Error(errorMessage) as any
+      error.status = res.status
+      throw error
+    }
     return await res.json().catch(() => ({}))
   },
 

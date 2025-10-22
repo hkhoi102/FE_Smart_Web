@@ -26,6 +26,12 @@ const PriceManagement = () => {
   const [priceDetails, setPriceDetails] = useState<any[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string>('')
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+
+  // Notification modal
+  const [notify, setNotify] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' }>({ open: false, title: '', message: '', type: 'success' })
+  const openNotify = (title: string, message: string, type: 'success' | 'error' = 'success') => setNotify({ open: true, title, message, type })
+  const closeNotify = () => setNotify(prev => ({ ...prev, open: false }))
 
   const loadHeaders = async () => {
     try {
@@ -122,6 +128,38 @@ const PriceManagement = () => {
     setSelectedHeader(null)
     setPriceDetails([])
     setErrorMessage('')
+  }
+
+  const handleActivateHeader = async () => {
+    if (!selectedHeader) return
+    setIsUpdatingStatus(true)
+    try {
+      await ProductService.activatePriceHeader(selectedHeader.id)
+      openNotify('Thành công', 'Đã kích hoạt bảng giá', 'success')
+      await loadHeaders() // Reload danh sách để cập nhật trạng thái
+      closeDetailModal()
+    } catch (error: any) {
+      console.error('Error activating header:', error)
+      openNotify('Lỗi', error?.message || 'Không thể kích hoạt bảng giá', 'error')
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
+
+  const handleDeactivateHeader = async () => {
+    if (!selectedHeader) return
+    setIsUpdatingStatus(true)
+    try {
+      await ProductService.deactivatePriceHeader(selectedHeader.id)
+      openNotify('Thành công', 'Đã tạm ngưng bảng giá', 'success')
+      await loadHeaders() // Reload danh sách để cập nhật trạng thái
+      closeDetailModal()
+    } catch (error: any) {
+      console.error('Error deactivating header:', error)
+      openNotify('Lỗi', error?.message || 'Không thể tạm ngưng bảng giá', 'error')
+    } finally {
+      setIsUpdatingStatus(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -379,14 +417,60 @@ const PriceManagement = () => {
                 >
                   Đóng
                 </button>
+                {selectedHeader.active ? (
+                  <button
+                    onClick={handleDeactivateHeader}
+                    disabled={isUpdatingStatus}
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdatingStatus ? 'Đang xử lý...' : 'Tạm Ngưng'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleActivateHeader}
+                    disabled={isUpdatingStatus}
+                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdatingStatus ? 'Đang xử lý...' : 'Kích Hoạt'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Modal */}
+      {notify.open && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={closeNotify} />
+            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h3 className={`text-lg font-semibold ${notify.type === 'success' ? 'text-green-900' : 'text-red-900'}`}>
+                  {notify.title}
+                </h3>
+                <button onClick={closeNotify} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-6">
+                <p className={`text-sm ${notify.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
+                  {notify.message}
+                </p>
+              </div>
+              <div className="flex justify-end px-6 py-4 border-t bg-gray-50">
                 <button
-                  onClick={() => {
-                    closeDetailModal()
-                    navigate(`/admin/prices/${selectedHeader.id}`)
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700"
+                  onClick={closeNotify}
+                  className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                    notify.type === 'success'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-red-600 hover:bg-red-700'
+                  }`}
                 >
-                  Thêm/Sửa giá
+                  Đóng
                 </button>
               </div>
             </div>

@@ -15,8 +15,8 @@ import MyOrders from '@/pages/MyOrders'
 import Login from '@/pages/Login'
 import UserLogin from '@/pages/UserLogin'
 import Admin from '@/pages/Admin'
-import PriceHeaderDetail from '@/pages/PriceHeaderDetail'
 import PromotionDetail from '@/pages/PromotionDetail'
+import ReturnOrderPage from '@/pages/ReturnOrderPage'
 // InventoryCheckCreate is rendered inside Admin when tab=inventory-check-create
 import InventoryImportExportDetail from '@/components/InventoryImportExportDetail'
 
@@ -96,6 +96,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <PromotionDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/return-order-page/:orderId"
+                element={
+                  <ProtectedRoute>
+                    <ReturnOrderPage />
                   </ProtectedRoute>
                 }
               />

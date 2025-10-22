@@ -63,13 +63,25 @@ const InventoryCheckCreate = () => {
         const pid = s.productUnitId ?? s.product_unit_id
         if (!pid) continue
 
-        const enriched = await ProductService.getProductUnitById(Number(pid)).catch(() => null)
+        // Sử dụng dữ liệu từ API stock, nếu không có thì gọi API bổ sung
+        let productName = s.productName
+        let unitName = s.unitName
+        let productId = s.productId
+
+        // Nếu API stock không trả về thông tin sản phẩm, gọi API bổ sung
+        if (!productName || !unitName) {
+          const enriched = await ProductService.getProductUnitById(Number(pid)).catch(() => null)
+          productName = enriched?.productName ?? productName ?? `PU#${pid}`
+          unitName = enriched?.unitName ?? unitName ?? ''
+          productId = enriched?.productId ?? productId ?? 0
+        }
+
         units.push({
           id: Number(pid),
-          productId: enriched?.productId ?? 0,
-          productName: enriched?.productName ?? `PU#${pid}`,
-          unitName: enriched?.unitName ?? '',
-          systemQuantity: s.quantity ?? 0,
+          productId: productId,
+          productName: productName,
+          unitName: unitName,
+          systemQuantity: s.quantity ?? 0, // Sử dụng quantity từ API stock
           selected: false,
           actualQuantity: 0,
           note: ''
@@ -104,7 +116,13 @@ const InventoryCheckCreate = () => {
       return
     }
 
-    setSelectedProducts(selected)
+    // Tự động set số lượng thực tế bằng với số lượng trong kho cho các sản phẩm đã chọn
+    const selectedWithActualQuantity = selected.map(p => ({
+      ...p,
+      actualQuantity: p.systemQuantity
+    }))
+
+    setSelectedProducts(selectedWithActualQuantity)
     setCurrentStep(2)
   }
 
