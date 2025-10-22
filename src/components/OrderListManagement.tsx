@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Order } from './OrderManagement'
 import Modal from './Modal'
 import OrderStatusTracker from './OrderStatusTracker'
@@ -9,6 +10,7 @@ import { ProductService } from '../services/productService'
 // Keeping detail shape flexible; concrete mapping happens at render time
 
 const OrderListManagement: React.FC = () => {
+  const navigate = useNavigate()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -340,7 +342,7 @@ const OrderListManagement: React.FC = () => {
       }
       const aMethodPriority = methodPriority[aMethod] || 0
       const bMethodPriority = methodPriority[bMethod] || 0
-      
+
       if (paymentMethodSortOrder === 'asc') {
         return aMethodPriority - bMethodPriority
       } else {
@@ -352,7 +354,7 @@ const OrderListManagement: React.FC = () => {
     if (dateSortOrder) {
       const aDate = new Date(a.created_at).getTime()
       const bDate = new Date(b.created_at).getTime()
-      
+
       if (dateSortOrder === 'asc') {
         return aDate - bDate
       } else {
@@ -370,7 +372,7 @@ const OrderListManagement: React.FC = () => {
       }
       const aPaymentPriority = paymentPriority[aPaymentStatus] || 0
       const bPaymentPriority = paymentPriority[bPaymentStatus] || 0
-      
+
       if (paymentSortOrder === 'asc') {
         return aPaymentPriority - bPaymentPriority
       } else {
@@ -388,7 +390,7 @@ const OrderListManagement: React.FC = () => {
       }
       const aStatusPriority = statusPriority[a.status] || 0
       const bStatusPriority = statusPriority[b.status] || 0
-      
+
       if (statusSortOrder === 'asc') {
         return aStatusPriority - bStatusPriority
       } else {
@@ -700,7 +702,7 @@ const OrderListManagement: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th 
+                  <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                     onClick={() => setDateSortOrder(dateSortOrder === 'asc' ? 'desc' : dateSortOrder === 'desc' ? null : 'asc')}
                   >
@@ -726,7 +728,7 @@ const OrderListManagement: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Giảm giá
                   </th>
-                  <th 
+                  <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                     onClick={() => setStatusSortOrder(statusSortOrder === 'asc' ? 'desc' : statusSortOrder === 'desc' ? null : 'asc')}
                   >
@@ -743,7 +745,7 @@ const OrderListManagement: React.FC = () => {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                     onClick={() => setPaymentSortOrder(paymentSortOrder === 'asc' ? 'desc' : paymentSortOrder === 'desc' ? null : 'asc')}
                   >
@@ -760,7 +762,7 @@ const OrderListManagement: React.FC = () => {
                       )}
                     </div>
                   </th>
-                   <th 
+                   <th
                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                      onClick={() => setPaymentMethodSortOrder(paymentMethodSortOrder === 'asc' ? 'desc' : paymentMethodSortOrder === 'desc' ? null : 'asc')}
                    >
@@ -1078,6 +1080,22 @@ const OrderListManagement: React.FC = () => {
                       updatedAt={selectedOrder.updated_at}
                     />
                   </div>
+                </div>
+
+                {/* Return Order Button */}
+                <div className="mt-6 pt-4 border-t">
+                  <button
+                    onClick={() => {
+                      setIsModalOpen(false)
+                      navigate(`/admin/return-order-page/${selectedOrder.id}`)
+                    }}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m5 14v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3" />
+                    </svg>
+                    Tạo đơn trả hàng
+                  </button>
                 </div>
               </div>
             )}

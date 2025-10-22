@@ -39,7 +39,28 @@ export const BarcodeService = {
     })
 
     if (!response.ok) {
-      throw new Error(`Failed to add barcode: ${response.statusText}`)
+      const text = await response.text().catch(() => '')
+      let errorMessage = text || `Failed to add barcode: ${response.status} ${response.statusText}`
+
+      // Xử lý lỗi 400 - trùng mã barcode
+      if (response.status === 400) {
+        try {
+          const errorData = JSON.parse(text)
+          console.log('🔍 Backend error response (barcode):', errorData)
+          if (errorData.message) {
+            errorMessage = errorData.message
+          }
+        } catch (parseError) {
+          console.log('⚠️ Could not parse error response as JSON (barcode):', text)
+          if (text && text.trim()) {
+            errorMessage = text
+          }
+        }
+      }
+
+      const error = new Error(errorMessage) as any
+      error.status = response.status
+      throw error
     }
 
     const result = await response.json()

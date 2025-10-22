@@ -73,7 +73,7 @@ const ProductTable = ({ products, categories, onEdit, onToggleUnitStatus, onView
                   {index + 1}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
-                  {unit?.code || 'Chưa có'}
+                  {product.code || 'Chưa có'}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap">
                   <div className="flex items-center">

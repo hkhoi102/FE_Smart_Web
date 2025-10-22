@@ -368,7 +368,31 @@ export class ProductService {
       headers: this.getAuthHeaders(),
       body: JSON.stringify(body),
     })
-    if (!res.ok) throw new Error(`Failed to create product: ${res.status} ${res.statusText}`)
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      let errorMessage = text || `Failed to create product: ${res.status} ${res.statusText}`
+
+      // Xử lý lỗi 400 - trùng mã/tên
+      if (res.status === 400) {
+        try {
+          const errorData = JSON.parse(text)
+          console.log('🔍 Backend error response:', errorData)
+          if (errorData.message) {
+            errorMessage = errorData.message
+          }
+        } catch (parseError) {
+          console.log('⚠️ Could not parse error response as JSON:', text)
+          // Nếu không parse được JSON, sử dụng text gốc nếu có
+          if (text && text.trim()) {
+            errorMessage = text
+          }
+        }
+      }
+
+      const error = new Error(errorMessage) as any
+      error.status = res.status
+      throw error
+    }
     const result = await res.json()
     return result.data ?? result
   }
@@ -412,13 +436,47 @@ export class ProductService {
     try { result = text ? JSON.parse(text) : null } catch (_) { result = text }
 
     if (!res.ok) {
-      // Chấp nhận các format thành công dù status lỗi
+      // Xử lý lỗi 400 - trùng mã/tên
+      let errorMessage = `Failed to create product with image: ${res.status} ${res.statusText}`
+      if (res.status === 400) {
+        try {
+          const errorData = JSON.parse(text)
+          console.log('🔍 Backend error response (with image):', errorData)
+          if (errorData.message) {
+            errorMessage = errorData.message
+            // Nếu có thông báo lỗi cụ thể về trùng mã/tên, không chấp nhận thành công
+            if (errorData.message.includes('already exists') || errorData.message.includes('đã tồn tại') ||
+                errorData.message.includes('duplicate') || errorData.message.includes('trùng')) {
+              const error = new Error(errorMessage) as any
+              error.status = res.status
+              throw error
+            }
+          }
+        } catch (parseError) {
+          console.log('⚠️ Could not parse error response as JSON (with image):', text)
+          if (text && text.trim()) {
+            errorMessage = text
+            // Nếu text chứa thông báo lỗi về trùng, không chấp nhận thành công
+            if (text.includes('already exists') || text.includes('đã tồn tại') ||
+                text.includes('duplicate') || text.includes('trùng')) {
+              const error = new Error(errorMessage) as any
+              error.status = res.status
+              throw error
+            }
+          }
+        }
+      }
+
+      // Chỉ chấp nhận thành công nếu không có lỗi trùng mã/tên
       const maybe = (result && (result.data || result.product || result.created || result))
       const candidate = Array.isArray(maybe) ? maybe[0] : maybe
       if (candidate && (candidate.id || result?.success === true)) {
         return candidate.id ? candidate : (result.data || candidate)
       }
-      throw new Error(`Failed to create product with image: ${res.status} ${res.statusText}`)
+
+      const error = new Error(errorMessage) as any
+      error.status = res.status
+      throw error
     }
 
     const data = (result && (result.data ?? result))
@@ -435,7 +493,30 @@ export class ProductService {
       headers: this.getAuthHeaders(),
       body: JSON.stringify(body),
     })
-    if (!res.ok) throw new Error(`Failed to update product: ${res.status} ${res.statusText}`)
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      let errorMessage = text || `Failed to update product: ${res.status} ${res.statusText}`
+
+      // Xử lý lỗi 400 - trùng mã/tên
+      if (res.status === 400) {
+        try {
+          const errorData = JSON.parse(text)
+          console.log('🔍 Backend error response (update):', errorData)
+          if (errorData.message) {
+            errorMessage = errorData.message
+          }
+        } catch (parseError) {
+          console.log('⚠️ Could not parse error response as JSON (update):', text)
+          if (text && text.trim()) {
+            errorMessage = text
+          }
+        }
+      }
+
+      const error = new Error(errorMessage) as any
+      error.status = res.status
+      throw error
+    }
     const result = await res.json()
     return result.data ?? result
   }
@@ -463,7 +544,30 @@ export class ProductService {
       })(),
       body: form,
     })
-    if (!res.ok) throw new Error(`Failed to update product with image: ${res.status} ${res.statusText}`)
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      let errorMessage = text || `Failed to update product with image: ${res.status} ${res.statusText}`
+
+      // Xử lý lỗi 400 - trùng mã/tên
+      if (res.status === 400) {
+        try {
+          const errorData = JSON.parse(text)
+          console.log('🔍 Backend error response (update with image):', errorData)
+          if (errorData.message) {
+            errorMessage = errorData.message
+          }
+        } catch (parseError) {
+          console.log('⚠️ Could not parse error response as JSON (update with image):', text)
+          if (text && text.trim()) {
+            errorMessage = text
+          }
+        }
+      }
+
+      const error = new Error(errorMessage) as any
+      error.status = res.status
+      throw error
+    }
     const result = await res.json().catch(() => ({}))
     return result.data ?? result
   }
@@ -724,6 +828,29 @@ export class ProductService {
       return result.data ?? result
     }
 
+    // Xử lý lỗi 400 - sản phẩm đã có giá trong header
+    if (res.status === 400) {
+      const text = await res.text().catch(() => '')
+      let errorMessage = text || `Failed to bulk add prices: ${res.status} ${res.statusText}`
+
+      try {
+        const errorData = JSON.parse(text)
+        console.log('🔍 Backend error response (bulk add prices):', errorData)
+        if (errorData.message) {
+          errorMessage = errorData.message
+        }
+      } catch (parseError) {
+        console.log('⚠️ Could not parse error response as JSON (bulk add prices):', text)
+        if (text && text.trim()) {
+          errorMessage = text
+        }
+      }
+
+      const error = new Error(errorMessage) as any
+      error.status = res.status
+      throw error
+    }
+
     // Attempt 2: wrapped payload with items [{ productCode, unitId, price }] for other BE versions
     const wrapped = { items: items.map(it => ({ productCode: it.productCode, unitId: it.productUnitId, price: it.price })) }
     res = await fetch(url, {
@@ -731,9 +858,124 @@ export class ProductService {
       headers: this.getAuthHeaders(),
       body: JSON.stringify(wrapped),
     })
-    if (!res.ok) throw new Error(`Failed to bulk add prices: ${res.status} ${res.statusText}`)
+    if (!res.ok) {
+      // Xử lý lỗi 400 cho attempt 2
+      if (res.status === 400) {
+        const text = await res.text().catch(() => '')
+        let errorMessage = text || `Failed to bulk add prices: ${res.status} ${res.statusText}`
+
+        try {
+          const errorData = JSON.parse(text)
+          console.log('🔍 Backend error response (bulk add prices attempt 2):', errorData)
+          if (errorData.message) {
+            errorMessage = errorData.message
+          }
+        } catch (parseError) {
+          console.log('⚠️ Could not parse error response as JSON (bulk add prices attempt 2):', text)
+          if (text && text.trim()) {
+            errorMessage = text
+          }
+        }
+
+        const error = new Error(errorMessage) as any
+        error.status = res.status
+        throw error
+      }
+
+      throw new Error(`Failed to bulk add prices: ${res.status} ${res.statusText}`)
+    }
     const result2 = await res.json().catch(() => ([]))
     return result2.data ?? result2
+  }
+
+  // Activate price header
+  static async activatePriceHeader(priceHeaderId: number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/price-headers/${priceHeaderId}/activate`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders(),
+      })
+      if (!res.ok) throw new Error(`Failed to activate price header: ${res.status} ${res.statusText}`)
+      const result = await res.json()
+      return result.data ?? result
+    } catch (error) {
+      console.error('Error activating price header:', error)
+      throw error
+    }
+  }
+
+  // Deactivate price header
+  static async deactivatePriceHeader(priceHeaderId: number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/price-headers/${priceHeaderId}/deactivate`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders(),
+      })
+      if (!res.ok) throw new Error(`Failed to deactivate price header: ${res.status} ${res.statusText}`)
+      const result = await res.json()
+      return result.data ?? result
+    } catch (error) {
+      console.error('Error deactivating price header:', error)
+      throw error
+    }
+  }
+
+  // Check products in price header
+  static async checkProductsInHeader(priceHeaderId: number): Promise<{
+    headerName: string;
+    productsInHeader: Array<{
+      productCode: string | null;
+      productId: number;
+      productName: string;
+      units: Array<{
+        productUnitId: number;
+        unitName: string;
+        price: number;
+        createdAt: string;
+      }>;
+      totalUnits: number;
+    }>;
+    totalProducts: number;
+    totalPrices: number;
+    headerId: number;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/price-headers/${priceHeaderId}/check-products`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      })
+      if (!res.ok) throw new Error(`Failed to check products: ${res.status} ${res.statusText}`)
+      const result = await res.json()
+      return result.data
+    } catch (error) {
+      console.error('Error checking products in header:', error)
+      throw error
+    }
+  }
+
+  // Check time conflict for product unit in price header
+  static async checkTimeConflict(productUnitId: number, priceHeaderId: number): Promise<{
+    hasConflict: boolean;
+    message?: string;
+    conflictingHeaders?: Array<{
+      headerId: number;
+      headerName: string;
+      timeStart: string;
+      timeEnd?: string;
+    }>;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/check-time-conflict?productUnitId=${productUnitId}&priceHeaderId=${priceHeaderId}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      })
+      if (!res.ok) throw new Error(`Failed to check time conflict: ${res.status} ${res.statusText}`)
+      const result = await res.json()
+      return result.data || result
+    } catch (error) {
+      console.error('Error checking time conflict:', error)
+      throw error
+    }
   }
 
   // Get prices by price header ID

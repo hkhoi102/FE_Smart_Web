@@ -24,7 +24,7 @@ const AddBarcodeModal: React.FC<AddBarcodeModalProps> = ({ isOpen, onClose, prod
   // Filter products that don't have barcodes
   const productsWithoutBarcodes = products.filter(product => {
     return !product.productUnits?.some(unit =>
-      unit.barcodes && unit.barcodes.length > 0
+      (unit as any).barcodes && (unit as any).barcodes.length > 0
     )
   })
 
@@ -77,7 +77,31 @@ const AddBarcodeModal: React.FC<AddBarcodeModalProps> = ({ isOpen, onClose, prod
       onSuccess()
       onClose()
     } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra khi thêm barcode')
+      console.error('Error adding barcode:', err)
+
+      // Xử lý lỗi 400 - trùng mã barcode
+      if (err?.status === 400) {
+        let errorMessage = 'Có lỗi xảy ra khi thêm barcode'
+
+        if (err?.message) {
+          const message = err.message.toLowerCase()
+          console.log('🔍 Barcode error message from backend:', err.message)
+
+          // Kiểm tra trùng mã barcode
+          if (message.includes('barcode') && (message.includes('already exists') || message.includes('đã tồn tại') ||
+              message.includes('duplicate') || message.includes('trùng'))) {
+            errorMessage = 'Mã barcode đã tồn tại. Vui lòng chọn mã khác.'
+          }
+          // Nếu có thông báo cụ thể từ backend, sử dụng nó
+          else if (err.message && err.message !== 'Failed to add barcode: 400 Bad Request') {
+            errorMessage = err.message
+          }
+        }
+
+        setError(errorMessage)
+      } else {
+        setError(err.message || 'Có lỗi xảy ra khi thêm barcode')
+      }
     } finally {
       setIsSubmitting(false)
     }
