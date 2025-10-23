@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useEffect, useState, useMemo } from 'react'
 import { ProductService, Product, ProductCategory, ProductUnit, CreateProductRequest, UpdateProductRequest } from '@/services/productService'
 import { InventoryService, WarehouseDto, StockLocationDto } from '@/services/inventoryService'
-import { Pagination, ProductTable, ProductFormWithUnitsAndPrices, Modal, UnitManagement, PriceManagement, AccountManagement, InventoryManagement, InventoryCheckManagement, WarehouseTab, PromotionManagement, OrderManagement, OrderProcessingManagement, OrderListManagement, AdminSidebar } from '@/components'
+import { Pagination, ProductTable, ProductFormWithUnitsAndPrices, Modal, UnitManagement, PriceManagement, AccountManagement, InventoryManagement, InventoryCheckManagement, WarehouseTab, PromotionManagement, OrderManagement, OrderProcessingManagement, OrderListManagement, AdminSidebar, WarehouseStatsPage, RevenuePage, ProductStatsPage } from '@/components'
 import CreateOrderManagement from '@/components/CreateOrderManagement'
 import InventoryImportExportCreate from '@/components/InventoryImportExportCreate'
 import InventoryImportExportList from '@/components/InventoryImportExportList'
@@ -11,6 +11,7 @@ import PriceHeaderDetail from '@/pages/PriceHeaderDetail'
 import InventoryCheckCreate from '@/pages/InventoryCheckCreate'
 import CategoryManagement from '@/components/CategoryManagement'
 import ReturnOrderManagement from '@/components/ReturnOrderManagement'
+import ReturnedOrdersPage from '@/pages/ReturnedOrdersPage'
 
 const Admin = () => {
   const { user, logout, isAuthenticated } = useAuth()
@@ -42,7 +43,7 @@ const Admin = () => {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>()
-  type TabType = 'overview' | 'management' | 'products' | 'categories' | 'units' | 'prices' | 'inventory' | 'inventory-management' | 'inventory-import-export' | 'inventory-import-export-list' | 'inventory-check-create' | 'inventory-check' | 'warehouses' | 'warehouse-list' | 'warehouse-history' | 'accounts' | 'promotions' | 'orders' | 'order-processing' | 'order-list' | 'return-processing' | 'create-order'
+  type TabType = 'overview' | 'management' | 'products' | 'categories' | 'units' | 'prices' | 'inventory' | 'inventory-management' | 'inventory-import-export' | 'inventory-import-export-list' | 'inventory-check-create' | 'inventory-check' | 'warehouses' | 'warehouse-list' | 'warehouse-history' | 'accounts' | 'promotions' | 'orders' | 'order-processing' | 'order-list' | 'return-processing' | 'returned-orders' | 'create-order' | 'statistics' | 'revenue' | 'warehouse-stats' | 'product-stats'
 
   const [currentTab, setCurrentTab] = useState<TabType>(
     (tab as TabType) ||
@@ -910,11 +911,27 @@ const Admin = () => {
             <CreateOrderManagement />
           )}
 
+          {currentTab === 'returned-orders' && (
+            <ReturnedOrdersPage />
+          )}
+
           {currentTab === 'warehouse-history' && (
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Lịch sử nhập xuất</h2>
               <p className="text-gray-600">Chức năng xem lịch sử nhập xuất sẽ được triển khai ở đây.</p>
             </div>
+          )}
+
+          {currentTab === 'revenue' && (
+            <RevenuePage />
+          )}
+
+          {currentTab === 'warehouse-stats' && (
+            <WarehouseStatsPage />
+          )}
+
+          {currentTab === 'product-stats' && (
+            <ProductStatsPage />
           )}
       </main>
       </div>
