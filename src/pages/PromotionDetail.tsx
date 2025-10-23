@@ -625,9 +625,9 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
             return (
               <div key={idx} className="grid grid-cols-12 gap-3 items-end">
                 {t === 'DISCOUNT_PERCENT' && (
-                  <div className="col-span-12 md:col-span-3">
-                    <div className="text-sm text-gray-700 mb-1">% giảm</div>
-                    <input placeholder="% giảm" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.discountPercent || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, discountPercent:e.target.value}:x))} />
+                  <div className="col-span-12 md:col-span-2">
+                    <div className="text-xs text-gray-700 mb-1">% giảm</div>
+                    <input placeholder="% giảm" className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.discountPercent || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, discountPercent:e.target.value}:x))} />
                   </div>
                 )}
                 {t === 'DISCOUNT_AMOUNT' && (
@@ -638,13 +638,13 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                 )}
                 {(t === 'DISCOUNT_PERCENT' || t === 'DISCOUNT_AMOUNT') && (
                   <>
-                    <div className="col-span-12 md:col-span-4">
-                      <div className="text-sm text-gray-700 mb-1">Đơn tối thiểu</div>
-                      <input placeholder="Nhập giá trị tối thiểu" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.minAmount || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, minAmount:e.target.value}:x))} />
+                    <div className="col-span-12 md:col-span-3">
+                      <div className="text-xs text-gray-700 mb-1">Đơn tối thiểu</div>
+                      <input placeholder="Nhập giá trị tối thiểu" className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.minAmount || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, minAmount:e.target.value}:x))} />
                     </div>
-                    <div className="col-span-12 md:col-span-4">
-                      <div className="text-sm text-gray-700 mb-1">Giảm tối đa</div>
-                      <input placeholder="Nhập mức giảm tối đa" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.maxDiscount || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, maxDiscount:e.target.value}:x))} />
+                    <div className="col-span-12 md:col-span-3">
+                      <div className="text-xs text-gray-700 mb-1">Giảm tối đa</div>
+                      <input placeholder="Nhập mức giảm tối đa" className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.maxDiscount || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, maxDiscount:e.target.value}:x))} />
                     </div>
                   </>
                 )}
