@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { PromotionService, PromotionType, TargetType } from '@/services/promotionService'
 import PromotionHeaderManagement from './PromotionHeaderManagement'
-import { ProductService } from '@/services/productService'
 
 export interface PromotionHeader {
   id: number
@@ -42,6 +41,8 @@ const PromotionManagement: React.FC = () => {
   const [headerForm, setHeaderForm] = useState({
     name: '', startDate: '', endDate: '', type: 'DISCOUNT_PERCENT' as PromotionType, active: true,
   })
+  const [headerDateError, setHeaderDateError] = useState('')
+  const [lineDateErrors, setLineDateErrors] = useState<Record<number, string>>({})
   type LineItem = {
     targetType: TargetType
     targetId: number
@@ -53,22 +54,32 @@ const PromotionManagement: React.FC = () => {
   const newLine = (): LineItem => ({ targetType: 'PRODUCT', targetId: 0, type: 'DISCOUNT_PERCENT' })
   const [lines, setLines] = useState<LineItem[]>([newLine()])
 
-  const [productOptions, setProductOptions] = useState<Array<{ id: number; name: string }>>([])
-  const [categoryOptions, setCategoryOptions] = useState<Array<{ id: number; name: string }>>([])
+  const validateHeaderDates = (startDate: string, endDate: string) => {
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      if (end <= start) {
+        setHeaderDateError('Ngày kết thúc phải sau ngày bắt đầu')
+        return false
+      }
+    }
+    setHeaderDateError('')
+    return true
+  }
 
-  useEffect(() => {
-    if (!isWizardOpen) return
-    ;(async () => {
-      try {
-        const prods = await ProductService.getProducts(1, 1000)
-        setProductOptions(prods.products.map(p => ({ id: p.id, name: p.name })))
-      } catch { setProductOptions([]) }
-      try {
-        const cats = await ProductService.getCategories()
-        setCategoryOptions(cats.map((c: any) => ({ id: c.id, name: c.name })))
-      } catch { setCategoryOptions([]) }
-    })()
-  }, [isWizardOpen])
+  const validateLineDates = (lineIndex: number, startDate: string, endDate: string) => {
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      if (end <= start) {
+        setLineDateErrors(prev => ({ ...prev, [lineIndex]: 'Ngày kết thúc phải sau ngày bắt đầu' }))
+        return false
+      }
+    }
+    setLineDateErrors(prev => ({ ...prev, [lineIndex]: '' }))
+    return true
+  }
+
 
   const subTabs: Array<{ id: 'headers'; label: string; icon: string }> = [
     { id: 'headers', label: 'Header Khuyến mãi', icon: '📋' },
@@ -148,9 +159,9 @@ const PromotionManagement: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         Tên chương trình <span className="text-red-500">*</span>
                       </label>
-                      <input 
-                        value={headerForm.name} 
-                        onChange={e=>setHeaderForm({...headerForm, name:e.target.value})} 
+                      <input
+                        value={headerForm.name}
+                        onChange={e=>setHeaderForm({...headerForm, name:e.target.value})}
                         placeholder="Nhập tên chương trình khuyến mãi..."
                         className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
                       />
@@ -160,29 +171,46 @@ const PromotionManagement: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">
                           Ngày bắt đầu <span className="text-red-500">*</span>
                         </label>
-                        <input 
-                          type="date" 
-                          value={headerForm.startDate} 
-                          onChange={e=>setHeaderForm({...headerForm, startDate:e.target.value})} 
-                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                        <input
+                          type="date"
+                          value={headerForm.startDate}
+                          onChange={e=>{
+                            const newStartDate = e.target.value
+                            setHeaderForm({...headerForm, startDate: newStartDate})
+                            // Kiểm tra validation khi cả 2 ngày đã được chọn
+                            if (newStartDate && headerForm.endDate) {
+                              validateHeaderDates(newStartDate, headerForm.endDate)
+                            }
+                          }}
+                          className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors ${headerDateError ? 'border-red-500' : ''}`}
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">
                           Ngày kết thúc <span className="text-gray-400 text-xs">(tùy chọn)</span>
                         </label>
-                        <input 
-                          type="date" 
-                          value={headerForm.endDate} 
-                          onChange={e=>setHeaderForm({...headerForm, endDate:e.target.value})} 
-                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                        <input
+                          type="date"
+                          value={headerForm.endDate}
+                          onChange={e=>{
+                            const newEndDate = e.target.value
+                            setHeaderForm({...headerForm, endDate: newEndDate})
+                            // Kiểm tra validation khi cả 2 ngày đã được chọn
+                            if (headerForm.startDate && newEndDate) {
+                              validateHeaderDates(headerForm.startDate, newEndDate)
+                            }
+                          }}
+                          className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors ${headerDateError ? 'border-red-500' : ''}`}
                         />
+                        {headerDateError && (
+                          <p className="mt-1 text-sm text-red-600">{headerDateError}</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">Trạng thái</label>
-                        <select 
-                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-colors" 
-                          value={headerForm.active ? '1' : '0'} 
+                        <select
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-colors"
+                          value={headerForm.active ? '1' : '0'}
                           onChange={(e)=>setHeaderForm({...headerForm, active: e.target.value==='1'})}
                         >
                           <option value="1">Kích hoạt</option>
@@ -205,7 +233,7 @@ const PromotionManagement: React.FC = () => {
                         {lines.length}
                       </span>
                     </div>
-                    <button 
+                    <button
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm hover:shadow"
                       onClick={()=>setLines(prev=>[...prev, newLine()])}
                     >
@@ -234,9 +262,9 @@ const PromotionManagement: React.FC = () => {
                                 </svg>
                                 Loại khuyến mãi
                               </label>
-                              <select 
-                                value={ln.type} 
-                                onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value as PromotionType}:l))} 
+                              <select
+                                value={ln.type}
+                                onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value as PromotionType}:l))}
                                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-colors"
                               >
                                 <option value="DISCOUNT_PERCENT">Giảm theo %</option>
@@ -251,11 +279,18 @@ const PromotionManagement: React.FC = () => {
                                 </svg>
                                 Ngày bắt đầu
                               </label>
-                              <input 
-                                type="date" 
-                                value={ln.lineStartDate || ''} 
-                                onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineStartDate:e.target.value}:l))} 
-                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                              <input
+                                type="date"
+                                value={ln.lineStartDate || ''}
+                                onChange={e=>{
+                                  const newStartDate = e.target.value
+                                  setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineStartDate: newStartDate}:l))
+                                  // Kiểm tra validation khi cả 2 ngày đã được chọn
+                                  if (newStartDate && ln.lineEndDate) {
+                                    validateLineDates(idx, newStartDate, ln.lineEndDate)
+                                  }
+                                }}
+                                className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors ${lineDateErrors[idx] ? 'border-red-500' : ''}`}
                               />
                             </div>
                             <div>
@@ -265,17 +300,28 @@ const PromotionManagement: React.FC = () => {
                                 </svg>
                                 Ngày kết thúc
                               </label>
-                              <input 
-                                type="date" 
-                                value={ln.lineEndDate || ''} 
-                                onChange={e=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineEndDate:e.target.value}:l))} 
-                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                              <input
+                                type="date"
+                                value={ln.lineEndDate || ''}
+                                onChange={e=>{
+                                  const newEndDate = e.target.value
+                                  setLines(prev=>prev.map((l,i)=> i===idx?{...l, lineEndDate: newEndDate}:l))
+                                  // Kiểm tra validation khi cả 2 ngày đã được chọn
+                                  if (ln.lineStartDate && newEndDate) {
+                                    validateLineDates(idx, ln.lineStartDate, newEndDate)
+                                  }
+                                }}
+                                className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors ${lineDateErrors[idx] ? 'border-red-500' : ''}`}
                               />
+                              {lineDateErrors[idx] && (
+                                <p className="mt-1 text-sm text-red-600">{lineDateErrors[idx]}</p>
+                              )}
                             </div>
                           </div>
+                          {/* Chỉ hiển thị nút xóa khi có nhiều hơn 1 dòng (trong modal tạo mới, tất cả dòng đều là dòng mới) */}
                           {lines.length > 1 && (
                             <div className="flex justify-end mt-3 pt-3 border-t border-gray-200">
-                              <button 
+                              <button
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
                                 onClick={()=>setLines(prev=>prev.filter((_,i)=>i!==idx))}
                               >
@@ -296,15 +342,19 @@ const PromotionManagement: React.FC = () => {
 
             {/* Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <button 
+              <button
                 className="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors shadow-sm"
                 onClick={()=>setIsWizardOpen(false)}
               >
                 Hủy
               </button>
-              <button 
-                disabled={creating} 
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm hover:shadow"
+              <button
+                disabled={creating || !!headerDateError || Object.values(lineDateErrors).some(error => error)}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm hover:shadow ${
+                  creating || !!headerDateError || Object.values(lineDateErrors).some(error => error)
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
                 onClick={async ()=>{
                   if (!headerForm.name.trim() || !headerForm.startDate) return
                   setCreating(true)
