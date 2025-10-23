@@ -322,6 +322,32 @@ export const OrderApi = {
     const data = await res.json().catch(() => ({}))
     return data.data ?? data
   },
+
+  async approveReturn(returnId: number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/returns/${returnId}/approve`, {
+      method: 'PUT',
+      headers: authHeaders()
+    })
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => '')
+      throw new Error(`Failed to approve return: ${res.status} ${res.statusText}${errorText ? ` - ${errorText}` : ''}`)
+    }
+    const data = await res.json().catch(() => ({}))
+    return data.data ?? data
+  },
+
+  async completeReturn(returnId: number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/returns/${returnId}/complete`, {
+      method: 'PUT',
+      headers: authHeaders()
+    })
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => '')
+      throw new Error(`Failed to complete return: ${res.status} ${res.statusText}${errorText ? ` - ${errorText}` : ''}`)
+    }
+    const data = await res.json().catch(() => ({}))
+    return data.data ?? data
+  },
 }
 
 

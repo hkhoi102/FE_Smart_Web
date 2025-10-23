@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-type TabType = 'overview' | 'management' | 'products' | 'categories' | 'units' | 'prices' | 'inventory' | 'inventory-management' | 'inventory-import-export' | 'inventory-import-export-list' | 'inventory-check-create' | 'inventory-check' | 'warehouses' | 'warehouse-list' | 'warehouse-history' | 'accounts' | 'promotions' | 'orders' | 'order-processing' | 'order-list' | 'return-processing' | 'create-order'
+type TabType = 'overview' | 'management' | 'products' | 'categories' | 'units' | 'prices' | 'inventory' | 'inventory-management' | 'inventory-import-export' | 'inventory-import-export-list' | 'inventory-check-create' | 'inventory-check' | 'warehouses' | 'warehouse-list' | 'warehouse-history' | 'accounts' | 'promotions' | 'orders' | 'order-processing' | 'order-list' | 'return-processing' | 'create-order' | 'statistics' | 'revenue' | 'warehouse-stats' | 'product-stats'
 
 interface AdminSidebarProps {
   currentTab: string
@@ -15,7 +15,7 @@ interface MenuItem {
 }
 
 const AdminSidebar = ({ currentTab, onTabChange }: AdminSidebarProps) => {
-  const [expandedItems, setExpandedItems] = useState<string[]>(['management', 'warehouses', 'orders'])
+  const [expandedItems, setExpandedItems] = useState<string[]>(['management', 'warehouses', 'orders', 'statistics'])
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   // Auto-collapse on small screens, expand on hover, collapse on leave
@@ -72,11 +72,11 @@ const AdminSidebar = ({ currentTab, onTabChange }: AdminSidebarProps) => {
           label: 'Danh sách kho',
           icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'
         },
-        {
-          id: 'warehouse-history',
-          label: 'Lịch sử nhập xuất',
-          icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
-        }
+        // {
+        //   id: 'warehouse-history',
+        //   label: 'Lịch sử nhập xuất',
+        //   icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
+        // }
       ]
     },
     {
@@ -94,10 +94,21 @@ const AdminSidebar = ({ currentTab, onTabChange }: AdminSidebarProps) => {
       label: 'Đơn hàng',
       icon: 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
       children: [
-        { id: 'order-processing', label: 'Xử lý đơn hàng', icon: 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
-        { id: 'order-list', label: 'Danh sách đơn hàng', icon: 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
-        { id: 'return-processing', label: 'Xử lý đơn trả về', icon: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' },
+        { id: 'order-processing', label: 'Đơn hàng đặt/trả', icon: 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+        { id: 'order-list', label: 'Đơn hàng hoàn thành', icon: 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+        // { id: 'return-processing', label: 'Xử lý đơn trả về', icon: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' },
+        { id: 'returned-orders', label: 'Đơn hàng hoàn trả', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
         { id: 'create-order', label: 'Tạo đơn hàng', icon: 'M12 6v6m0 0v6m0-6h6m-6 0H6' }
+      ]
+    },
+    {
+      id: 'statistics',
+      label: 'Thống kê',
+      icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+      children: [
+        { id: 'revenue', label: 'Doanh thu', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1' },
+        { id: 'product-stats', label: 'Sản phẩm', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z' },
+        { id: 'warehouse-stats', label: 'Kho', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' }
       ]
     }
   ]

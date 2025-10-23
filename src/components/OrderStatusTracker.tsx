@@ -160,7 +160,7 @@ const OrderStatusTracker: React.FC<OrderStatusTrackerProps> = ({
           {currentStep === 2 && 'Đơn hàng đang được xử lý'}
           {currentStep === 3 && 'Đơn hàng đã hoàn thành'}
         </p>
-        {paymentStatus === 'PAID' && (
+        {/* {paymentStatus === 'PAID' && (
           <p className="text-xs text-green-600 mt-1">✓ Đã thanh toán</p>
         )}
         {paymentStatus === 'UNPAID' && (
@@ -168,7 +168,7 @@ const OrderStatusTracker: React.FC<OrderStatusTrackerProps> = ({
         )}
         {paymentStatus === 'PARTIAL' && (
           <p className="text-xs text-yellow-600 mt-1">⚠ Thanh toán một phần</p>
-        )}
+        )} */}
       </div>
     </div>
   )

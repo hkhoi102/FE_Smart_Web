@@ -291,6 +291,11 @@ const OrderListManagement: React.FC = () => {
   const filteredOrders = orders.filter(order => {
     // Only display COMPLETED and CANCELLED on this page
     if (order.status !== 'COMPLETED' && order.status !== 'CANCELLED') return false
+
+    // Only display orders that have order details (products)
+    const orderDetails = orderDetailsMap[order.id] || []
+    if (orderDetails.length === 0) return false
+
     // Search term filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
@@ -779,9 +784,6 @@ const OrderListManagement: React.FC = () => {
                        )}
                      </div>
                    </th>
-                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                     Thao tác
-                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -835,22 +837,6 @@ const OrderListManagement: React.FC = () => {
                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                        {getPaymentMethodLabel((detailMap[order.id]?.paymentMethod as any) || order.payment_method)}
                      </td>
-                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEdit(order)}
-                          className="text-green-600 hover:text-green-900"
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          onClick={() => handleDelete(order.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -947,7 +933,7 @@ const OrderListManagement: React.FC = () => {
                 >
                   <option value="UNPAID">Chưa thanh toán</option>
                   <option value="PAID">Đã thanh toán</option>
-                  <option value="PARTIAL">Thanh toán một phần</option>
+
                 </select>
               </div>
             </div>
@@ -1094,7 +1080,7 @@ const OrderListManagement: React.FC = () => {
                     <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m5 14v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3" />
                     </svg>
-                    Tạo đơn trả hàng
+                   Trả hàng
                   </button>
                 </div>
               </div>

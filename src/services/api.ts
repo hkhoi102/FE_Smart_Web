@@ -1,5 +1,5 @@
 // Base API configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'
+const API_BASE_URL = '/api' // Force to /api
 
 // API response types
 export interface ApiResponse<T = any> {
@@ -95,9 +95,9 @@ export const userApi = {
 }
 
 export const authApi = {
-  login: (credentials: { email: string; password: string }) => 
+  login: (credentials: { email: string; password: string }) =>
     api.post('/auth/login', credentials),
-  register: (userData: { email: string; password: string; name: string }) => 
+  register: (userData: { email: string; password: string; name: string }) =>
     api.post('/auth/register', userData),
   logout: () => api.post('/auth/logout'),
 }
