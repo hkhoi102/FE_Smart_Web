@@ -98,14 +98,6 @@ const PromotionDetail: React.FC = () => {
     }
   }
 
-  const viTarget = (t?: string) => {
-    switch ((t || '').toUpperCase()) {
-      case 'PRODUCT': return 'Sản phẩm'
-      case 'CATEGORY': return 'Danh mục'
-      case 'CUSTOMER': return 'Khách hàng'
-      default: return t || '-'
-    }
-  }
 
   const getStatusColor = (active: boolean) => {
     return active
@@ -334,12 +326,13 @@ const PromotionDetail: React.FC = () => {
 const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: any[]) => void; onClose: () => void }> = ({ line, details, onChange, onClose }) => {
   const [saving, setSaving] = useState(false)
   const [giftNameByUnitId, setGiftNameByUnitId] = useState<Record<number, string>>({})
-  const [conditionNameByUnitId, setConditionNameByUnitId] = useState<Record<number, string>>({})
-  const [giftProductIdByUnitId, setGiftProductIdByUnitId] = useState<Record<number, number>>({})
-  const [conditionProductIdByUnitId, setConditionProductIdByUnitId] = useState<Record<number, number>>({})
-  const [productOptions, setProductOptions] = useState<Array<{ id: number; name: string }>>([])
-  const [giftUnitOptions, setGiftUnitOptions] = useState<Array<{ id: number; label: string }>>([])
-  const [conditionUnitOptions, setConditionUnitOptions] = useState<Array<{ id: number; label: string }>>([])
+
+  // New states for product and unit selection
+  const [products, setProducts] = useState<Array<{ id: number; name: string; productUnits: Array<{ id: number; unitName: string; unitId: number }> }>>([])
+  const [selectedProductForCondition, setSelectedProductForCondition] = useState<Record<number, number>>({})
+  const [selectedProductForGift, setSelectedProductForGift] = useState<Record<number, number>>({})
+  const [selectedUnitForCondition, setSelectedUnitForCondition] = useState<Record<number, number>>({})
+  const [selectedUnitForGift, setSelectedUnitForGift] = useState<Record<number, number>>({})
 
   const viType = (t?: string) => {
     switch (String(t || '').toUpperCase()) {
@@ -358,29 +351,81 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
     }
   }
 
-  const addDetail = () => onChange([...(details || []), { 
-    id: 0, 
-    promotionLineId: line.id, 
-    discountPercent: '', 
-    discountAmount: '', 
-    minAmount: '', 
-    maxDiscount: '', 
-    conditionQuantity: '', 
-    freeQuantity: '', 
-    giftProductUnitId: '', 
-    conditionProductUnitId: '', 
-    // New fields for separated product and unit selection
-    conditionProductQuery: '',
-    conditionUnitQuery: '',
-    giftProductQuery: '',
-    giftUnitQuery: '',
-    showSuggestConditionProduct: false,
-    showSuggestConditionUnit: false,
-    showSuggestGiftProduct: false,
-    showSuggestGiftUnit: false,
-    active: true 
-  }])
-  const removeDetail = (idx: number) => onChange(details.filter((_, i) => i !== idx))
+  const addDetail = () => {
+    const newDetail = { id: 0, promotionLineId: line.id, discountPercent: '', discountAmount: '', minAmount: '', maxDiscount: '', conditionQuantity: '', freeQuantity: '', giftProductUnitId: '', conditionProductUnitId: '', active: true }
+    onChange([...(details || []), newDetail])
+
+    // Reset selections for new detail
+    const newIdx = (details || []).length
+    setSelectedProductForCondition(prev => ({ ...prev, [newIdx]: 0 }))
+    setSelectedProductForGift(prev => ({ ...prev, [newIdx]: 0 }))
+    setSelectedUnitForCondition(prev => ({ ...prev, [newIdx]: 0 }))
+    setSelectedUnitForGift(prev => ({ ...prev, [newIdx]: 0 }))
+  }
+  const removeDetail = (idx: number) => {
+    onChange(details.filter((_, i) => i !== idx))
+
+    // Clean up selections for removed detail
+    setSelectedProductForCondition(prev => {
+      const newState = { ...prev }
+      delete newState[idx]
+      const shifted: Record<number, number> = {}
+      Object.keys(newState).forEach(key => {
+        const numKey = Number(key)
+        if (numKey > idx) {
+          shifted[numKey - 1] = newState[numKey]
+        } else {
+          shifted[numKey] = newState[numKey]
+        }
+      })
+      return shifted
+    })
+
+    setSelectedProductForGift(prev => {
+      const newState = { ...prev }
+      delete newState[idx]
+      const shifted: Record<number, number> = {}
+      Object.keys(newState).forEach(key => {
+        const numKey = Number(key)
+        if (numKey > idx) {
+          shifted[numKey - 1] = newState[numKey]
+        } else {
+          shifted[numKey] = newState[numKey]
+        }
+      })
+      return shifted
+    })
+
+    setSelectedUnitForCondition(prev => {
+      const newState = { ...prev }
+      delete newState[idx]
+      const shifted: Record<number, number> = {}
+      Object.keys(newState).forEach(key => {
+        const numKey = Number(key)
+        if (numKey > idx) {
+          shifted[numKey - 1] = newState[numKey]
+        } else {
+          shifted[numKey] = newState[numKey]
+        }
+      })
+      return shifted
+    })
+
+    setSelectedUnitForGift(prev => {
+      const newState = { ...prev }
+      delete newState[idx]
+      const shifted: Record<number, number> = {}
+      Object.keys(newState).forEach(key => {
+        const numKey = Number(key)
+        if (numKey > idx) {
+          shifted[numKey - 1] = newState[numKey]
+        } else {
+          shifted[numKey] = newState[numKey]
+        }
+      })
+      return shifted
+    })
+  }
 
   const save = async () => {
     setSaving(true)
@@ -425,27 +470,29 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
     } catch {}
   }
 
-  // Load products for search
+  // Load products and their units
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
         const list = await ProductService.getProducts(1, 1000)
         if (cancelled) return
-        
-        // Tạo danh sách sản phẩm riêng biệt
-        const productOptions: Array<{ id: number; name: string }> = []
-        
-        ;(list?.products || []).forEach((p: any) => {
-          if (p.id && p.name) {
-            productOptions.push({ id: Number(p.id), name: p.name })
-          }
-        })
-        
-        setProductOptions(productOptions)
-        console.log('Loaded products:', productOptions.length, 'products')
+
+        // Set products with their units
+        const productsWithUnits = (list?.products || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          productUnits: (p.productUnits || []).map((u: any) => ({
+            id: u.id,
+            unitName: u.unitName || u.name,
+            unitId: u.unitId || u.id
+          }))
+        }))
+        setProducts(productsWithUnits)
+
+        // Products are loaded with their units for dropdown functionality
       } catch {
-        setProductOptions([])
+        setProducts([])
       }
     })()
     return () => { cancelled = true }
@@ -499,114 +546,129 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
     })()
   }, [details])
 
-  const resolveConditionName = async (unitId?: number | string) => {
-    const idNum = Number(unitId)
-    if (!idNum || isNaN(idNum)) return
-    if (conditionNameByUnitId[idNum]) return
-    try {
-      const info = await ProductService.getProductUnitById(idNum)
-      const name = info?.productName || ''
-      const productId = info?.productId || 0
-      setConditionNameByUnitId(prev => ({ ...prev, [idNum]: name }))
-      if (productId) {
-        setConditionProductIdByUnitId(prev => ({ ...prev, [idNum]: productId }))
-        console.log('Resolved condition product:', { unitId: idNum, productId, name })
-      }
-    } catch {}
-  }
+  // Initialize selected products and units from existing details
+  useEffect(() => {
+    if (products.length === 0) return
 
-  const getUnitNameFromId = (unitId?: number | string) => {
-    const idNum = Number(unitId)
-    if (!idNum || isNaN(idNum)) return ''
-    const option = conditionUnitOptions.find(o => o.id === idNum)
-    return option ? option.label.split(' • ')[1] || '' : ''
-  }
+    const newSelectedProductForCondition: Record<number, number> = {}
+    const newSelectedProductForGift: Record<number, number> = {}
+    const newSelectedUnitForCondition: Record<number, number> = {}
+    const newSelectedUnitForGift: Record<number, number> = {}
 
-  const getGiftUnitNameFromId = (unitId?: number | string) => {
-    const idNum = Number(unitId)
-    if (!idNum || isNaN(idNum)) return ''
-    const option = giftUnitOptions.find(o => o.id === idNum)
-    return option ? option.label.split(' • ')[1] || '' : ''
-  }
+    console.log('Initializing from details:', details)
+    console.log('Available products:', products)
 
-  // Load units for a specific product
-  const loadUnitsForProduct = async (productId: number, isGift: boolean = false) => {
-    try {
-      // First try to get product details to get its units
-      const product = await ProductService.getProductById(productId)
-      if (product && product.productUnits && product.productUnits.length > 0) {
-        const units = product.productUnits
-        
-        console.log('Loaded units for product', productId, ':', units)
-        
-        const unitOptions = units.map((unit: any) => ({
-          id: unit.id,
-          label: unit.unitName || unit.unit_name || ''
-        }))
-        
-        if (isGift) {
-          setGiftUnitOptions(unitOptions)
-          console.log('Set gift unit options:', unitOptions)
-        } else {
-          setConditionUnitOptions(unitOptions)
-          console.log('Set condition unit options:', unitOptions)
+    details.forEach((d, idx) => {
+      console.log(`Processing detail ${idx}:`, d)
+
+      if (d.conditionProductUnitId) {
+        console.log(`Looking for conditionProductUnitId: ${d.conditionProductUnitId}`)
+        // Find product and unit for condition
+        for (const product of products) {
+          const unit = product.productUnits.find(u => u.id === Number(d.conditionProductUnitId))
+          if (unit) {
+            newSelectedProductForCondition[idx] = product.id
+            newSelectedUnitForCondition[idx] = unit.id
+            console.log(`Found condition product: ${product.name}, unit: ${unit.unitName}`)
+            break
+          }
         }
-        return
       }
-      
-      // Fallback: try direct API call if ProductService doesn't have units
-      console.log('ProductService did not return units, trying direct API call...')
-      const response = await fetch(`${window.location.origin.replace('3000', '8080')}/api/products/${productId}/units`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('user_access_token') || localStorage.getItem('admin_access_token')}`,
-          'Content-Type': 'application/json'
+
+      if (d.giftProductUnitId) {
+        console.log(`Looking for giftProductUnitId: ${d.giftProductUnitId}`)
+        // Find product and unit for gift
+        for (const product of products) {
+          const unit = product.productUnits.find(u => u.id === Number(d.giftProductUnitId))
+          if (unit) {
+            newSelectedProductForGift[idx] = product.id
+            newSelectedUnitForGift[idx] = unit.id
+            console.log(`Found gift product: ${product.name}, unit: ${unit.unitName}`)
+            break
+          }
         }
-      })
-      
-      if (!response.ok) {
-        console.error('Failed to load units:', response.status, response.statusText)
-        return
       }
-      
-      const data = await response.json()
-      const units = data.data || data || []
-      
-      console.log('Loaded units for product', productId, ':', units)
-      
-      const unitOptions = units.map((unit: any) => ({
-        id: unit.id,
-        label: unit.unitName || unit.unit_name || ''
-      }))
-      
-      if (isGift) {
-        setGiftUnitOptions(unitOptions)
-        console.log('Set gift unit options:', unitOptions)
-      } else {
-        setConditionUnitOptions(unitOptions)
-        console.log('Set condition unit options:', unitOptions)
-      }
-    } catch (error) {
-      console.error('Error loading units:', error)
-      // If all fails, try to load all units as fallback
-      try {
-        const allUnits = await ProductService.getUnits()
-        const unitOptions = allUnits.map((unit: any) => ({
-          id: unit.id,
-          label: unit.name || ''
-        }))
-        
-        if (isGift) {
-          setGiftUnitOptions(unitOptions)
-          console.log('Set fallback gift unit options:', unitOptions)
-        } else {
-          setConditionUnitOptions(unitOptions)
-          console.log('Set fallback condition unit options:', unitOptions)
+    })
+
+    console.log('Setting selected products and units:', {
+      newSelectedProductForCondition,
+      newSelectedProductForGift,
+      newSelectedUnitForCondition,
+      newSelectedUnitForGift
+    })
+
+    setSelectedProductForCondition(newSelectedProductForCondition)
+    setSelectedProductForGift(newSelectedProductForGift)
+    setSelectedUnitForCondition(newSelectedUnitForCondition)
+    setSelectedUnitForGift(newSelectedUnitForGift)
+  }, [products, details])
+
+  // Initialize query fields from existing data
+  useEffect(() => {
+    if (products.length === 0) return
+
+    const updatedDetails = details.map((d, idx) => {
+      let updatedDetail = { ...d }
+
+      // Set conditionQuery if not already set
+      if (d.conditionProductUnitId && !d.conditionQuery) {
+        for (const product of products) {
+          const unit = product.productUnits.find(u => u.id === Number(d.conditionProductUnitId))
+          if (unit) {
+            updatedDetail.conditionQuery = product.name
+            console.log('Setting conditionQuery:', product.name, 'for detail', idx)
+            break
+          }
         }
-      } catch (fallbackError) {
-        console.error('Fallback unit loading also failed:', fallbackError)
       }
+
+      // Set giftQuery if not already set
+      if (d.giftProductUnitId && !d.giftQuery) {
+        for (const product of products) {
+          const unit = product.productUnits.find(u => u.id === Number(d.giftProductUnitId))
+          if (unit) {
+            updatedDetail.giftQuery = product.name
+            console.log('Setting giftQuery:', product.name, 'for detail', idx)
+            break
+          }
+        }
+      }
+
+      return updatedDetail
+    })
+
+    // Only update if there are changes
+    const hasChanges = updatedDetails.some((d, idx) =>
+      d.conditionQuery !== details[idx]?.conditionQuery ||
+      d.giftQuery !== details[idx]?.giftQuery
+    )
+
+    if (hasChanges) {
+      console.log('Updating details with changes:', updatedDetails)
+      onChange(updatedDetails)
     }
-  }
+  }, [products, details])
+
+  // Sync selected products when details change
+  useEffect(() => {
+    details.forEach((d, idx) => {
+      // If conditionQuery exists but no selectedProductForCondition, try to find it
+      if (d.conditionQuery && !selectedProductForCondition[idx]) {
+        const product = products.find(p => p.name === d.conditionQuery)
+        if (product) {
+          setSelectedProductForCondition(prev => ({ ...prev, [idx]: product.id }))
+        }
+      }
+
+      // If giftQuery exists but no selectedProductForGift, try to find it
+      if (d.giftQuery && !selectedProductForGift[idx]) {
+        const product = products.find(p => p.name === d.giftQuery)
+        if (product) {
+          setSelectedProductForGift(prev => ({ ...prev, [idx]: product.id }))
+        }
+      }
+    })
+  }, [details, products, selectedProductForCondition, selectedProductForGift])
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 style: !mt-0">
@@ -650,28 +712,12 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                 )}
                 {t === 'BUY_X_GET_Y' && (
                   <>
-                    {/* Sản phẩm mua */}
-                    <div className="col-span-3 relative">
-                      <div className="text-xs text-gray-700 mb-1">Sản phẩm mua</div>
+                    <div className="col-span-12 md:col-span-2 relative">
+                      <div className="text-sm text-gray-700 mb-1">Sản phẩm điều kiện</div>
                       <input
-                        placeholder="Nhập tên sản phẩm mua..."
-                        className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={(() => {
-                          // First try to get product name from conditionProductId
-                          if (d.conditionProductId) {
-                            return productOptions.find(p => p.id === d.conditionProductId)?.name || ''
-                          }
-                          // Then try to get product name from unitId
-                          if (d.conditionProductUnitId) {
-                            const productId = conditionProductIdByUnitId[d.conditionProductUnitId]
-                            if (productId) {
-                              return productOptions.find(p => p.id === productId)?.name || ''
-                            }
-                            return conditionNameByUnitId[d.conditionProductUnitId] || ''
-                          }
-                          // Fallback to query
-                          return d.conditionProductQuery || ''
-                        })()}
+                        placeholder="Nhập tên sản phẩm..."
+                        className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={(d.conditionQuery ?? '')}
                         onChange={(e)=>{
                           const q = e.target.value
                           onChange(details.map((x,i)=> i===idx?{...x, conditionProductQuery:q, showSuggestConditionProduct:true}:x))
@@ -679,75 +725,48 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                       />
                       {((d.conditionProductQuery || '').trim().length > 0) && d.showSuggestConditionProduct && (
                         <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
-                          {productOptions.filter(o => o.name.toLowerCase().includes(String(d.conditionProductQuery).toLowerCase())).slice(0,8).map(opt => (
-                            <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={async ()=>{
-                              onChange(details.map((x,i)=> i===idx?{...x, conditionProductId: opt.id, conditionProductQuery: opt.name, showSuggestConditionProduct:false}:x))
-                              await loadUnitsForProduct(opt.id, false)
-                            }}>{opt.name}</div>
+                          {products.filter(p => p.name.toLowerCase().includes(String(d.conditionQuery).toLowerCase())).slice(0,8).map(product => (
+                            <div key={product.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>{
+                              setSelectedProductForCondition(prev => ({ ...prev, [idx]: product.id }))
+                              setSelectedUnitForCondition(prev => ({ ...prev, [idx]: 0 }))
+                              onChange(details.map((x,i)=> i===idx?{...x, conditionQuery: product.name, showSuggestCondition:false, conditionProductUnitId: ''}:x))
+                            }}>{product.name}</div>
                           ))}
                         </div>
                       )}
                     </div>
-                    
-                    {/* Đơn vị sản phẩm mua */}
-                    <div className="col-span-2 relative">
-                      <div className="text-xs text-gray-700 mb-1">Đơn vị</div>
-                      <input
-                        placeholder={d.conditionProductId ? "Nhập đơn vị..." : "Chọn sản phẩm trước"}
-                        className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={(d.conditionUnitQuery ?? getUnitNameFromId(d.conditionProductUnitId))}
-                        onChange={(e)=>{
-                          const q = e.target.value
-                          onChange(details.map((x,i)=> i===idx?{...x, conditionUnitQuery:q, showSuggestConditionUnit:true}:x))
+                    <div className="col-span-12 md:col-span-2">
+                      <div className="text-sm text-gray-700 mb-1">Đơn vị</div>
+                      <select
+                        className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={selectedUnitForCondition[idx] || ''}
+                        onChange={(e) => {
+                          const unitId = Number(e.target.value)
+                          setSelectedUnitForCondition(prev => ({ ...prev, [idx]: unitId }))
+                          onChange(details.map((x,i)=> i===idx?{...x, conditionProductUnitId: unitId}:x))
                         }}
-                        disabled={!d.conditionProductId}
-                      />
-                      {((d.conditionUnitQuery || '').trim().length > 0) && d.showSuggestConditionUnit && d.conditionProductId && conditionUnitOptions.length > 0 && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
-                          {(() => {
-                            const filtered = conditionUnitOptions.filter(o => o.label.toLowerCase().includes(String(d.conditionUnitQuery).toLowerCase()))
-                            console.log('Condition unit query:', d.conditionUnitQuery)
-                            console.log('Condition product ID:', d.conditionProductId)
-                            console.log('Condition unit options:', conditionUnitOptions)
-                            console.log('Filtered units:', filtered)
-                            return filtered.slice(0,8).map(opt => (
-                              <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>{
-                                onChange(details.map((x,i)=> i===idx?{...x, conditionProductUnitId: opt.id, conditionUnitQuery: opt.label, showSuggestConditionUnit:false}:x))
-                              }}>{opt.label}</div>
-                            ))
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                    
-                      {/* Số lượng mua (X) */}
-                      <div className="col-span-1">
-                        <div className="text-xs text-gray-700 mb-1">SL mua</div>
-                      <input placeholder="SL X" className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.conditionQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, conditionQuantity:e.target.value}:x))} />
-                    </div>
-                    
-                    {/* Sản phẩm tặng */}
-                    <div className="col-span-3 relative">
-                      <div className="text-xs text-gray-700 mb-1">Sản phẩm tặng</div>
-                      <input
-                        placeholder="Nhập tên sản phẩm tặng..."
-                        className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={(() => {
-                          // First try to get product name from giftProductId
-                          if (d.giftProductId) {
-                            return productOptions.find(p => p.id === d.giftProductId)?.name || ''
-                          }
-                          // Then try to get product name from unitId
-                          if (d.giftProductUnitId) {
-                            const productId = giftProductIdByUnitId[d.giftProductUnitId]
-                            if (productId) {
-                              return productOptions.find(p => p.id === productId)?.name || ''
-                            }
-                            return giftNameByUnitId[d.giftProductUnitId] || ''
-                          }
-                          // Fallback to query
-                          return d.giftProductQuery || ''
+                        disabled={!selectedProductForCondition[idx]}
+                      >
+                        <option value="">-- Chọn --</option>
+                        {selectedProductForCondition[idx] && (() => {
+                          const selectedProduct = products.find(p => p.id === selectedProductForCondition[idx])
+                          console.log('Condition Product:', selectedProduct?.name, 'Units:', selectedProduct?.productUnits)
+                          return selectedProduct?.productUnits.map(unit => (
+                            <option key={unit.id} value={unit.id}>{unit.unitName}</option>
+                          ))
                         })()}
+                      </select>
+                    </div>
+                    <div className="col-span-12 md:col-span-1">
+                      <div className="text-sm text-gray-700 mb-1">SL mua</div>
+                      <input placeholder="SL X" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.conditionQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, conditionQuantity:e.target.value}:x))} />
+                    </div>
+                    <div className="col-span-12 md:col-span-2 relative">
+                      <div className="text-sm text-gray-700 mb-1">Sản phẩm quà tặng</div>
+                      <input
+                        placeholder="Nhập tên sản phẩm..."
+                        className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={(d.giftQuery ?? '')}
                         onChange={(e)=>{
                           const q = e.target.value
                           onChange(details.map((x,i)=> i===idx?{...x, giftProductQuery:q, showSuggestGiftProduct:true}:x))
@@ -755,52 +774,46 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                       />
                       {((d.giftProductQuery || '').trim().length > 0) && d.showSuggestGiftProduct && (
                         <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
-                          {productOptions.filter(o => o.name.toLowerCase().includes(String(d.giftProductQuery).toLowerCase())).slice(0,8).map(opt => (
-                            <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={async ()=>{
-                              onChange(details.map((x,i)=> i===idx?{...x, giftProductId: opt.id, giftProductQuery: opt.name, showSuggestGiftProduct:false}:x))
-                              await loadUnitsForProduct(opt.id, true)
-                            }}>{opt.name}</div>
+                          {products.filter(p => p.name.toLowerCase().includes(String(d.giftQuery).toLowerCase())).slice(0,8).map(product => (
+                            <div key={product.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>{
+                              setSelectedProductForGift(prev => ({ ...prev, [idx]: product.id }))
+                              setSelectedUnitForGift(prev => ({ ...prev, [idx]: 0 }))
+                              onChange(details.map((x,i)=> i===idx?{...x, giftQuery: product.name, showSuggest:false, giftProductUnitId: ''}:x))
+                            }}>{product.name}</div>
                           ))}
                         </div>
                       )}
                     </div>
-                    
-                    {/* Đơn vị sản phẩm tặng */}
-                    <div className="col-span-2 relative">
-                      <div className="text-xs text-gray-700 mb-1">Đơn vị</div>
-                      <input
-                        placeholder={d.giftProductId ? "Nhập đơn vị..." : "Chọn sản phẩm trước"}
-                        className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={(d.giftUnitQuery ?? getGiftUnitNameFromId(d.giftProductUnitId))}
-                        onChange={(e)=>{
-                          const q = e.target.value
-                          onChange(details.map((x,i)=> i===idx?{...x, giftUnitQuery:q, showSuggestGiftUnit:true}:x))
+                    <div className="col-span-12 md:col-span-2">
+                      <div className="text-sm text-gray-700 mb-1">Đơn vị</div>
+                      <select
+                        className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={selectedUnitForGift[idx] || ''}
+                        onChange={(e) => {
+                          const unitId = Number(e.target.value)
+                          setSelectedUnitForGift(prev => ({ ...prev, [idx]: unitId }))
+                          onChange(details.map((x,i)=> i===idx?{...x, giftProductUnitId: unitId}:x))
                         }}
-                        disabled={!d.giftProductId}
-                      />
-                      {((d.giftUnitQuery || '').trim().length > 0) && d.showSuggestGiftUnit && d.giftProductId && giftUnitOptions.length > 0 && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
-                          {(() => {
-                            const filtered = giftUnitOptions.filter(o => o.label.toLowerCase().includes(String(d.giftUnitQuery).toLowerCase()))
-                            console.log('Gift unit query:', d.giftUnitQuery)
-                            console.log('Gift product ID:', d.giftProductId)
-                            console.log('Gift unit options:', giftUnitOptions)
-                            console.log('Filtered gift units:', filtered)
-                            return filtered.slice(0,8).map(opt => (
-                              <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={async ()=>{
-                                onChange(details.map((x,i)=> i===idx?{...x, giftProductUnitId: opt.id, giftUnitQuery: opt.label, showSuggestGiftUnit:false}:x))
-                                await resolveGiftName(opt.id)
-                              }}>{opt.label}</div>
-                            ))
-                          })()}
-                        </div>
-                      )}
+                        disabled={!selectedProductForGift[idx]}
+                      >
+                        <option value="">-- Chọn --</option>
+                        {selectedProductForGift[idx] && (() => {
+                          const selectedProduct = products.find(p => p.id === selectedProductForGift[idx])
+                          console.log('Gift Product:', selectedProduct?.name, 'Units:', selectedProduct?.productUnits)
+                          return selectedProduct?.productUnits.map(unit => (
+                            <option key={unit.id} value={unit.id}>{unit.unitName}</option>
+                          ))
+                        })()}
+                      </select>
                     </div>
-                    
-                      {/* Số lượng tặng (Y) */}
-                      <div className="col-span-1">
-                        <div className="text-xs text-gray-700 mb-1">SL tặng</div>
-                      <input placeholder="SL Y" className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.freeQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, freeQuantity:e.target.value}:x))} />
+                    <div className="col-span-12 md:col-span-1">
+                      <div className="text-sm text-gray-700 mb-1">SL tặng</div>
+                      <input placeholder="SL Y" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.freeQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, freeQuantity:e.target.value}:x))} />
+                    </div>
+                    <div className="col-span-12 md:col-span-1 flex items-end justify-end">
+                      {!d.id && (
+                        <button className="px-3 py-2 text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
+                      )}
                     </div>
                     
                     {/* Nút xóa */}
@@ -814,7 +827,9 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                 )}
                 {t !== 'BUY_X_GET_Y' && (
                   <div className="col-span-12 md:col-span-1">
-                    <button className="text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
+                    {!d.id && (
+                      <button className="text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
+                    )}
                   </div>
                 )}
               </div>

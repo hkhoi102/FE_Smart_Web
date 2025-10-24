@@ -21,7 +21,20 @@ const PromotionHeaderManagement: React.FC = () => {
     end_date: '',
     active: 1
   })
-  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [dateError, setDateError] = useState('')
+
+  const validateDates = (startDate: string, endDate: string) => {
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      if (end <= start) {
+        setDateError('Ngày kết thúc phải sau ngày bắt đầu')
+        return false
+      }
+    }
+    setDateError('')
+    return true
+  }
 
   const loadHeaders = async () => {
     try {
@@ -79,16 +92,15 @@ const PromotionHeaderManagement: React.FC = () => {
     setIsModalOpen(false)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa header khuyến mãi này?')) return
-    await PromotionMutations.deleteHeader(id)
-    await loadHeaders()
-  }
 
   const handleToggleActive = async (id: number) => {
     const current = headers.find(h => h.id === id)
     if (!current) return
-    await PromotionMutations.updateHeader(id, { active: !(current.active === 1) })
+    if (current.active === 1) {
+      await PromotionServiceApi.deactivateHeader(id)
+    } else {
+      await PromotionServiceApi.activateHeader(id)
+    }
     await loadHeaders()
   }
 
@@ -163,14 +175,6 @@ const PromotionHeaderManagement: React.FC = () => {
     }
   }
 
-  const viTarget = (t?: string) => {
-    switch ((t || '').toUpperCase()) {
-      case 'PRODUCT': return 'Sản phẩm'
-      case 'CATEGORY': return 'Danh mục'
-      case 'CUSTOMER': return 'Khách hàng'
-      default: return t || '-'
-    }
-  }
 
   const getStatusColor = (active: number) => {
     return active === 1
@@ -195,16 +199,8 @@ const PromotionHeaderManagement: React.FC = () => {
   })
 
   const [lineEditOpen, setLineEditOpen] = useState(false)
-  const [lineEditing, setLineEditing] = useState<any | null>(null)
+  const [lineEditing] = useState<any | null>(null)
   const [lineDetails, setLineDetails] = useState<any[]>([])
-  const openLineEditor = async (line: any) => {
-    setLineEditing(line)
-    try {
-      const ds = await PromotionServiceApi.getDetailsAll(line.id)
-      setLineDetails(Array.isArray(ds) ? ds : [])
-    } catch { setLineDetails([]) }
-    setLineEditOpen(true)
-  }
 
   const handlePromotionNameClick = (header: any) => {
     navigate(`/admin/promotion/${header.id}`)
@@ -479,8 +475,15 @@ const PromotionHeaderManagement: React.FC = () => {
                 required
                 min={getTodayString()}
                 value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                onChange={(e) => {
+                  const newStartDate = e.target.value
+                  setFormData({ ...formData, start_date: newStartDate })
+                  // Kiểm tra validation khi cả 2 ngày đã được chọn
+                  if (newStartDate && formData.end_date) {
+                    validateDates(newStartDate, formData.end_date)
+                  }
+                }}
+                className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${dateError ? 'border-red-500' : ''}`}
               />
             </div>
 
@@ -493,9 +496,19 @@ const PromotionHeaderManagement: React.FC = () => {
                 required
                 min={formData.start_date || getTodayString()}
                 value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                onChange={(e) => {
+                  const newEndDate = e.target.value
+                  setFormData({ ...formData, end_date: newEndDate })
+                  // Kiểm tra validation khi cả 2 ngày đã được chọn
+                  if (formData.start_date && newEndDate) {
+                    validateDates(formData.start_date, newEndDate)
+                  }
+                }}
+                className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${dateError ? 'border-red-500' : ''}`}
               />
+              {dateError && (
+                <p className="mt-1 text-sm text-red-600">{dateError}</p>
+              )}
             </div>
           </div>
 
@@ -530,7 +543,12 @@ const PromotionHeaderManagement: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={!!dateError}
+              className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                dateError
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
             >
               Thêm mới
             </button>
@@ -688,6 +706,34 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
   const [saving, setSaving] = useState(false)
   const [hdr, setHdr] = useState<any>({ id: header.id, name: header.name, startDate: header.start_date, endDate: header.end_date, active: header.active === 1 })
   const [lines, setLines] = useState<any[]>([])
+  const [headerDateError, setHeaderDateError] = useState('')
+  const [lineDateErrors, setLineDateErrors] = useState<Record<number, string>>({})
+
+  const validateHeaderDates = (startDate: string, endDate: string) => {
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      if (end <= start) {
+        setHeaderDateError('Ngày kết thúc phải sau ngày bắt đầu')
+        return false
+      }
+    }
+    setHeaderDateError('')
+    return true
+  }
+
+  const validateLineDates = (lineIndex: number, startDate: string, endDate: string) => {
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      if (end <= start) {
+        setLineDateErrors(prev => ({ ...prev, [lineIndex]: 'Ngày kết thúc phải sau ngày bắt đầu' }))
+        return false
+      }
+    }
+    setLineDateErrors(prev => ({ ...prev, [lineIndex]: '' }))
+    return true
+  }
 
   React.useEffect(() => {
     let cancelled = false
@@ -709,7 +755,16 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
   const saveAll = async () => {
     setSaving(true)
     try {
-      await PromotionMutations.updateHeader(hdr.id, { name: hdr.name, startDate: hdr.startDate, endDate: hdr.endDate, active: !!hdr.active })
+      // Update header basic info (name, dates)
+      await PromotionMutations.updateHeader(hdr.id, { name: hdr.name, startDate: hdr.startDate, endDate: hdr.endDate })
+
+      // Handle activation/deactivation separately using the correct API
+      if (hdr.active) {
+        await PromotionServiceApi.activateHeader(hdr.id)
+      } else {
+        await PromotionServiceApi.deactivateHeader(hdr.id)
+      }
+
       // Upsert lines
       for (const ln of lines) {
         if (ln.id && ln.id !== 0) {
@@ -733,8 +788,8 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
             <h3 className="text-lg font-bold text-gray-900">Sửa khuyến mãi</h3>
             <p className="text-xs text-gray-600 mt-0.5">Cập nhật thông tin chương trình khuyến mãi</p>
           </div>
-          <button 
-            onClick={() => onClose(false)} 
+          <button
+            onClick={() => onClose(false)}
             className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1.5 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -763,30 +818,47 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Tên chương trình</label>
-                    <input 
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+                    <input
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                       placeholder="Nhập tên chương trình"
-                      value={hdr.name} 
-                      onChange={e=>setHdr({...hdr, name:e.target.value})} 
+                      value={hdr.name}
+                      onChange={e=>setHdr({...hdr, name:e.target.value})}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Ngày bắt đầu</label>
-                    <input 
-                      type="date" 
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
-                      value={hdr.startDate || ''} 
-                      onChange={e=>setHdr({...hdr, startDate:e.target.value})} 
+                    <input
+                      type="date"
+                      className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${headerDateError ? 'border-red-500' : ''}`}
+                      value={hdr.startDate || ''}
+                      onChange={e => {
+                        const newStartDate = e.target.value
+                        setHdr({...hdr, startDate: newStartDate})
+                        // Kiểm tra validation khi cả 2 ngày đã được chọn
+                        if (newStartDate && hdr.endDate) {
+                          validateHeaderDates(newStartDate, hdr.endDate)
+                        }
+                      }}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Ngày kết thúc</label>
                     <input
-                      type="date" 
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
-                      value={hdr.endDate || ''} 
-                      onChange={e=>setHdr({...hdr, endDate:e.target.value})} 
+                      type="date"
+                      className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${headerDateError ? 'border-red-500' : ''}`}
+                      value={hdr.endDate || ''}
+                      onChange={e => {
+                        const newEndDate = e.target.value
+                        setHdr({...hdr, endDate: newEndDate})
+                        // Kiểm tra validation khi cả 2 ngày đã được chọn
+                        if (hdr.startDate && newEndDate) {
+                          validateHeaderDates(hdr.startDate, newEndDate)
+                        }
+                      }}
                     />
+                    {headerDateError && (
+                      <p className="mt-1 text-sm text-red-600">{headerDateError}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -801,8 +873,8 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
                     <h4 className="text-base font-semibold text-gray-900">Dòng khuyến mãi</h4>
                     <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">{lines.length}</span>
                   </div>
-                  <button 
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm" 
+                  <button
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
                     onClick={addLine}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -825,9 +897,9 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-3">
                           <div className="md:col-span-2">
                             <label className="block text-xs font-medium text-gray-600 mb-1.5">Loại khuyến mãi</label>
-                            <select 
-                              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors" 
-                              value={ln.type || 'DISCOUNT_PERCENT'} 
+                            <select
+                              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors"
+                              value={ln.type || 'DISCOUNT_PERCENT'}
                               onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, type:e.target.value}:l))}
                             >
                               <option value="DISCOUNT_PERCENT">📊 Giảm theo %</option>
@@ -838,20 +910,37 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
                           <div className="md:col-span-3">
                             <label className="block text-xs font-medium text-gray-600 mb-1.5">Thời gian áp dụng</label>
                             <div className="flex items-center gap-2">
-                              <input 
-                                type="date" 
-                                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors" 
-                                value={ln.startDate || ''} 
-                                onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, startDate:e.target.value}:l))} 
+                              <input
+                                type="date"
+                                className={`flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors ${lineDateErrors[idx] ? 'border-red-500' : ''}`}
+                                value={ln.startDate || ''}
+                                onChange={(e) => {
+                                  const newStartDate = e.target.value
+                                  setLines(prev => prev.map((l, i) => i === idx ? { ...l, startDate: newStartDate } : l))
+                                  // Kiểm tra validation khi cả 2 ngày đã được chọn
+                                  if (newStartDate && ln.endDate) {
+                                    validateLineDates(idx, newStartDate, ln.endDate)
+                                  }
+                                }}
                               />
                               <span className="text-gray-400">→</span>
-                              <input 
-                                type="date" 
-                                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors" 
-                                value={ln.endDate || ''} 
-                                onChange={(e)=>setLines(prev=>prev.map((l,i)=> i===idx?{...l, endDate:e.target.value}:l))} 
+                              <input
+                                type="date"
+                                className={`flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors ${lineDateErrors[idx] ? 'border-red-500' : ''}`}
+                                value={ln.endDate || ''}
+                                onChange={(e) => {
+                                  const newEndDate = e.target.value
+                                  setLines(prev => prev.map((l, i) => i === idx ? { ...l, endDate: newEndDate } : l))
+                                  // Kiểm tra validation khi cả 2 ngày đã được chọn
+                                  if (ln.startDate && newEndDate) {
+                                    validateLineDates(idx, ln.startDate, newEndDate)
+                                  }
+                                }}
                               />
                             </div>
+                            {lineDateErrors[idx] && (
+                              <p className="mt-1 text-sm text-red-600">{lineDateErrors[idx]}</p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center justify-between pt-3 border-t border-gray-200">
@@ -860,8 +949,8 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
                             <button
                               type="button"
                               className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                                ln.active 
-                                  ? 'bg-green-100 text-green-700 ring-2 ring-green-200' 
+                                ln.active
+                                  ? 'bg-green-100 text-green-700 ring-2 ring-green-200'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                               onClick={async () => {
@@ -876,8 +965,8 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
                             <button
                               type="button"
                               className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                                !ln.active 
-                                  ? 'bg-red-100 text-red-700 ring-2 ring-red-200' 
+                                !ln.active
+                                  ? 'bg-red-100 text-red-700 ring-2 ring-red-200'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                               onClick={async () => {
@@ -890,13 +979,16 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
                               ✕ Tạm ngưng
                             </button>
                           </div>
-                          <button
-                            type="button"
-                            className="text-red-600 hover:text-red-800 text-xs font-medium"
-                            onClick={() => setLines(prev => prev.filter((_, i) => i !== idx))}
-                          >
-                            🗑️ Xóa dòng
-                          </button>
+                          {/* Chỉ hiển thị nút xóa cho dòng mới (chưa có ID từ DB) */}
+                          {!ln.id && (
+                            <button
+                              type="button"
+                              className="text-red-600 hover:text-red-800 text-xs font-medium"
+                              onClick={() => setLines(prev => prev.filter((_, i) => i !== idx))}
+                            >
+                              🗑️ Xóa dòng
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))
@@ -909,15 +1001,19 @@ const InlinePromotionEditor: React.FC<{ header: any; onClose: (changed: boolean)
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <button 
-            className="px-5 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors" 
+          <button
+            className="px-5 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
             onClick={()=>onClose(false)}
           >
             Hủy
           </button>
-          <button 
-            disabled={saving} 
-            className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm" 
+          <button
+            disabled={saving || !!headerDateError || Object.values(lineDateErrors).some(error => error)}
+            className={`px-6 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm ${
+              saving || !!headerDateError || Object.values(lineDateErrors).some(error => error)
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
             onClick={saveAll}
           >
             {saving ? 'Đang lưu...' : '💾 Lưu thay đổi'}
@@ -939,6 +1035,11 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
   const [giftUnitOptions, setGiftUnitOptions] = useState<Array<{ id: number; label: string }>>([])
   const [conditionUnitOptions, setConditionUnitOptions] = useState<Array<{ id: number; label: string }>>([])
 
+  // New states for product and unit selection
+  const [products, setProducts] = useState<Array<{ id: number; name: string; productUnits: Array<{ id: number; unitName: string; unitId: number }> }>>([])
+  const [selectedUnitForCondition, setSelectedUnitForCondition] = useState<Record<number, number>>({})
+  const [selectedUnitForGift, setSelectedUnitForGift] = useState<Record<number, number>>({})
+
   const viType = (t?: string) => {
     switch (String(t || '').toUpperCase()) {
       case 'DISCOUNT_PERCENT': return 'Giảm theo %'
@@ -947,38 +1048,51 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
       default: return t || '-'
     }
   }
-  const viTarget = (t?: string) => {
-    switch (String(t || '').toUpperCase()) {
-      case 'PRODUCT': return 'Sản phẩm'
-      case 'CATEGORY': return 'Danh mục'
-      case 'CUSTOMER': return 'Khách hàng'
-      default: return t || '-'
-    }
+
+  const addDetail = () => {
+    const newDetail = { id: 0, promotionLineId: line.id, discountPercent: '', discountAmount: '', minAmount: '', maxDiscount: '', conditionQuantity: '', freeQuantity: '', giftProductUnitId: '', conditionProductUnitId: '', active: true }
+    onChange([...(details || []), newDetail])
+
+    // Reset selections for new detail
+    const newIdx = (details || []).length
+    setSelectedUnitForCondition(prev => ({ ...prev, [newIdx]: 0 }))
+    setSelectedUnitForGift(prev => ({ ...prev, [newIdx]: 0 }))
   }
 
-  const addDetail = () => onChange([...(details || []), { 
-    id: 0, 
-    promotionLineId: line.id, 
-    discountPercent: '', 
-    discountAmount: '', 
-    minAmount: '', 
-    maxDiscount: '', 
-    conditionQuantity: '', 
-    freeQuantity: '', 
-    giftProductUnitId: '', 
-    conditionProductUnitId: '', 
-    // New fields for separated product and unit selection
-    conditionProductQuery: '',
-    conditionUnitQuery: '',
-    giftProductQuery: '',
-    giftUnitQuery: '',
-    showSuggestConditionProduct: false,
-    showSuggestConditionUnit: false,
-    showSuggestGiftProduct: false,
-    showSuggestGiftUnit: false,
-    active: true 
-  }])
-  const removeDetail = (idx: number) => onChange(details.filter((_, i) => i !== idx))
+  const removeDetail = (idx: number) => {
+    onChange(details.filter((_, i) => i !== idx))
+
+    // Clean up selections for removed detail
+    setSelectedUnitForCondition(prev => {
+      const newState = { ...prev }
+      delete newState[idx]
+      const shifted: Record<number, number> = {}
+      Object.keys(newState).forEach(key => {
+        const numKey = Number(key)
+        if (numKey > idx) {
+          shifted[numKey - 1] = newState[numKey]
+        } else {
+          shifted[numKey] = newState[numKey]
+        }
+      })
+      return shifted
+    })
+
+    setSelectedUnitForGift(prev => {
+      const newState = { ...prev }
+      delete newState[idx]
+      const shifted: Record<number, number> = {}
+      Object.keys(newState).forEach(key => {
+        const numKey = Number(key)
+        if (numKey > idx) {
+          shifted[numKey - 1] = newState[numKey]
+        } else {
+          shifted[numKey] = newState[numKey]
+        }
+      })
+      return shifted
+    })
+  }
 
   const save = async () => {
     setSaving(true)
@@ -1023,27 +1137,41 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
     } catch {}
   }
 
-  // Load products for search
+  // Load products and their units
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
         const list = await ProductService.getProducts(1, 1000)
         if (cancelled) return
-        
-        // Tạo danh sách sản phẩm riêng biệt
-        const productOptions: Array<{ id: number; name: string }> = []
-        
-        ;(list?.products || []).forEach((p: any) => {
-          if (p.id && p.name) {
-            productOptions.push({ id: Number(p.id), name: p.name })
-          }
+
+        // Set products with their units
+        const productsWithUnits = (list?.products || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          productUnits: (p.productUnits || []).map((u: any) => ({
+            id: u.id,
+            unitName: u.unitName || u.name,
+            unitId: u.unitId || u.id
+          }))
+        }))
+        setProducts(productsWithUnits)
+
+        // Keep old logic for backward compatibility
+        const opts: Array<{ id: number; label: string }> = []
+        productsWithUnits.forEach((p: any) => {
+          p.productUnits.forEach((u: any) => {
+            const label = `${p.name}${u.unitName ? ' • ' + u.unitName : ''}`
+            if (u.id) opts.push({ id: Number(u.id), label })
+          })
         })
         
         setProductOptions(productOptions)
         console.log('Loaded products:', productOptions.length, 'products')
       } catch {
-        setProductOptions([])
+        setProducts([])
+        setGiftUnitOptions([])
+        setConditionUnitOptions([])
       }
     })()
     return () => { cancelled = true }
@@ -1097,114 +1225,84 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
     })()
   }, [details])
 
-  const resolveConditionName = async (unitId?: number | string) => {
-    const idNum = Number(unitId)
-    if (!idNum || isNaN(idNum)) return
-    if (conditionNameByUnitId[idNum]) return
-    try {
-      const info = await ProductService.getProductUnitById(idNum)
-      const name = info?.productName || ''
-      const productId = info?.productId || 0
-      setConditionNameByUnitId(prev => ({ ...prev, [idNum]: name }))
-      if (productId) {
-        setConditionProductIdByUnitId(prev => ({ ...prev, [idNum]: productId }))
-        console.log('Resolved condition product:', { unitId: idNum, productId, name })
-      }
-    } catch {}
-  }
+  // Initialize query fields from existing data
+  useEffect(() => {
+    if (products.length === 0) return
 
-  const getUnitNameFromId = (unitId?: number | string) => {
-    const idNum = Number(unitId)
-    if (!idNum || isNaN(idNum)) return ''
-    const option = conditionUnitOptions.find(o => o.id === idNum)
-    return option ? option.label.split(' • ')[1] || '' : ''
-  }
+    const updatedDetails = details.map((d, idx) => {
+      let updatedDetail = { ...d }
 
-  const getGiftUnitNameFromId = (unitId?: number | string) => {
-    const idNum = Number(unitId)
-    if (!idNum || isNaN(idNum)) return ''
-    const option = giftUnitOptions.find(o => o.id === idNum)
-    return option ? option.label.split(' • ')[1] || '' : ''
-  }
+      // Set conditionQuery if not already set
+      if (d.conditionProductUnitId && !d.conditionQuery) {
+        for (const product of products) {
+          const unit = product.productUnits.find(u => u.id === Number(d.conditionProductUnitId))
+          if (unit) {
+            updatedDetail.conditionQuery = product.name
+            console.log('Setting conditionQuery:', product.name, 'for detail', idx)
+            break
+          }
+        }
+      }
 
-  // Load units for a specific product
-  const loadUnitsForProduct = async (productId: number, isGift: boolean = false) => {
-    try {
-      // First try to get product details to get its units
-      const product = await ProductService.getProductById(productId)
-      if (product && product.productUnits && product.productUnits.length > 0) {
-        const units = product.productUnits
-        
-        console.log('Loaded units for product', productId, ':', units)
-        
-        const unitOptions = units.map((unit: any) => ({
-          id: unit.id,
-          label: unit.unitName || unit.unit_name || ''
-        }))
-        
-        if (isGift) {
-          setGiftUnitOptions(unitOptions)
-          console.log('Set gift unit options:', unitOptions)
-        } else {
-          setConditionUnitOptions(unitOptions)
-          console.log('Set condition unit options:', unitOptions)
+      // Set giftQuery if not already set
+      if (d.giftProductUnitId && !d.giftQuery) {
+        for (const product of products) {
+          const unit = product.productUnits.find(u => u.id === Number(d.giftProductUnitId))
+          if (unit) {
+            updatedDetail.giftQuery = product.name
+            console.log('Setting giftQuery:', product.name, 'for detail', idx)
+            break
+          }
         }
-        return
       }
-      
-      // Fallback: try direct API call if ProductService doesn't have units
-      console.log('ProductService did not return units, trying direct API call...')
-      const response = await fetch(`${window.location.origin.replace('3000', '8080')}/api/products/${productId}/units`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('user_access_token') || localStorage.getItem('admin_access_token')}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      if (!response.ok) {
-        console.error('Failed to load units:', response.status, response.statusText)
-        return
-      }
-      
-      const data = await response.json()
-      const units = data.data || data || []
-      
-      console.log('Loaded units for product', productId, ':', units)
-      
-      const unitOptions = units.map((unit: any) => ({
-        id: unit.id,
-        label: unit.unitName || unit.unit_name || ''
-      }))
-      
-      if (isGift) {
-        setGiftUnitOptions(unitOptions)
-        console.log('Set gift unit options:', unitOptions)
-      } else {
-        setConditionUnitOptions(unitOptions)
-        console.log('Set condition unit options:', unitOptions)
-      }
-    } catch (error) {
-      console.error('Error loading units:', error)
-      // If all fails, try to load all units as fallback
-      try {
-        const allUnits = await ProductService.getUnits()
-        const unitOptions = allUnits.map((unit: any) => ({
-          id: unit.id,
-          label: unit.name || ''
-        }))
-        
-        if (isGift) {
-          setGiftUnitOptions(unitOptions)
-          console.log('Set fallback gift unit options:', unitOptions)
-        } else {
-          setConditionUnitOptions(unitOptions)
-          console.log('Set fallback condition unit options:', unitOptions)
-        }
-      } catch (fallbackError) {
-        console.error('Fallback unit loading also failed:', fallbackError)
-      }
+
+      return updatedDetail
+    })
+
+    // Only update if there are changes
+    const hasChanges = updatedDetails.some((d, idx) =>
+      d.conditionQuery !== details[idx]?.conditionQuery ||
+      d.giftQuery !== details[idx]?.giftQuery
+    )
+
+    if (hasChanges) {
+      console.log('Updating details with changes:', updatedDetails)
+      onChange(updatedDetails)
     }
-  }
+  }, [products, details])
+
+  // Initialize selected units from existing details
+  useEffect(() => {
+    if (products.length === 0) return
+
+    const newSelectedUnitForCondition: Record<number, number> = {}
+    const newSelectedUnitForGift: Record<number, number> = {}
+
+    console.log('HeaderManagement - Initializing from details:', details)
+    console.log('HeaderManagement - Available products:', products)
+
+    details.forEach((d, idx) => {
+      console.log(`HeaderManagement - Processing detail ${idx}:`, d)
+
+      if (d.conditionProductUnitId) {
+        newSelectedUnitForCondition[idx] = Number(d.conditionProductUnitId)
+        console.log(`HeaderManagement - Set condition unit: ${d.conditionProductUnitId}`)
+      }
+
+      if (d.giftProductUnitId) {
+        newSelectedUnitForGift[idx] = Number(d.giftProductUnitId)
+        console.log(`HeaderManagement - Set gift unit: ${d.giftProductUnitId}`)
+      }
+    })
+
+    console.log('HeaderManagement - Setting selected units:', {
+      newSelectedUnitForCondition,
+      newSelectedUnitForGift
+    })
+
+    setSelectedUnitForCondition(newSelectedUnitForCondition)
+    setSelectedUnitForGift(newSelectedUnitForGift)
+  }, [products, details])
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 style: !mt-0">
@@ -1248,9 +1346,8 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                 )}
                 {t === 'BUY_X_GET_Y' && (
                   <>
-                    {/* Sản phẩm mua */}
-                    <div className="col-span-3 relative">
-                      <div className="text-xs text-gray-700 mb-1">Sản phẩm mua</div>
+                    <div className="col-span-12 md:col-span-2 relative">
+                      <div className="text-sm text-gray-700 mb-1">Sản phẩm điều kiện</div>
                       <input
                         placeholder="Nhập tên sản phẩm mua..."
                         className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1286,47 +1383,40 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                         </div>
                       )}
                     </div>
-                    
-                    {/* Đơn vị sản phẩm mua */}
-                    <div className="col-span-2 relative">
-                      <div className="text-xs text-gray-700 mb-1">Đơn vị</div>
-                      <input
-                        placeholder={d.conditionProductId ? "Nhập đơn vị..." : "Chọn sản phẩm trước"}
-                        className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={(d.conditionUnitQuery ?? getUnitNameFromId(d.conditionProductUnitId))}
-                        onChange={(e)=>{
-                          const q = e.target.value
-                          onChange(details.map((x,i)=> i===idx?{...x, conditionUnitQuery:q, showSuggestConditionUnit:true}:x))
+                    <div className="col-span-12 md:col-span-2">
+                      <div className="text-sm text-gray-700 mb-1">Đơn vị</div>
+                      <select
+                        className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={selectedUnitForCondition[idx] || ''}
+                        onChange={(e) => {
+                          const unitId = Number(e.target.value)
+                          setSelectedUnitForCondition(prev => ({ ...prev, [idx]: unitId }))
+                          // Find the product unit from the selected conditionProductUnitId
+                          const selectedUnit = products.flatMap(p => p.productUnits).find(u => u.id === unitId)
+                          if (selectedUnit) {
+                            onChange(details.map((x,i)=> i===idx?{...x, conditionProductUnitId: unitId}:x))
+                          }
                         }}
-                        disabled={!d.conditionProductId}
-                      />
-                      {((d.conditionUnitQuery || '').trim().length > 0) && d.showSuggestConditionUnit && d.conditionProductId && conditionUnitOptions.length > 0 && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
-                          {(() => {
-                            const filtered = conditionUnitOptions.filter(o => o.label.toLowerCase().includes(String(d.conditionUnitQuery).toLowerCase()))
-                            console.log('Condition unit query:', d.conditionUnitQuery)
-                            console.log('Condition product ID:', d.conditionProductId)
-                            console.log('Condition unit options:', conditionUnitOptions)
-                            console.log('Filtered units:', filtered)
-                            return filtered.slice(0,8).map(opt => (
-                              <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={()=>{
-                                onChange(details.map((x,i)=> i===idx?{...x, conditionProductUnitId: opt.id, conditionUnitQuery: opt.label, showSuggestConditionUnit:false}:x))
-                              }}>{opt.label}</div>
-                            ))
-                          })()}
-                        </div>
-                      )}
+                        disabled={!d.conditionProductUnitId}
+                      >
+                        <option value="">-- Chọn đơn vị --</option>
+                        {d.conditionProductUnitId && (() => {
+                          // Find the product that contains the selected unit
+                          const selectedProduct = products.find(p =>
+                            p.productUnits.some(u => u.id === Number(d.conditionProductUnitId))
+                          )
+                          return selectedProduct?.productUnits.map(unit => (
+                            <option key={unit.id} value={unit.id}>{unit.unitName}</option>
+                          ))
+                        })()}
+                      </select>
                     </div>
-                    
-                      {/* Số lượng mua (X) */}
-                      <div className="col-span-1">
-                        <div className="text-xs text-gray-700 mb-1">SL mua</div>
-                      <input placeholder="SL X" className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.conditionQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, conditionQuantity:e.target.value}:x))} />
+                    <div className="col-span-12 md:col-span-1">
+                      <div className="text-sm text-gray-700 mb-1">SL mua</div>
+                      <input placeholder="SL X" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.conditionQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, conditionQuantity:e.target.value}:x))} />
                     </div>
-                    
-                    {/* Sản phẩm tặng */}
-                    <div className="col-span-3 relative">
-                      <div className="text-xs text-gray-700 mb-1">Sản phẩm tặng</div>
+                    <div className="col-span-12 md:col-span-2 relative">
+                      <div className="text-sm text-gray-700 mb-1">Sản phẩm quà tặng</div>
                       <input
                         placeholder="Nhập tên sản phẩm tặng..."
                         className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1362,36 +1452,41 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                         </div>
                       )}
                     </div>
-                    
-                    {/* Đơn vị sản phẩm tặng */}
-                    <div className="col-span-2 relative">
-                      <div className="text-xs text-gray-700 mb-1">Đơn vị</div>
-                      <input
-                        placeholder={d.giftProductId ? "Nhập đơn vị..." : "Chọn sản phẩm trước"}
-                        className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={(d.giftUnitQuery ?? getGiftUnitNameFromId(d.giftProductUnitId))}
-                        onChange={(e)=>{
-                          const q = e.target.value
-                          onChange(details.map((x,i)=> i===idx?{...x, giftUnitQuery:q, showSuggestGiftUnit:true}:x))
+                    <div className="col-span-12 md:col-span-2">
+                      <div className="text-sm text-gray-700 mb-1">Đơn vị</div>
+                      <select
+                        className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={selectedUnitForGift[idx] || ''}
+                        onChange={(e) => {
+                          const unitId = Number(e.target.value)
+                          setSelectedUnitForGift(prev => ({ ...prev, [idx]: unitId }))
+                          // Find the product unit from the selected giftProductUnitId
+                          const selectedUnit = products.flatMap(p => p.productUnits).find(u => u.id === unitId)
+                          if (selectedUnit) {
+                            onChange(details.map((x,i)=> i===idx?{...x, giftProductUnitId: unitId}:x))
+                          }
                         }}
-                        disabled={!d.giftProductId}
-                      />
-                      {((d.giftUnitQuery || '').trim().length > 0) && d.showSuggestGiftUnit && d.giftProductId && giftUnitOptions.length > 0 && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-48 overflow-auto">
-                          {(() => {
-                            const filtered = giftUnitOptions.filter(o => o.label.toLowerCase().includes(String(d.giftUnitQuery).toLowerCase()))
-                            console.log('Gift unit query:', d.giftUnitQuery)
-                            console.log('Gift product ID:', d.giftProductId)
-                            console.log('Gift unit options:', giftUnitOptions)
-                            console.log('Filtered gift units:', filtered)
-                            return filtered.slice(0,8).map(opt => (
-                              <div key={opt.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={async ()=>{
-                                onChange(details.map((x,i)=> i===idx?{...x, giftProductUnitId: opt.id, giftUnitQuery: opt.label, showSuggestGiftUnit:false}:x))
-                                await resolveGiftName(opt.id)
-                              }}>{opt.label}</div>
-                            ))
-                          })()}
-                        </div>
+                        disabled={!d.giftProductUnitId}
+                      >
+                        <option value="">-- Chọn đơn vị --</option>
+                        {d.giftProductUnitId && (() => {
+                          // Find the product that contains the selected unit
+                          const selectedProduct = products.find(p =>
+                            p.productUnits.some(u => u.id === Number(d.giftProductUnitId))
+                          )
+                          return selectedProduct?.productUnits.map(unit => (
+                            <option key={unit.id} value={unit.id}>{unit.unitName}</option>
+                          ))
+                        })()}
+                      </select>
+                    </div>
+                    <div className="col-span-12 md:col-span-1">
+                      <div className="text-sm text-gray-700 mb-1">SL tặng</div>
+                      <input placeholder="SL Y" className="w-full px-3 py-2.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={d.freeQuantity || ''} onChange={(e)=>onChange(details.map((x,i)=> i===idx?{...x, freeQuantity:e.target.value}:x))} />
+                    </div>
+                    <div className="col-span-12 md:col-span-1 flex items-end justify-end">
+                      {!d.id && (
+                        <button className="px-3 py-2 text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
                       )}
                     </div>
                     
@@ -1412,7 +1507,9 @@ const LineDetailEditor: React.FC<{ line: any; details: any[]; onChange: (arr: an
                 )}
                 {t !== 'BUY_X_GET_Y' && (
                   <div className="col-span-12 md:col-span-1">
-                    <button className="text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
+                    {!d.id && (
+                      <button className="text-xs text-red-600 hover:text-red-700" onClick={()=>removeDetail(idx)}>Xóa</button>
+                    )}
                   </div>
                 )}
               </div>
