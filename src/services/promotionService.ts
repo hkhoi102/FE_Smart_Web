@@ -149,6 +149,16 @@ export const PromotionServiceApi = {
   async deactivateDetail(id: number): Promise<void> {
     const res = await fetch(`${BASE}/details/${id}/deactivate`, { method: 'PUT', headers: authHeaders() })
     if (!res.ok) throw new Error('Failed to deactivate detail')
+  },
+
+  async activateHeader(id: number): Promise<void> {
+    const res = await fetch(`${BASE}/headers/${id}/activate`, { method: 'PUT', headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to activate header')
+  },
+
+  async deactivateHeader(id: number): Promise<void> {
+    const res = await fetch(`${BASE}/headers/${id}/deactivate`, { method: 'PUT', headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to deactivate header')
   }
 }
 
